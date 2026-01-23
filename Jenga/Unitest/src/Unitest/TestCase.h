@@ -16,10 +16,7 @@ namespace nkentseu {
 
             class TestCaseAutoRegistrar {
                 public:
-                    static TestCaseAutoRegistrar& GetInstance() {
-                        static TestCaseAutoRegistrar sInstance;
-                        return sInstance;
-                    }
+                    static TestCaseAutoRegistrar& GetInstance();
                     
                     void AddRegistrar(ITestCaseRegistrar* registrar) {
                         mRegistrars.push_back(registrar);

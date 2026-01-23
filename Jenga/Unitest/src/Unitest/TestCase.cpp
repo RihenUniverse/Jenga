@@ -10,6 +10,11 @@ namespace nkentseu {
                     registrar->RegisterTestCase();
                 }
             }
+            
+            TestCaseAutoRegistrar& TestCaseAutoRegistrar::GetInstance() {
+                static TestCaseAutoRegistrar sInstance;
+                return sInstance;
+            }
         }
         
         TestCase::TestCase(const std::string& testName)

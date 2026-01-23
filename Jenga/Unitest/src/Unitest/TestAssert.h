@@ -833,10 +833,6 @@ namespace nkentseu {
                     return "";
                 }
         };
-        
-        // Définition des variables statiques
-        inline TestCase* TestAssert::sCurrentTest = nullptr;
-        inline bool TestAssert::sStopOnFailure = false;
 
     } // namespace test
 } // namespace nkentseu

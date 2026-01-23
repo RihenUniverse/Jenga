@@ -111,7 +111,8 @@ class Project:
     
     # Toolchain
     toolchain: Optional[str] = None  # Specific toolchain for this project
-    
+    _explicit_toolchain = False  # Track si le toolchain est explicitement défini
+        
     # Build hooks
     prebuildcommands: List[str] = field(default_factory=list)
     postbuildcommands: List[str] = field(default_factory=list)
@@ -158,6 +159,8 @@ class Workspace:
     startproject: str = ""
     projects: Dict[str, Project] = field(default_factory=dict)
     toolchains: Dict[str, Toolchain] = field(default_factory=dict)
+        
+    toolchain = None  # Toolchain par défaut pour tous les projets
     
     # Android SDK/NDK paths
     androidsdkpath: str = ""
@@ -762,10 +765,37 @@ def postlink(commands: List[str]):
 
 
 # Project toolchain selection
-def usetoolchain(toolchain_name: str):
-    """Select toolchain for current project"""
-    if _current_project:
-        _current_project.toolchain = toolchain_name
+def usetoolchain(name: str):
+    """
+    Use a specific toolchain
+    
+    When called in workspace: sets default for all projects
+    When called in project: overrides workspace default
+    """
+    global _current_project, _current_workspace
+    
+    # Si on est dans un projet
+    if _current_project is not None:
+        if name not in _current_workspace.toolchains:
+            raise ValueError(f"Toolchain '{name}' not defined")
+        
+        _current_project.toolchain = name
+        _current_project._explicit_toolchain = True  # Marquer comme explicite
+    
+    # Si on est dans un workspace (mais pas dans un projet)
+    elif _current_workspace is not None:
+        if name not in _current_workspace.toolchains:
+            raise ValueError(f"Toolchain '{name}' not defined. Define it first.")
+        
+        _current_workspace.toolchain = name
+        
+        # Appliquer à tous les projets existants sans toolchain explicite
+        for project in _current_workspace.projects.values():
+            if not hasattr(project, '_explicit_toolchain') or not project._explicit_toolchain:
+                project.toolchain = name
+    
+    else:
+        raise RuntimeError("usetoolchain() must be called within a workspace or project")
 
 
 # File dependencies
