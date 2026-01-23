@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jenga-build-system"
+version = "1.0.2"
+description = "Modern multi-platform C/C++ build system with unified Python DSL"
+readme = "README.md"
+authors = [
+    {name = "Rihen", email = "rihen.universe@gmail.com"}
+]
+license = {text = "MIT"}
+keywords = ["build-system", "c++", "cross-platform", "android", "ios"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.7"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/RihenUniverse/Jenga"
+Documentation = "https://github.com/RihenUniverse/Jenga/tree/main/Docs"
+Repository = "https://github.com/RihenUniverse/Jenga"
+Changelog = "https://github.com/RihenUniverse/Jenga/blob/main/Docs/CHANGELOG_v1.0.2.md"
+
+[project.scripts]
+jenga = "Jenga.jenga:main"

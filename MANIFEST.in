@@ -1,0 +1,8 @@
+include *.md
+include *.txt
+include *.bat
+include *.sh
+include LICENSE
+include jenga.*
+recursive-include Jenga/Unitest *.cpp *.h *.txt *.md
+recursive-include Docs *.md
