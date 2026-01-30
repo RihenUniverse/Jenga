@@ -6,9 +6,10 @@ Provides the DSL for configuring workspaces and projects
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 from pathlib import Path
 from enum import Enum
+import os
 
 
 class ProjectKind(Enum):
@@ -18,6 +19,8 @@ class ProjectKind(Enum):
     STATIC_LIB = "StaticLib"
     SHARED_LIB = "SharedLib"
     TEST_SUITE = "TestSuite"
+    # ANDROID_APP = "AndroidApp"
+    # IOS_APP = "iOSApp"
 
 
 class Language(Enum):
@@ -134,6 +137,11 @@ class Project:
     androidkeystorepass: str = ""  # Keystore password
     androidkeyalias: str = ""  # Key alias
     
+    # iOS specific
+    iosbundleid: str = ""
+    iosversion: str = "1.0"
+    iosminsdk: str = "11.0"
+    
     # Test settings
     is_test: bool = False
     parent_project: Optional[str] = None
@@ -233,7 +241,6 @@ class workspace:
     def __exit__(self, exc_type, exc_val, exc_tb):
         global _current_workspace
         # DON'T clear workspace - keep it available for commands
-        # _current_workspace = None  # REMOVED
         return False
 
 
@@ -434,14 +441,6 @@ def startproject(name: str):
         _current_workspace.startproject = name
 
 
-def location(loc: str):
-    """Set location"""
-    if _current_project:
-        _current_project.location = loc
-    elif _current_workspace:
-        _current_workspace.location = loc
-
-
 # Project kind functions
 def consoleapp():
     """Set project as console application"""
@@ -465,6 +464,18 @@ def sharedlib():
     """Set project as shared library"""
     if _current_project:
         _current_project.kind = ProjectKind.SHARED_LIB
+
+
+def androidapp():
+    """Set project as Android application"""
+    if _current_project:
+        _current_project.kind = ProjectKind.WINDOWED_APP
+
+
+def iosapp():
+    """Set project as iOS application"""
+    if _current_project:
+        _current_project.kind = ProjectKind.WINDOWED_APP
 
 
 def testsuite():
@@ -529,10 +540,18 @@ def excludefiles(file_list: List[str]):
         _current_project.excludefiles.extend(file_list)
 
 
+def removefiles(file_list: List[str]):
+    excludefiles(file_list)
+
+
 def excludemainfiles(file_list: List[str]):
     """Exclude main files (for tests)"""
     if _current_project:
         _current_project.excludemainfiles.extend(file_list)
+
+
+def removemainfiles(file_list: List[str]):
+    excludemainfiles(file_list)
 
 
 # Directory functions
@@ -672,6 +691,25 @@ def androidtargetsdk(sdk: int):
     """Set Android target SDK"""
     if _current_project:
         _current_project.androidtargetsdk = sdk
+
+
+# iOS settings
+def iosbundleid(bundle_id: str):
+    """Set iOS bundle ID"""
+    if _current_project:
+        _current_project.iosbundleid = bundle_id
+
+
+def iosversion(version: str):
+    """Set iOS version"""
+    if _current_project:
+        _current_project.iosversion = version
+
+
+def iosminsdk(min_sdk: str):
+    """Set iOS minimum SDK"""
+    if _current_project:
+        _current_project.iosminsdk = min_sdk
 
 
 # Test settings
@@ -876,6 +914,7 @@ def reset_state():
     _current_toolchain = None
     _current_filter = None
 
+
 # ============================================================================
 # ADVANCED TOOLCHAIN FUNCTIONS
 # ============================================================================
@@ -896,25 +935,30 @@ def addflag(flag: str):
             else:
                 _current_toolchain.cflags.append(flag)
 
+
 def addcflag(flag: str):
     """Add a single C-specific flag"""
     if _current_toolchain:
         _current_toolchain.cflags.append(flag)
+
 
 def addcxxflag(flag: str):
     """Add a single C++-specific flag"""
     if _current_toolchain:
         _current_toolchain.cxxflags.append(flag)
 
+
 def addldflag(flag: str):
     """Add a single linker flag"""
     if _current_toolchain:
         _current_toolchain.ldflags.append(flag)
 
+
 def adddefine(define: str):
     """Add a single preprocessor define"""
     if _current_toolchain:
         _current_toolchain.defines.append(define)
+
 
 def framework(framework_name: str):
     """Add framework (macOS specific)"""
@@ -926,25 +970,30 @@ def framework(framework_name: str):
                 _current_toolchain.flags["macos_frameworks"] = []
             _current_toolchain.flags["macos_frameworks"].append(framework_name)
 
+
 def librarypath(path: str):
     """Add library search path (-L)"""
     if _current_toolchain:
         _current_toolchain.ldflags.append(f"-L{path}")
+
 
 def library(lib_name: str):
     """Add library to link (-l)"""
     if _current_toolchain:
         _current_toolchain.ldflags.append(f"-l{lib_name}")
 
+
 def rpath(path: str):
     """Add runtime library path (-rpath)"""
     if _current_toolchain:
         _current_toolchain.ldflags.append(f"-Wl,-rpath,{path}")
 
+
 def nostdlib():
     """Do not use standard system libraries"""
     if _current_toolchain:
         _current_toolchain.ldflags.append("-nostdlib")
+
 
 def nostdinc():
     """Do not use standard system includes"""
@@ -952,11 +1001,13 @@ def nostdinc():
         _current_toolchain.cflags.append("-nostdinc")
         _current_toolchain.cxxflags.append("-nostdinc++")
 
+
 def pic():
     """Generate position independent code (for shared libraries)"""
     if _current_toolchain:
         _current_toolchain.cflags.append("-fPIC")
         _current_toolchain.cxxflags.append("-fPIC")
+
 
 def pie():
     """Generate position independent executable"""
@@ -964,6 +1015,7 @@ def pie():
         _current_toolchain.ldflags.append("-pie")
         _current_toolchain.cflags.append("-fPIE")
         _current_toolchain.cxxflags.append("-fPIE")
+
 
 def sanitize(sanitizer: str):
     """Add sanitizer (address, thread, undefined, etc.)"""
@@ -973,11 +1025,13 @@ def sanitize(sanitizer: str):
         _current_toolchain.cxxflags.append(flag)
         _current_toolchain.ldflags.append(flag)
 
+
 def nowarnings():
     """Disable all warnings"""
     if _current_toolchain:
         _current_toolchain.cflags.append("-w")
         _current_toolchain.cxxflags.append("-w")
+
 
 def profile(enable: bool = True):
     """Enable/disable profiling information"""
@@ -987,6 +1041,7 @@ def profile(enable: bool = True):
             _current_toolchain.cxxflags.append("-pg")
             _current_toolchain.ldflags.append("-pg")
 
+
 def coverage(enable: bool = True):
     """Enable/disable code coverage"""
     if _current_toolchain:
@@ -994,120 +1049,6 @@ def coverage(enable: bool = True):
             _current_toolchain.cflags.append("--coverage")
             _current_toolchain.cxxflags.append("--coverage")
             _current_toolchain.ldflags.append("--coverage")
-
-# ============================================================================
-# PROJECT GROUPS
-# ============================================================================
-
-class group:
-    """Project group context manager"""
-    def __init__(self, name: str):
-        self.name = name
-        self.group_projects = []
-        
-    def __enter__(self):
-        global _current_workspace
-        if _current_workspace is None:
-            raise RuntimeError("Group must be defined within a workspace")
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # Store group info in workspace
-        if not hasattr(_current_workspace, 'groups'):
-            _current_workspace.groups = {}
-        _current_workspace.groups[self.name] = self.group_projects
-        return False
-
-# ============================================================================
-# EXTERNAL PROJECT INCLUSION
-# ============================================================================
-
-def include(jenga_file: str, projects: list = None):
-    """
-    Include projects from external .jenga file
-    
-    Args:
-        jenga_file: Path to .jenga file
-        projects: Optional list of project names to include
-                 - None: Include all projects
-                 - ["ProjectA", "ProjectB"]: Include only these projects
-    
-    Examples:
-        include("external/MyLib/mylib.jenga")  # Include all projects
-        include("external/MyLib/mylib.jenga", ["Math", "Physics"])  # Include only Math and Physics
-        include("libs/all.jenga", ["*"])  # Explicit: include all (same as None)
-    """
-    global _current_workspace
-    
-    if _current_workspace is None:
-        raise RuntimeError("include() must be called within a workspace")
-    
-    from pathlib import Path
-    
-    jenga_path = Path(jenga_file)
-    
-    # Make relative to workspace location if not absolute
-    if not jenga_path.is_absolute():
-        workspace_dir = Path(_current_workspace.location) if _current_workspace.location else Path.cwd()
-        jenga_path = workspace_dir / jenga_path
-    
-    if not jenga_path.exists():
-        raise FileNotFoundError(f"External .jenga file not found: {jenga_path}")
-    
-    # Read and execute the external file
-    with open(jenga_path, 'r', encoding='utf-8') as f:
-        external_code = f.read()
-    
-    # Comment out imports
-    import re
-    external_code = re.sub(
-        r'^(\s*)(from\s+jenga\..*?import\s+.*?)$',
-        r'\1# \2  # Auto-commented by Jenga loader',
-        external_code,
-        flags=re.MULTILINE
-    )
-    
-    # Execute in current context
-    exec_globals = {
-        '__file__': str(jenga_path.absolute()),
-        '__name__': '__external__'
-    }
-    
-    # Inject API
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    import core.api as api
-    exec_globals.update({
-        name: getattr(api, name) 
-        for name in dir(api) 
-        if not name.startswith('_')
-    })
-    
-    # Store current workspace state
-    old_projects = dict(_current_workspace.projects)
-    
-    # Execute external file
-    exec(external_code, exec_globals)
-    
-    # Projects added are now in workspace
-    new_projects = set(_current_workspace.projects.keys()) - set(old_projects.keys())
-    
-    # Filter projects if specific list provided
-    if projects is not None and "*" not in projects:
-        # Remove projects not in the inclusion list
-        for proj_name in list(new_projects):
-            if proj_name not in projects:
-                del _current_workspace.projects[proj_name]
-                new_projects.remove(proj_name)
-    
-    # Mark included projects as external
-    for proj_name in new_projects:
-        if proj_name in _current_workspace.projects:
-            _current_workspace.projects[proj_name]._external = True
-            _current_workspace.projects[proj_name]._external_file = str(jenga_path)
-    
-    # Return list of included projects for user feedback
-    return list(new_projects)
 
 
 # ============================================================================
@@ -1167,6 +1108,339 @@ def ldflags(flag_list: List[str]):
     """Set linker-specific flags"""
     if _current_toolchain:
         _current_toolchain.ldflags.extend(flag_list)
+
+
+def linkerflags(flag_list: List[str]):
+    """Set linker-specific flags"""
+    ldflags(flag_list)
+
+
+# ============================================================================
+# EXTERNAL PROJECT INCLUSION
+# ============================================================================
+
+def include(jenga_file: str, projects: list = None):
+    """
+    Include projects from external .jenga file
+    
+    Args:
+        jenga_file: Path to .jenga file (relative to workspace or absolute)
+        projects: Optional list of project names to include
+                 - None: Include all projects
+                 - ["ProjectA", "ProjectB"]: Include only these projects
+    
+    Supporte 3 formats:
+    1. Projets dans un workspace (standard):
+        with workspace("MyLib"): 
+            with project("Lib1"): ...
+    
+    2. Projets standalone SANS workspace:
+        with project("Lib1"): ...  # Direct project definition
+    
+    3. Mélange de projets et workspace:
+        with project("Lib1"): ...
+        with workspace("Other"): 
+            with project("Lib2"): ...
+    
+    Les projets avec location="." sont relatifs au fichier .jenga externe.
+    """
+    global _current_workspace
+    
+    if _current_workspace is None:
+        raise RuntimeError("include() must be called within a workspace")
+    
+    from pathlib import Path
+    
+    jenga_path = Path(jenga_file)
+    
+    # Make relative to workspace location if not absolute
+    if not jenga_path.is_absolute():
+        workspace_dir = Path(_current_workspace.location) if _current_workspace.location else Path.cwd()
+        jenga_path = workspace_dir / jenga_path
+    
+    if not jenga_path.exists():
+        raise FileNotFoundError(f"External .jenga file not found: {jenga_path}")
+    
+    # Store the external file's directory for relative project locations
+    external_dir = jenga_path.parent.absolute()
+    
+    # Save current state
+    old_projects = dict(_current_workspace.projects)
+    old_location = _current_workspace.location
+    old_toolchains = dict(_current_workspace.toolchains)
+    
+    # Temporarily set workspace location to external directory
+    # This ensures that relative paths in external file are resolved correctly
+    original_location = _current_workspace.location
+    _current_workspace.location = str(external_dir)
+    
+    # Read and execute the external file
+    with open(jenga_path, 'r', encoding='utf-8') as f:
+        external_code = f.read()
+    
+    # Comment out imports
+    import re
+    external_code = re.sub(
+        r'^(\s*)(from\s+jenga\..*?import\s+.*?)$',
+        r'\1# \2  # Auto-commented by Jenga loader',
+        external_code,
+        flags=re.MULTILINE
+    )
+    
+    # Create execution context
+    exec_globals = {
+        '__file__': str(jenga_path.absolute()),
+        '__name__': '__external__',
+        '_current_workspace': _current_workspace,
+        '_external_include': True,  # Flag to indicate we're in an include
+    }
+    
+    # Inject ALL API functions
+    import sys
+    
+    # Dynamically get all API functions
+    current_module = sys.modules[__name__]
+    for name in dir(current_module):
+        if not name.startswith('_'):
+            obj = getattr(current_module, name)
+            if callable(obj) or isinstance(obj, (int, float, str, list, dict, type)):
+                exec_globals[name] = obj
+    
+    # Also inject workspace class for standalone projects
+    exec_globals['Workspace'] = Workspace
+    
+    # Store projects defined outside of workspace
+    standalone_projects = {}
+    original_projects_count = len(_current_workspace.projects)
+    
+    try:
+        # Execute external file in its own directory
+        original_cwd = Path.cwd()
+        os.chdir(external_dir)
+        
+        # Track if we're inside a workspace in the external file
+        external_workspace_active = False
+        
+        # Helper function to track workspace context
+        class _TrackedWorkspace(workspace):
+            def __enter__(self):
+                nonlocal external_workspace_active
+                external_workspace_active = True
+                return super().__enter__()
+            
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                nonlocal external_workspace_active
+                result = super().__exit__(exc_type, exc_val, exc_tb)
+                external_workspace_active = False
+                return result
+        
+        exec_globals['workspace'] = _TrackedWorkspace
+        
+        # Execute the code
+        exec(external_code, exec_globals)
+        
+        # Check what was added
+        all_new_projects = set(_current_workspace.projects.keys()) - set(old_projects.keys())
+        
+        # If no workspace was active during execution, projects were defined standalone
+        # They are already in _current_workspace.projects
+        if not external_workspace_active and all_new_projects:
+            # These are standalone projects
+            standalone_projects = {name: _current_workspace.projects[name] for name in all_new_projects}
+        
+        # Filter projects if specific list provided
+        if projects is not None and "*" not in projects:
+            # Determine which projects to keep
+            projects_to_keep = set(projects)
+            
+            # Remove projects not in the inclusion list
+            for proj_name in list(_current_workspace.projects.keys()):
+                if proj_name in all_new_projects and proj_name not in projects_to_keep:
+                    del _current_workspace.projects[proj_name]
+                    if proj_name in standalone_projects:
+                        del standalone_projects[proj_name]
+        
+        # Adjust project locations for included projects
+        for proj_name, proj in _current_workspace.projects.items():
+            if proj_name in all_new_projects:
+                # Mark as external
+                proj._external = True
+                proj._external_file = str(jenga_path)
+                proj._external_dir = str(external_dir)
+                proj._standalone = proj_name in standalone_projects
+                
+                # Handle location: 
+                # - If location is "." or empty, set to external directory
+                # - If relative, make it relative to external directory (not main workspace)
+                if proj.location == "." or not proj.location:
+                    # Means "same directory as the external .jenga file"
+                    proj.location = str(external_dir)
+                elif not Path(proj.location).is_absolute():
+                    # Relative path - make it relative to external directory
+                    proj.location = str(external_dir / proj.location)
+                # If absolute, leave as is
+        
+        # Merge toolchains from external file
+        new_toolchains = set(_current_workspace.toolchains.keys()) - set(old_toolchains.keys())
+        for tc_name in new_toolchains:
+            # Mark as external toolchain
+            _current_toolchain = _current_workspace.toolchains[tc_name]
+            _current_toolchain._external = True
+            _current_toolchain._external_file = str(jenga_path)
+        
+        # Restore workspace location
+        _current_workspace.location = original_location
+        
+        # Restore original working directory
+        os.chdir(original_cwd)
+        
+        # Return list of included projects for user feedback
+        included_projects = list(set(_current_workspace.projects.keys()) - set(old_projects.keys()))
+        return included_projects
+        
+    except Exception as e:
+        # Restore on error
+        _current_workspace.location = original_location
+        
+        # Restore original working directory
+        os.chdir(original_cwd)
+        
+        raise RuntimeError(f"Error in included file {jenga_file}: {e}") from e
+    
+
+# ============================================================================
+# UTILITY FUNCTIONS FOR INCLUDE SYSTEM
+# ============================================================================
+
+def getincludedprojects() -> Dict[str, Dict]:
+    """
+    Get information about all included (external) projects
+    Useful for debugging and understanding dependency structure
+    
+    Returns: 
+        Dict[str, Dict] where key is project name and value contains:
+            - 'file': Path to the .jenga file
+            - 'dir': Directory of the .jenga file
+            - 'standalone': bool (True if project was defined without workspace)
+            - 'location': Actual project location (after path resolution)
+    
+    Example usage in .jenga file:
+        # Print included projects info
+        included = get_included_projects()
+        for name, info in included.items():
+            print(f"{name}: from {info['file']}")
+    """
+    global _current_workspace
+    
+    if not _current_workspace:
+        return {}
+    
+    included = {}
+    for name, proj in _current_workspace.projects.items():
+        if hasattr(proj, '_external') and proj._external:
+            included[name] = {
+                'file': getattr(proj, '_external_file', 'unknown'),
+                'dir': getattr(proj, '_external_dir', 'unknown'),
+                'standalone': getattr(proj, '_standalone', False),
+                'location': proj.location,
+                'original_location': getattr(proj, '_original_location', None),
+            }
+    
+    return included
+
+
+def getprojectinfo(project_name: str = None) -> Optional[Dict]:
+    """
+    Get detailed information about a specific project (or current project)
+    
+    Args:
+        project_name: Name of project (None for current project)
+    
+    Returns:
+        Dict with project information including source file, dependencies, etc.
+    """
+    global _current_workspace, _current_project
+    
+    if not _current_workspace:
+        return None
+    
+    if project_name is None:
+        if _current_project:
+            project = _current_project
+            project_name = project.name
+        else:
+            return None
+    elif project_name in _current_workspace.projects:
+        project = _current_workspace.projects[project_name]
+    else:
+        return None
+    
+    info = {
+        'name': project.name,
+        'kind': project.kind.value,
+        'language': project.language.value,
+        'location': project.location,
+        'target_dir': project.targetdir,
+        'target_name': project.targetname or project.name,
+        'dependencies': list(project.dependson),
+        'files': list(project.files),
+        'include_dirs': list(project.includedirs),
+        'is_test': getattr(project, 'is_test', False),
+        'parent_project': getattr(project, 'parent_project', None),
+    }
+    
+    # Add include information if external
+    if hasattr(project, '_external'):
+        info.update({
+            'external': True,
+            'external_file': getattr(project, '_external_file', 'unknown'),
+            'external_dir': getattr(project, '_external_dir', 'unknown'),
+            'standalone': getattr(project, '_standalone', False),
+        })
+    
+    return info
+
+
+def listallprojects() -> List[Dict]:
+    """
+    List all projects in the workspace with basic info
+    
+    Returns:
+        List of project information dictionaries
+    """
+    global _current_workspace
+    
+    if not _current_workspace:
+        return []
+    
+    projects = []
+    for name, proj in _current_workspace.projects.items():
+        projects.append({
+            'name': name,
+            'kind': proj.kind.value,
+            'location': proj.location,
+            'external': hasattr(proj, '_external'),
+            'is_test': getattr(proj, 'is_test', False),
+        })
+    
+    return projects
+
+
+# Générer un rapport des dépendances
+def generatedependencyreport():
+    included = getincludedprojects()
+    
+    report = "# Jenga Dependency Report\n\n"
+    report += "## External Libraries\n"
+    
+    for name, info in included.items():
+        report += f"### {name}\n"
+        report += f"- **Source**: `{info['file']}`\n"
+        report += f"- **Location**: `{info['location']}`\n"
+        report += f"- **Type**: {'Standalone' if info['standalone'] else 'Workspace'}\n\n"
+    
+    with open("DEPENDENCIES.md", "w") as f:
+        f.write(report)
 
 
 # ============================================================================
@@ -1362,3 +1636,353 @@ def debug(enable: bool = True):
         debug_tc(enable)
     elif _current_project:
         _current_project.symbols = "On" if enable else "Off"
+
+
+# ===========================================================================
+# ANDROID ENHANCED API FUNCTIONS
+# ===========================================================================
+
+def androidabis(abis: List[str]):
+    """
+    Set Android ABIs to build
+    
+    Args:
+        abis: List of ABIs (e.g., ['armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'])
+    
+    Examples:
+        # Build for all ABIs
+        androidabis(['armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'])
+        
+        # Build only for ARM
+        androidabis(['armeabi-v7a', 'arm64-v8a'])
+        
+        # Build only for 64-bit
+        androidabis(['arm64-v8a', 'x86_64'])
+    """
+    if _current_project:
+        _current_project.androidabis = abis
+
+
+def androidproguard(enable: bool = True):
+    """
+    Enable ProGuard code obfuscation
+    
+    Args:
+        enable: True to enable ProGuard
+    
+    Example:
+        androidproguard(True)  # Enable for release builds
+    """
+    if _current_project:
+        _current_project.androidproguard = enable
+
+
+def androidproguardrules(rules: List[str]):
+    """
+    Add custom ProGuard rules
+    
+    Args:
+        rules: List of ProGuard rule strings
+    
+    Example:
+        androidproguardrules([
+            "-keep class com.myapp.** { *; }",
+            "-dontwarn javax.annotation.**"
+        ])
+    """
+    if _current_project:
+        if not hasattr(_current_project, 'androidproguardrules'):
+            _current_project.androidproguardrules = []
+        _current_project.androidproguardrules.extend(rules)
+
+
+def androidassets(asset_patterns: List[str]):
+    """
+    Specify assets to include in APK/AAB
+    
+    Args:
+        asset_patterns: List of file patterns (supports wildcards)
+    
+    Examples:
+        # Single directory
+        androidassets(["assets"])
+        
+        # Multiple patterns
+        androidassets([
+            "assets/**",
+            "config/*.json",
+            "data/textures/*"
+        ])
+    """
+    if _current_project:
+        if not hasattr(_current_project, 'androidassets'):
+            _current_project.androidassets = []
+        _current_project.androidassets.extend(asset_patterns)
+
+
+def androidpermissions(permissions: List[str]):
+    """
+    Add Android permissions to manifest
+    
+    Args:
+        permissions: List of permission names (can be short or full)
+    
+    Examples:
+        # Short names (auto-prefixed with android.permission.)
+        androidpermissions([
+            "INTERNET",
+            "WRITE_EXTERNAL_STORAGE",
+            "CAMERA",
+            "ACCESS_FINE_LOCATION"
+        ])
+        
+        # Full names
+        androidpermissions([
+            "android.permission.INTERNET",
+            "android.permission.CAMERA"
+        ])
+    """
+    if _current_project:
+        if not hasattr(_current_project, 'androidpermissions'):
+            _current_project.androidpermissions = []
+        _current_project.androidpermissions.extend(permissions)
+
+
+def androidnativeactivity(enable: bool = True):
+    """
+    Use NativeActivity (pure C++) vs Java MainActivity
+    
+    Args:
+        enable: True for NativeActivity, False for Java MainActivity
+    
+    Example:
+        # Pure C++ app
+        androidnativeactivity(True)
+        
+        # Java app with JNI
+        androidnativeactivity(False)
+    """
+    if _current_project:
+        _current_project.androidnativeactivity = enable
+
+
+def androidcompilesdk(sdk: int):
+    """
+    Set Android compile SDK version
+    
+    Args:
+        sdk: SDK version number
+    
+    Example:
+        androidcompilesdk(33)  # Android 13
+    """
+    if _current_project:
+        _current_project.androidcompilesdk = sdk
+
+
+def ndkversion(version: str):
+    """
+    Set specific NDK version
+    
+    Args:
+        version: NDK version string
+    
+    Example:
+        ndkversion("25.1.8937393")
+    """
+    if _current_project:
+        _current_project.ndkversion = version
+
+
+# ===========================================================================
+# EXAMPLE USAGE IN .jenga FILE
+# ===========================================================================
+
+"""
+Example .jenga file with all Android features:
+
+with workspace("MyAndroidGame"):
+    configurations(["Debug", "Release"])
+    platforms(["Android"])
+    
+    # Android SDK/NDK configuration
+    androidsdkpath("/path/to/android-sdk")
+    androidndkpath("/path/to/android-ndk")
+    javajdkpath("/path/to/jdk")  # Optional
+    
+    with project("Game"):
+        androidapp()
+        language("C++")
+        cppdialect("C++17")
+        
+        files(["src/**.cpp"])
+        includedirs(["include"])
+        
+        # Basic Android config
+        androidapplicationid("com.mygame.android")
+        androidversioncode(1)
+        androidversionname("1.0.0")
+        androidminsdk(21)
+        androidtargetsdk(33)
+        androidcompilesdk(33)
+        
+        # ✨ NEW: Multi-ABI support
+        androidabis([
+            "armeabi-v7a",  # 32-bit ARM
+            "arm64-v8a",    # 64-bit ARM (required for Play Store)
+            "x86",          # 32-bit x86 (emulator)
+            "x86_64"        # 64-bit x86 (emulator)
+        ])
+        
+        # Or just ARM for smaller APK
+        # androidabis(["armeabi-v7a", "arm64-v8a"])
+        
+        # ✨ NEW: ProGuard obfuscation
+        androidproguard(True)  # Enable for Release
+        androidproguardrules([
+            "-keep class com.mygame.** { *; }",
+            "-dontwarn org.lwjgl.**",
+            "-keepattributes *Annotation*"
+        ])
+        
+        # ✨ NEW: Assets management
+        androidassets([
+            "assets",           # Copy entire assets directory
+            "config/*.json",    # Copy all JSON configs
+            "data/textures/*"   # Copy textures
+        ])
+        
+        # ✨ NEW: Permissions
+        androidpermissions([
+            "INTERNET",
+            "WRITE_EXTERNAL_STORAGE",
+            "READ_EXTERNAL_STORAGE",
+            "CAMERA",
+            "ACCESS_FINE_LOCATION",
+            "ACCESS_COARSE_LOCATION"
+        ])
+        
+        # Native activity (pure C++) or Java activity
+        androidnativeactivity(True)  # True = NativeActivity, False = MainActivity
+        
+        # NDK version
+        ndkversion("25.1.8937393")
+        
+        # Signing (optional)
+        androidsign(True)
+        androidkeystore("mygame.keystore")
+        androidkeystorepass("mypassword")
+        androidkeyalias("key0")
+        
+        targetdir("Build/Android/%{cfg.buildcfg}")
+
+
+# Building:
+# jenga build --platform Android --config Release
+# jenga package --platform Android --type apk     # APK for testing
+# jenga package --platform Android --type aab     # AAB for Play Store
+"""
+
+# ===========================================================================
+# COMMON ANDROID PERMISSIONS REFERENCE
+# ===========================================================================
+
+ANDROID_PERMISSIONS_REFERENCE = """
+Common Android Permissions:
+
+# Network
+INTERNET                      - Access internet
+ACCESS_NETWORK_STATE          - Check network status
+ACCESS_WIFI_STATE             - Access WiFi state
+
+# Storage
+WRITE_EXTERNAL_STORAGE        - Write to external storage
+READ_EXTERNAL_STORAGE         - Read from external storage
+MANAGE_EXTERNAL_STORAGE       - Manage all files (Android 11+)
+
+# Location
+ACCESS_FINE_LOCATION          - Precise location
+ACCESS_COARSE_LOCATION        - Approximate location
+ACCESS_BACKGROUND_LOCATION    - Background location (Android 10+)
+
+# Camera & Media
+CAMERA                        - Use camera
+RECORD_AUDIO                  - Record audio
+READ_MEDIA_IMAGES             - Read images (Android 13+)
+READ_MEDIA_VIDEO              - Read videos (Android 13+)
+READ_MEDIA_AUDIO              - Read audio (Android 13+)
+
+# Sensors
+VIBRATE                       - Vibrate device
+BODY_SENSORS                  - Access body sensors
+
+# Bluetooth
+BLUETOOTH                     - Use Bluetooth
+BLUETOOTH_ADMIN               - Discover and pair devices
+BLUETOOTH_CONNECT             - Connect to paired devices (Android 12+)
+BLUETOOTH_SCAN                - Scan for devices (Android 12+)
+
+# Phone
+READ_PHONE_STATE              - Read phone state
+CALL_PHONE                    - Make phone calls
+
+# Contacts
+READ_CONTACTS                 - Read contacts
+WRITE_CONTACTS                - Modify contacts
+
+# Calendar
+READ_CALENDAR                 - Read calendar
+WRITE_CALENDAR                - Modify calendar
+
+# System
+WAKE_LOCK                     - Prevent screen from dimming
+RECEIVE_BOOT_COMPLETED        - Start on boot
+FOREGROUND_SERVICE            - Run foreground services (Android 9+)
+
+Usage:
+    androidpermissions(["INTERNET", "CAMERA", "ACCESS_FINE_LOCATION"])
+"""
+
+# ===========================================================================
+# PROGUARD RULES TEMPLATES
+# ===========================================================================
+
+PROGUARD_TEMPLATES = """
+Common ProGuard Rules:
+
+# Keep app classes
+androidproguardrules([
+    "-keep class com.myapp.** { *; }"
+])
+
+# Keep native methods
+androidproguardrules([
+    "-keepclasseswithmembernames class * {",
+    "    native <methods>;",
+    "}"
+])
+
+# Keep annotations
+androidproguardrules([
+    "-keepattributes *Annotation*"
+])
+
+# Suppress warnings
+androidproguardrules([
+    "-dontwarn org.lwjgl.**",
+    "-dontwarn javax.annotation.**"
+])
+
+# Keep serializable classes
+androidproguardrules([
+    "-keepclassmembers class * implements java.io.Serializable {",
+    "    static final long serialVersionUID;",
+    "    private static final java.io.ObjectStreamField[] serialPersistentFields;",
+    "    !static !transient <fields>;",
+    "    private void writeObject(java.io.ObjectOutputStream);",
+    "    private void readObject(java.io.ObjectInputStream);",
+    "    java.lang.Object writeReplace();",
+    "    java.lang.Object readResolve();",
+    "}"
+])
+"""

@@ -66,8 +66,14 @@ def print_help():
   sign       - Sign the application (Android APK, iOS IPA, etc.)
   keygen     - Generate keystore for signing
   info       - Display workspace/project information
+  create     - Create workspaces, projects, and files
   version    - Show version information
   help       - Show this help message
+
+{Colors.BOLD}Create Subcommands:{Colors.RESET}
+  create workspace    - Create a new workspace
+  create project      - Create a new project
+  create file         - Create a source file
 
 {Colors.BOLD}Options:{Colors.RESET}
   --config <name>     - Specify configuration (Debug, Release, Dist)
@@ -83,6 +89,9 @@ def print_help():
 {Colors.BOLD}Examples:{Colors.RESET}
   jenga --version
   jenga build --config Release
+  jenga create workspace MyGame
+  jenga create project Engine --type staticlib
+  jenga create file Player --type class
   jenga rebuild --project MyApp --jobs 8
   jenga run --config Debug
   jenga clean
@@ -114,6 +123,15 @@ def main():
         print_banner()
         print_help()
         return 0
+    
+    # Handle create command separately
+    if command == "create":
+        try:
+            from Commands.create import execute
+            return execute(args[1:])
+        except ImportError as e:
+            Display.error(f"Failed to load create command: {e}")
+            return 1
     
     # Parse options
     options = parse_options(args[1:])

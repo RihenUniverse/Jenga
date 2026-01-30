@@ -83,69 +83,108 @@ def execute(options: dict) -> bool:
         return _package_macos(workspace, project, config, options)
     else:
         return _package_generic(workspace, project, config, platform, options)
-
+    
 
 def _package_android(workspace, project, config, package_type, options):
-    """Package Android application as APK or AAB"""
+    """Package Android application as APK or AAB using Gradle"""
     
-    Display.step("Building Android package...")
+    Display.step(f"Building Android {package_type.upper()}...")
     
-    # Check for Android SDK/NDK
+    # Validate
     if not workspace.androidsdkpath:
-        Display.error("Android SDK path not set in workspace")
-        Display.info("Set it with: androidsdkpath(\"/path/to/android-sdk\")")
+        Display.error("Android SDK path not set")
+        Display.info("Use: androidsdkpath(\"/path/to/sdk\")")
         return False
     
-    sdk_path = Path(workspace.androidsdkpath)
-    if not sdk_path.exists():
-        Display.error(f"Android SDK not found at: {sdk_path}")
+    if not workspace.androidndkpath:
+        Display.error("Android NDK path not set")
+        Display.info("Use: androidndkpath(\"/path/to/ndk\")")
         return False
     
-    # Build tools
-    build_tools_dir = sdk_path / "build-tools"
-    if not build_tools_dir.exists():
-        Display.error("Android build-tools not found")
-        return False
+    # Import enhanced builder
+    from core.androidsystem import build_android_with_gradle
     
-    # Get latest build tools version
-    build_tools_versions = sorted([d.name for d in build_tools_dir.iterdir() if d.is_dir()])
-    if not build_tools_versions:
-        Display.error("No Android build-tools version found")
-        return False
+    # Build
+    output_path = build_android_with_gradle(workspace, project, config, package_type)
     
-    build_tools_version = build_tools_versions[-1]
-    build_tools_path = build_tools_dir / build_tools_version
-    
-    Display.info(f"Using build-tools: {build_tools_version}")
-    
-    # Paths
-    aapt = build_tools_path / "aapt"
-    aapt2 = build_tools_path / "aapt2"
-    zipalign = build_tools_path / "zipalign"
-    apksigner = build_tools_path / "apksigner"
-    
-    if not aapt.exists() and not aapt2.exists():
-        Display.error("aapt/aapt2 not found in build-tools")
-        return False
-    
-    # Project directories
-    project_dir = Path(workspace.location) / project.location
-    build_dir = Path(workspace.location) / "Build" / platform / config
-    package_dir = build_dir / "Package"
-    package_dir.mkdir(parents=True, exist_ok=True)
-    
-    # App ID
-    app_id = project.androidapplicationid or f"com.example.{project.name.lower()}"
-    version_code = project.androidversioncode or 1
-    version_name = project.androidversionname or "1.0"
-    
-    Display.info(f"App ID: {app_id}")
-    Display.info(f"Version: {version_name} ({version_code})")
-    
-    if package_type == 'aab':
-        return _build_aab(workspace, project, config, package_dir, options)
+    if output_path:
+        Display.success(f"\n✅ Android {package_type.upper()} created!")
+        Display.info(f"   Location: {output_path}")
+        Display.info(f"   Size: {output_path.stat().st_size / (1024*1024):.2f} MB")
+        
+        if package_type == 'apk':
+            print(f"\n{Display.info_prefix()} Install:")
+            print(f"   adb install {output_path}")
+        elif package_type == 'aab':
+            print(f"\n{Display.info_prefix()} Upload to Play Store")
+        
+        return True
     else:
-        return _build_apk(workspace, project, config, package_dir, build_tools_path, options)
+        Display.error(f"Failed to build {package_type.upper()}")
+        return False
+
+
+# def _package_android(workspace, project, config, package_type, options):
+#     """Package Android application as APK or AAB"""
+    
+#     Display.step("Building Android package...")
+    
+#     # Check for Android SDK/NDK
+#     if not workspace.androidsdkpath:
+#         Display.error("Android SDK path not set in workspace")
+#         Display.info("Set it with: androidsdkpath(\"/path/to/android-sdk\")")
+#         return False
+    
+#     sdk_path = Path(workspace.androidsdkpath)
+#     if not sdk_path.exists():
+#         Display.error(f"Android SDK not found at: {sdk_path}")
+#         return False
+    
+#     # Build tools
+#     build_tools_dir = sdk_path / "build-tools"
+#     if not build_tools_dir.exists():
+#         Display.error("Android build-tools not found")
+#         return False
+    
+#     # Get latest build tools version
+#     build_tools_versions = sorted([d.name for d in build_tools_dir.iterdir() if d.is_dir()])
+#     if not build_tools_versions:
+#         Display.error("No Android build-tools version found")
+#         return False
+    
+#     build_tools_version = build_tools_versions[-1]
+#     build_tools_path = build_tools_dir / build_tools_version
+    
+#     Display.info(f"Using build-tools: {build_tools_version}")
+    
+#     # Paths
+#     aapt = build_tools_path / "aapt"
+#     aapt2 = build_tools_path / "aapt2"
+#     zipalign = build_tools_path / "zipalign"
+#     apksigner = build_tools_path / "apksigner"
+    
+#     if not aapt.exists() and not aapt2.exists():
+#         Display.error("aapt/aapt2 not found in build-tools")
+#         return False
+    
+#     # Project directories
+#     project_dir = Path(workspace.location) / project.location
+#     build_dir = Path(workspace.location) / "Build" / platform / config
+#     package_dir = build_dir / "Package"
+#     package_dir.mkdir(parents=True, exist_ok=True)
+    
+#     # App ID
+#     app_id = project.androidapplicationid or f"com.example.{project.name.lower()}"
+#     version_code = project.androidversioncode or 1
+#     version_name = project.androidversionname or "1.0"
+    
+#     Display.info(f"App ID: {app_id}")
+#     Display.info(f"Version: {version_name} ({version_code})")
+    
+#     if package_type == 'aab':
+#         return _build_aab(workspace, project, config, package_dir, options)
+#     else:
+#         return _build_apk(workspace, project, config, package_dir, build_tools_path, options)
 
 
 def _build_apk(workspace, project, config, package_dir, build_tools_path, options):
