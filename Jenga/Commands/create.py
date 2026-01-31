@@ -454,10 +454,10 @@ def create_workspace_interactive():
     main_project_namespace = workspace_name.lower()
     sub_namespaces = []
     project_name = workspace_name  # Default: same as workspace
-    project_location = workspace_name  # Default location for project
+    project_location = workspace_name  # Default: créer le projet dans un dossier avec le nom du projet
     
     if create_main_project:
-        # ✅ CRITICAL FIX: Ask if user wants different project name
+        # Ask if user wants different project name
         print(f"\n📝 Project Name Configuration:")
         print(f"   By default, project name is same as workspace: {workspace_name}")
         if ask_yes_no("   Use different project name?", default=False):
@@ -465,18 +465,10 @@ def create_workspace_interactive():
             if not project_name:
                 project_name = workspace_name
         
-        # ✅ CRITICAL FIX: Ask for project location
+        # ✅ CORRECTION: Toujours créer le projet dans un sous-dossier du workspace
         print(f"\n📂 Project Location Configuration:")
-        print(f"   Workspace: {workspace_name}")
-        print(f"   Project: {project_name}")
-        print(f"   By default, project will be created in: {project_name}/")
-        project_location = input(f"   Where to create project? (relative to workspace) [{project_name}/]: ").strip()
-        if not project_location:
-            project_location = project_name
-        else:
-            # ✅ FIX: Ensure project location ends with project name
-            if not project_location.endswith(f"/{project_name}"):
-                project_location = f"{project_location}/{project_name}"
+        print(f"   Project will be created in: {workspace_name}/{project_name}/")
+        project_location = project_name
         
         # Project type
         print("\n🎯 Select main project type:")
@@ -610,11 +602,7 @@ def create_workspace(
     if project_name is None:
         project_name = workspace_name
     if project_location is None:
-        project_location = ""
-    else:
-        # ✅ FIX: Ensure project location ends with project name
-        if not project_location.endswith(f"/{project_name}"):
-            project_location = f"{project_location}/{project_name}"
+        project_location = project_name  # ✅ CORRECTION: Toujours créer dans un sous-dossier
     if platforms is None:
         platforms = ["Windows", "Linux", "MacOS"]
     if architectures is None:
@@ -652,16 +640,15 @@ def create_workspace(
     
     # Create main project if requested
     if create_main_project:
-        # ✅ CRITICAL FIX: Create project directory FIRST
+        # ✅ CORRECTION: Créer le projet dans un sous-dossier du workspace
         project_dir = workspace_dir / project_location
         project_dir.mkdir(parents=True, exist_ok=True)
         print(f"  📁 Created project directory: {project_location}/")
         
-        # ✅ CRITICAL FIX: Create ALL project directories BEFORE creating files
-        # ✅ MODIFICATION: Ajouter les sous-dossiers avec le nom du projet
+        # Créer la structure du projet (sans sous-dossier project_name dans include et src)
         create_directory_structure(project_dir, [
-            f"include/{project_name}",  # <-- MODIFICATION ICI
-            f"src/{project_name}",      # <-- MODIFICATION ICI
+            "include",    # ✅ MODIFICATION: juste include/
+            "src",        # ✅ MODIFICATION: juste src/
             "pch",
             "tests",
             "resources",
@@ -680,7 +667,7 @@ def create_workspace(
             relative_path=project_location
         )
         
-        # ✅ CRITICAL FIX: Create source files - directories already exist
+        # Create source files
         create_project_source_files(
             project_dir=project_dir,
             project_name=project_name,
@@ -817,6 +804,7 @@ def create_workspace_jenga_file(
     
     # Ajouter l'inclusion du projet principal si créé
     if create_main_project and project_name and project_location:
+        # ✅ CORRECTION: Le chemin est juste le nom du dossier du projet
         content += f'''
     # Included project: {project_name}
     include("{project_location}/{project_name}.jenga")
@@ -848,22 +836,22 @@ This project was created with Jenga Build System v{VERSION}.
 ```
 {workspace_name}/
 ├── {workspace_name}.jenga          # Workspace configuration
-├── Core/                          # Core projects
-│   └── {workspace_name}/          # Main project
-│       ├── {workspace_name}.jenga # Project configuration
-│       ├── src/                   # Source files
-│       │   └── {workspace_name}/  # Project-specific source files
-│       ├── include/               # Public headers
-│       │   └── {workspace_name}/  # Project-specific headers
-│       ├── pch/                   # Precompiled headers
-│       └── tests/                 # Unit tests
-├── assets/                        # Assets (images, sounds, etc.)
-├── docs/                          # Documentation
-├── externals/                     # External dependencies
-├── tools/                         # Build tools and utilities
-├── scripts/                       # Build and deployment scripts
-├── config/                        # Configuration files
-└── .github/workflows/             # CI/CD workflows
+├── {workspace_name}/               # Main project
+│   ├── {workspace_name}.jenga      # Project configuration
+│   ├── src/                        # Source files
+│   ├── include/                    # Public headers
+│   ├── pch/                        # Precompiled headers
+│   └── tests/                      # Unit tests
+├── assets/                         # Assets (images, sounds, etc.)
+├── docs/                           # Documentation
+├── externals/                      # External dependencies
+├── tools/                          # Build tools and utilities
+├── scripts/                        # Build and deployment scripts
+├── config/                         # Configuration files
+├── .github/workflows/              # CI/CD workflows
+├── README.md                       # Documentation
+├── .gitignore                      # Git ignore
+└── LICENSE                         # License
 ```
 
 ## Getting Started
@@ -1081,8 +1069,8 @@ def print_workspace_creation_summary(
         project_type_name = PROJECT_TYPES[main_project_type]['name']
         print(f"   ├── {project_location}/             # Main project: {project_name} ({project_type_name})")
         print(f"   │   ├── {project_name}.jenga     # Project configuration")
-        print(f"   │   ├── src/{project_name}/      # Source files")
-        print(f"   │   ├── include/{project_name}/  # Public headers")
+        print(f"   │   ├── src/                     # Source files")
+        print(f"   │   ├── include/                 # Public headers")
         print(f"   │   ├── pch/                     # Precompiled headers")
         print(f"   │   └── tests/                   # Unit tests")
     
@@ -1142,15 +1130,11 @@ def create_project_interactive():
         print("❌ Project name is required")
         return 1
     
-    # ✅ CRITICAL: Project location - ask user
+    # ✅ CORRECTION: Demander la localisation par défaut au nom du projet
     default_location = project_name
     location = input(f"📂 Location (relative to workspace) [{default_location}/]: ").strip()
     if not location:
         location = default_location
-    else:
-        # ✅ FIX: Ensure location ends with project name
-        if not location.endswith(f"/{project_name}"):
-            location = f"{location}/{project_name}"
     
     # Project type
     print("\n🎯 Project type:")
@@ -1230,15 +1214,15 @@ def create_project(
     workspace_dir = workspace_jenga_file.parent
     
     # Determine project location
-    if location is None or location == ".":
-        location = ""
-    else:
-        # ✅ FIX: Ensure location ends with project name
-        if not location.endswith(f"/{name}"):
-            location = f"{location}/{name}"
+    if location is None:
+        location = name
+    elif location == ".":
+        print("❌ Error: Cannot create project at workspace root")
+        print("💡 Hint: Specify a subdirectory name")
+        return 1
     
-    project_path = workspace_dir / location if location else workspace_dir / name
-    project_relative_path = location if location else name
+    project_path = workspace_dir / location
+    project_relative_path = location
     
     print(f"\n📦 Creating project '{name}' ({PROJECT_TYPES[project_type]['name']})...")
     print(f"   Location: {project_relative_path}/")
@@ -1258,11 +1242,10 @@ def create_project(
     else:
         project_path.mkdir(parents=True, exist_ok=True)
     
-    # ✅ CRITICAL FIX: Create ALL directories BEFORE creating any files
-    # ✅ MODIFICATION: Ajouter les sous-dossiers avec le nom du projet
+    # ✅ CORRECTION: Créer la structure simple sans sous-dossier project_name
     create_directory_structure(project_path, [
-        f"include/{name}",  # <-- MODIFICATION ICI
-        f"src/{name}",      # <-- MODIFICATION ICI
+        "include",    # ✅ MODIFICATION: juste include/
+        "src",        # ✅ MODIFICATION: juste src/
         "pch",
         "tests",
         "resources",
@@ -1281,7 +1264,7 @@ def create_project(
         relative_path=project_relative_path
     )
     
-    # ✅ CRITICAL FIX: Create source files - directories already exist
+    # ✅ CORRECTION: Create source files - use simple structure
     create_project_source_files(
         project_dir=project_path,
         project_name=name,
@@ -1302,8 +1285,8 @@ def create_project(
     print(f"\n📂 Project structure:")
     print(f"   {project_relative_path}/")
     print(f"   ├── {name}.jenga                    # Project configuration")
-    print(f"   ├── src/{name}/                     # Source files")
-    print(f"   ├── include/{name}/                 # Public headers")
+    print(f"   ├── src/                           # Source files")
+    print(f"   ├── include/                       # Public headers")
     print(f"   ├── pch/                           # Precompiled headers")
     print(f"   ├── tests/                         # Unit tests")
     print(f"   ├── resources/                     # Resource files")
@@ -1382,9 +1365,7 @@ with workspace("{project_name}"):
         # Include directories
         includedirs([
             "include",
-            "include/{project_name}",
-            "src",
-            "src/{project_name}"
+            "src"
         ])
         
         # Output directories
@@ -1670,11 +1651,11 @@ def create_main_header_file(
     if sub_namespaces is None:
         sub_namespaces = []
     
-    # ✅ MODIFICATION: Créer le dossier spécifique au projet
-    include_project_dir = project_dir / "include" / project_name
-    include_project_dir.mkdir(parents=True, exist_ok=True)
+    # ✅ CORRECTION: Créer directement dans include/
+    include_dir = project_dir / "include"
+    include_dir.mkdir(parents=True, exist_ok=True)
     
-    header_file = include_project_dir / f"{project_name}.h"
+    header_file = include_dir / f"{project_name}.h"
     guard = f"{project_name.upper()}_{project_name.upper()}_H"
     
     content = get_file_header(
@@ -1799,13 +1780,13 @@ private:
     # ✅ CRITICAL: Write file safely with UTF-8 encoding
     try:
         header_file.write_text(content, encoding='utf-8')
-        print(f"✅ Created: include/{project_name}/{project_name}.h")
+        print(f"✅ Created: include/{project_name}.h")
     except Exception as e:
         print(f"❌ Error creating header file: {e}")
         # Try to create parent directory and retry
         header_file.parent.mkdir(parents=True, exist_ok=True)
         header_file.write_text(content, encoding='utf-8')
-        print(f"✅ Created (retry): include/{project_name}/{project_name}.h")
+        print(f"✅ Created (retry): include/{project_name}.h")
 
 
 def create_main_source_file(
@@ -1819,11 +1800,11 @@ def create_main_source_file(
     if sub_namespaces is None:
         sub_namespaces = []
     
-    # ✅ MODIFICATION: Créer le dossier spécifique au projet
-    src_project_dir = project_dir / "src" / project_name
-    src_project_dir.mkdir(parents=True, exist_ok=True)
+    # ✅ CORRECTION: Créer directement dans src/
+    src_dir = project_dir / "src"
+    src_dir.mkdir(parents=True, exist_ok=True)
     
-    source_file = src_project_dir / f"{project_name}.cpp"
+    source_file = src_dir / f"{project_name}.cpp"
     
     content = get_file_header(
         filename=f"{project_name}.cpp",
@@ -1831,7 +1812,7 @@ def create_main_source_file(
         file_type="cpp"
     )
     
-    content += f'''#include "{project_name}/{project_name}.h"
+    content += f'''#include "{project_name}.h"
 #include <iostream>
 #include <chrono>
 
@@ -1935,23 +1916,23 @@ void {project_name}::run() {{
     # ✅ CRITICAL: Write file safely with UTF-8 encoding
     try:
         source_file.write_text(content, encoding='utf-8')
-        print(f"✅ Created: src/{project_name}/{project_name}.cpp")
+        print(f"✅ Created: src/{project_name}.cpp")
     except Exception as e:
         print(f"❌ Error creating source file: {e}")
         # Try to create parent directory and retry
         source_file.parent.mkdir(parents=True, exist_ok=True)
         source_file.write_text(content, encoding='utf-8')
-        print(f"✅ Created (retry): src/{project_name}/{project_name}.cpp")
+        print(f"✅ Created (retry): src/{project_name}.cpp")
 
 
 def create_main_app_file(project_dir: Path, project_name: str, main_namespace: str = None) -> None:
     """Create main application file."""
     
-    # ✅ MODIFICATION: Créer le dossier spécifique au projet
-    src_project_dir = project_dir / "src" / project_name
-    src_project_dir.mkdir(parents=True, exist_ok=True)
+    # ✅ CORRECTION: Créer directement dans src/
+    src_dir = project_dir / "src"
+    src_dir.mkdir(parents=True, exist_ok=True)
     
-    main_file = src_project_dir / "main.cpp"
+    main_file = src_dir / "main.cpp"
     
     content = get_file_header(
         filename="main.cpp",
@@ -1964,7 +1945,7 @@ def create_main_app_file(project_dir: Path, project_name: str, main_namespace: s
 '''
     
     if main_namespace:
-        content += f'''#include "{project_name}/{project_name}.h"
+        content += f'''#include "{project_name}.h"
 
 using namespace {main_namespace};
 
@@ -1998,7 +1979,7 @@ int main(int argc, char* argv[]) {{
 }}
 '''
     else:
-        content += f'''#include "{project_name}/{project_name}.h"
+        content += f'''#include "{project_name}.h"
 
 int main(int argc, char* argv[]) {{
     std::cout << "========================================" << std::endl;
@@ -2034,13 +2015,13 @@ int main(int argc, char* argv[]) {{
     # ✅ CRITICAL: Write file safely with UTF-8 encoding
     try:
         main_file.write_text(content, encoding='utf-8')
-        print(f"✅ Created: src/{project_name}/main.cpp")
+        print(f"✅ Created: src/main.cpp")
     except Exception as e:
         print(f"❌ Error creating main file: {e}")
         # Try to create parent directory and retry
         main_file.parent.mkdir(parents=True, exist_ok=True)
         main_file.write_text(content, encoding='utf-8')
-        print(f"✅ Created (retry): src/{project_name}/main.cpp")
+        print(f"✅ Created (retry): src/main.cpp")
 
 
 def create_test_file(
@@ -2067,7 +2048,7 @@ def create_test_file(
 '''
     
     if main_namespace:
-        content += f'''#include "{project_name}/{project_name}.h"
+        content += f'''#include "{project_name}.h"
 
 using namespace {main_namespace};
 
@@ -2105,7 +2086,7 @@ int main() {{
 }}
 '''
     else:
-        content += f'''#include "{project_name}/{project_name}.h"
+        content += f'''#include "{project_name}.h"
 
 void test_{project_name.lower()}_creation() {{
     {project_name} app;
@@ -2485,14 +2466,14 @@ def determine_file_location(file_type: str, project_dir: Path, location: str = N
     if location:
         target_dir = project_dir / location
     elif file_type in ["header", "h"]:
-        # ✅ MODIFICATION: Créer dans le dossier du projet
-        target_dir = project_dir / "include" / project_dir.name
+        # ✅ CORRECTION: Créer directement dans include/
+        target_dir = project_dir / "include"
     elif file_type in ["class", "struct", "enum", "union", "interface"]:
-        # ✅ MODIFICATION: Créer dans le dossier du projet
-        target_dir = project_dir / "src" / project_dir.name
+        # ✅ CORRECTION: Créer directement dans src/
+        target_dir = project_dir / "src"
     elif file_type in ["source", "cpp", "c", "m", "mm", "inl"]:
-        # ✅ MODIFICATION: Créer dans le dossier du projet
-        target_dir = project_dir / "src" / project_dir.name
+        # ✅ CORRECTION: Créer directement dans src/
+        target_dir = project_dir / "src"
     else:
         target_dir = project_dir
     

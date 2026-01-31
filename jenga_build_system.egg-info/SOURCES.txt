@@ -44,6 +44,7 @@ Jenga/Commands/export.py
 Jenga/Commands/gen.py
 Jenga/Commands/info.py
 Jenga/Commands/init.py
+Jenga/Commands/install.py
 Jenga/Commands/keygen.py
 Jenga/Commands/package.py
 Jenga/Commands/rebuild.py

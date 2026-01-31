@@ -74,7 +74,7 @@ class Project:
     name: str
     kind: ProjectKind = ProjectKind.CONSOLE_APP
     language: Language = Language.CPP
-    location: str = ""  # Now mandatory for projects
+    location: str = "."  # Now mandatory for projects
     cppdialect: str = "C++17"
     cdialect: str = "C11"
     
@@ -242,7 +242,7 @@ class workspace:
         global _current_workspace
         # DON'T clear workspace - keep it available for commands
         return False
-
+    
 
 class project:
     """Project context manager"""
@@ -259,7 +259,7 @@ class project:
         self.project = Project(name=self.name)
         
         # MANDATORY: Set default location to "." (current workspace dir)
-        self.project.location = "."
+        # self.project.location = "."  # Déjà fait dans la dataclass
         
         # MANDATORY: Set default toolchain if not specified
         if not self.project.toolchain and _current_workspace.toolchains:
@@ -1119,193 +1119,1032 @@ def linkerflags(flag_list: List[str]):
 # EXTERNAL PROJECT INCLUSION
 # ============================================================================
 
-def include(jenga_file: str, projects: list = None):
+# def include(jenga_file: str, projects: list = None):
+#     """
+#     Include projects from external .jenga file
+    
+#     Args:
+#         jenga_file: Path to .jenga file (relative to workspace or absolute)
+#         projects: Optional list of project names to include
+#                  - None: Include all projects
+#                  - ["ProjectA", "ProjectB"]: Include only these projects
+    
+#     Supporte 3 formats:
+#     1. Projets dans un workspace (standard):
+#         with workspace("MyLib"): 
+#             with project("Lib1"): ...
+    
+#     2. Projets standalone SANS workspace:
+#         with project("Lib1"): ...  # Direct project definition
+    
+#     3. Mélange de projets et workspace:
+#         with project("Lib1"): ...
+#         with workspace("Other"): 
+#             with project("Lib2"): ...
+    
+#     Les projets avec location="." sont relatifs au fichier .jenga externe.
+#     """
+#     global _current_workspace
+    
+#     if _current_workspace is None:
+#         raise RuntimeError("include() must be called within a workspace")
+    
+#     from pathlib import Path
+    
+#     jenga_path = Path(jenga_file)
+    
+#     # Make relative to workspace location if not absolute
+#     if not jenga_path.is_absolute():
+#         workspace_dir = Path(_current_workspace.location) if _current_workspace.location else Path.cwd()
+#         jenga_path = workspace_dir / jenga_path
+    
+#     if not jenga_path.exists():
+#         raise FileNotFoundError(f"External .jenga file not found: {jenga_path}")
+    
+#     # Store the external file's directory for relative project locations
+#     external_dir = jenga_path.parent.absolute()
+    
+#     # Save current state
+#     old_projects = dict(_current_workspace.projects)
+#     old_location = _current_workspace.location
+#     old_toolchains = dict(_current_workspace.toolchains)
+    
+#     # Temporarily set workspace location to external directory
+#     # This ensures that relative paths in external file are resolved correctly
+#     original_location = _current_workspace.location
+#     _current_workspace.location = str(external_dir)
+    
+#     # Read and execute the external file
+#     with open(jenga_path, 'r', encoding='utf-8') as f:
+#         external_code = f.read()
+    
+#     # Comment out imports
+#     import re
+#     external_code = re.sub(
+#         r'^(\s*)(from\s+jenga\..*?import\s+.*?)$',
+#         r'\1# \2  # Auto-commented by Jenga loader',
+#         external_code,
+#         flags=re.MULTILINE
+#     )
+    
+#     # Create execution context
+#     exec_globals = {
+#         '__file__': str(jenga_path.absolute()),
+#         '__name__': '__external__',
+#         '_current_workspace': _current_workspace,
+#         '_external_include': True,  # Flag to indicate we're in an include
+#     }
+    
+#     # Inject ALL API functions
+#     import sys
+    
+#     # Dynamically get all API functions
+#     current_module = sys.modules[__name__]
+#     for name in dir(current_module):
+#         if not name.startswith('_'):
+#             obj = getattr(current_module, name)
+#             if callable(obj) or isinstance(obj, (int, float, str, list, dict, type)):
+#                 exec_globals[name] = obj
+    
+#     # Also inject workspace class for standalone projects
+#     exec_globals['Workspace'] = Workspace
+    
+#     # Store projects defined outside of workspace
+#     standalone_projects = {}
+#     original_projects_count = len(_current_workspace.projects)
+    
+#     try:
+#         # Execute external file in its own directory
+#         original_cwd = Path.cwd()
+#         os.chdir(external_dir)
+        
+#         # Track if we're inside a workspace in the external file
+#         external_workspace_active = False
+        
+#         # Helper function to track workspace context
+#         class _TrackedWorkspace(workspace):
+#             def __enter__(self):
+#                 nonlocal external_workspace_active
+#                 external_workspace_active = True
+#                 return super().__enter__()
+            
+#             def __exit__(self, exc_type, exc_val, exc_tb):
+#                 nonlocal external_workspace_active
+#                 result = super().__exit__(exc_type, exc_val, exc_tb)
+#                 external_workspace_active = False
+#                 return result
+        
+#         exec_globals['workspace'] = _TrackedWorkspace
+        
+#         # Execute the code
+#         exec(external_code, exec_globals)
+        
+#         # Check what was added
+#         all_new_projects = set(_current_workspace.projects.keys()) - set(old_projects.keys())
+        
+#         # If no workspace was active during execution, projects were defined standalone
+#         # They are already in _current_workspace.projects
+#         if not external_workspace_active and all_new_projects:
+#             # These are standalone projects
+#             standalone_projects = {name: _current_workspace.projects[name] for name in all_new_projects}
+        
+#         # Filter projects if specific list provided
+#         if projects is not None and "*" not in projects:
+#             # Determine which projects to keep
+#             projects_to_keep = set(projects)
+            
+#             # Remove projects not in the inclusion list
+#             for proj_name in list(_current_workspace.projects.keys()):
+#                 if proj_name in all_new_projects and proj_name not in projects_to_keep:
+#                     del _current_workspace.projects[proj_name]
+#                     if proj_name in standalone_projects:
+#                         del standalone_projects[proj_name]
+        
+#         # Adjust project locations for included projects
+#         for proj_name, proj in _current_workspace.projects.items():
+#             if proj_name in all_new_projects:
+#                 # Mark as external
+#                 proj._external = True
+#                 proj._external_file = str(jenga_path)
+#                 proj._external_dir = str(external_dir)
+#                 proj._standalone = proj_name in standalone_projects
+                
+#                 # Handle location: 
+#                 # - If location is "." or empty, set to external directory
+#                 # - If relative, make it relative to external directory (not main workspace)
+#                 if proj.location == "." or not proj.location:
+#                     # Means "same directory as the external .jenga file"
+#                     proj.location = str(external_dir)
+#                 elif not Path(proj.location).is_absolute():
+#                     # Relative path - make it relative to external directory
+#                     proj.location = str(external_dir / proj.location)
+#                 # If absolute, leave as is
+        
+#         # Merge toolchains from external file
+#         new_toolchains = set(_current_workspace.toolchains.keys()) - set(old_toolchains.keys())
+#         for tc_name in new_toolchains:
+#             # Mark as external toolchain
+#             _current_toolchain = _current_workspace.toolchains[tc_name]
+#             _current_toolchain._external = True
+#             _current_toolchain._external_file = str(jenga_path)
+        
+#         # Restore workspace location
+#         _current_workspace.location = original_location
+        
+#         # Restore original working directory
+#         os.chdir(original_cwd)
+        
+#         # Return list of included projects for user feedback
+#         included_projects = list(set(_current_workspace.projects.keys()) - set(old_projects.keys()))
+#         return included_projects
+        
+#     except Exception as e:
+#         # Restore on error
+#         _current_workspace.location = original_location
+        
+#         # Restore original working directory
+#         os.chdir(original_cwd)
+        
+#         raise RuntimeError(f"Error in included file {jenga_file}: {e}") from e
+
+
+"""
+NEW INCLUDE SYSTEM - Context Manager Based
+Complete rewrite of the external project inclusion system
+"""
+
+# ============================================================================
+# NOUVELLE APPROCHE: include comme context manager
+# ============================================================================
+
+class include:
     """
-    Include projects from external .jenga file
+    Context manager for including external .jenga files
     
-    Args:
-        jenga_file: Path to .jenga file (relative to workspace or absolute)
-        projects: Optional list of project names to include
-                 - None: Include all projects
-                 - ["ProjectA", "ProjectB"]: Include only these projects
+    Usage in workspace:
+        with workspace("MyApp"):
+            with toolchain("default", "g++"):
+                # ... toolchain config
+            
+            # Include external projects
+            with include("libs/logger/logger.jenga"):
+                # Optionally filter which projects to include
+                only(["Logger"])  # or skip(["Tests"])
+            
+            with include("libs/math/math.jenga"):
+                # Include all projects from this file
+                pass
+            
+            # Your own projects
+            with project("MyApp"):
+                # ... project config
+                dependson(["Logger", "MathLib"])  # Reference included projects
     
-    Supporte 3 formats:
-    1. Projets dans un workspace (standard):
-        with workspace("MyLib"): 
-            with project("Lib1"): ...
+    Features:
+    - Clean context manager syntax
+    - Automatic workspace isolation
+    - Proper toolchain inheritance
+    - Path resolution
+    - Project filtering
+    """
     
-    2. Projets standalone SANS workspace:
-        with project("Lib1"): ...  # Direct project definition
+    def __init__(self, jenga_file: str):
+        """
+        Initialize include context
+        
+        Args:
+            jenga_file: Path to external .jenga file (relative to workspace or absolute)
+        """
+        self.jenga_file = jenga_file
+        self.jenga_path = None
+        self.external_dir = None
+        self.parent_workspace = None
+        self.temp_workspace = None
+        self.included_projects = []
+        self.filter_mode = None  # 'only' or 'skip'
+        self.filter_projects = []
+        
+    def __enter__(self):
+        global _current_workspace, _current_project, _current_toolchain, _current_filter
+        
+        if _current_workspace is None:
+            raise RuntimeError("include() must be used within a workspace context")
+        
+        from pathlib import Path
+        import os
+        
+        # Save parent workspace
+        self.parent_workspace = _current_workspace
+        
+        # Resolve path
+        self.jenga_path = Path(self.jenga_file)
+        if not self.jenga_path.is_absolute():
+            workspace_dir = Path(self.parent_workspace.location) if self.parent_workspace.location else Path.cwd()
+            self.jenga_path = workspace_dir / self.jenga_path
+        
+        if not self.jenga_path.exists():
+            raise FileNotFoundError(f"External .jenga file not found: {self.jenga_path}")
+        
+        self.external_dir = self.jenga_path.parent.absolute()
+        
+        # Create isolated workspace for external file
+        self.temp_workspace = Workspace(name=f"__include_{self.jenga_path.stem}__")
+        self.temp_workspace.location = str(self.external_dir)
+        
+        # Copy toolchains from parent (inheritance)
+        self.temp_workspace.toolchains = dict(self.parent_workspace.toolchains)
+        
+        # Read external file
+        with open(self.jenga_path, 'r', encoding='utf-8') as f:
+            external_code = f.read()
+        
+        # Comment out jenga imports
+        import re
+        external_code = re.sub(
+            r'^(\s*)(from\s+[Jj]enga\..*?import\s+.*?)$',
+            r'\1# \2  # Auto-commented by include',
+            external_code,
+            flags=re.MULTILINE
+        )
+        
+        # Create execution context
+        exec_globals = self._create_execution_context()
+        
+        # Save current directory
+        self.original_cwd = Path.cwd()
+        
+        # Execute in external directory
+        os.chdir(self.external_dir)
+        
+        try:
+            # Switch to temp workspace
+            _current_workspace = self.temp_workspace
+            _current_project = None
+            _current_toolchain = None
+            _current_filter = None
+            
+            # Execute external file
+            exec(external_code, exec_globals)
+            
+        finally:
+            # Restore parent workspace
+            _current_workspace = self.parent_workspace
+            _current_project = None
+            _current_toolchain = None
+            _current_filter = None
+            
+            # Restore directory
+            os.chdir(self.original_cwd)
+        
+        # Return self for filter methods (only/skip)
+        return self
     
-    3. Mélange de projets et workspace:
-        with project("Lib1"): ...
-        with workspace("Other"): 
-            with project("Lib2"): ...
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Transfer projects from temp workspace to parent workspace"""
+        
+        # Définir resolve_path UNE FOIS en dehors de la boucle
+        def resolve_path(path, base_dir=None):
+            """Resolve a path relative to external directory"""
+            if base_dir is None:
+                base_dir = self.external_dir
+            
+            from pathlib import Path
+            path_obj = Path(path)
+            
+            # Si c'est déjà un chemin absolu, le garder
+            if path_obj.is_absolute():
+                return str(path_obj)
+            
+            # Si c'est un chemin avec des variables comme %{prj.location}, le garder tel quel
+            if '%{' in path:
+                return path
+            
+            # Faire le chemin relatif au dossier de base
+            resolved = base_dir / path_obj
+            
+            # Essayer de le rendre relatif au workspace
+            workspace_dir = Path(self.parent_workspace.location) if self.parent_workspace.location else Path.cwd()
+            try:
+                return str(resolved.relative_to(workspace_dir))
+            except ValueError:
+                # Si on ne peut pas le rendre relatif, garder le chemin absolu
+                return str(resolved)
+        
+        # Déterminer quels projets inclure
+        projects_to_include = set(self.temp_workspace.projects.keys())
+        
+        # Appliquer les filtres
+        if self.filter_mode == 'only':
+            projects_to_include &= set(self.filter_projects)
+        elif self.filter_mode == 'skip':
+            projects_to_include -= set(self.filter_projects)
+        
+        # Supprimer les projets cachés (comme __Unitest__)
+        projects_to_include = {p for p in projects_to_include if not p.startswith('__')}
+        
+        # Transférer les projets
+        from pathlib import Path
+        
+        for proj_name in projects_to_include:
+            proj = self.temp_workspace.projects[proj_name]
+            
+            # Ajuster la localisation du projet
+            if proj.location == "." or not proj.location:
+                proj.location = str(self.external_dir)
+            elif not Path(proj.location).is_absolute() and '%{' not in proj.location:
+                proj.location = str(self.external_dir / Path(proj.location))
+            
+            # ============================================================
+            # AJUSTER TOUS LES CHEMINS RELATIFS
+            # ============================================================
+            
+            # 1. Chemins de fichiers et patterns
+            adjusted_files = []
+            for file_pattern in proj.files:
+                # Si c'est un pattern glob ou contient des variables, le garder tel quel
+                if '**' in file_pattern or '*' in file_pattern or '%{' in file_pattern:
+                    adjusted_files.append(file_pattern)
+                elif not Path(file_pattern).is_absolute():
+                    adjusted_files.append(resolve_path(file_pattern))
+                else:
+                    adjusted_files.append(file_pattern)
+            proj.files = adjusted_files
+            
+            # 2. Fichiers exclus
+            adjusted_excludes = []
+            for file_pattern in proj.excludefiles:
+                if '**' in file_pattern or '*' in file_pattern or '%{' in file_pattern:
+                    adjusted_excludes.append(file_pattern)
+                elif not Path(file_pattern).is_absolute():
+                    adjusted_excludes.append(resolve_path(file_pattern))
+                else:
+                    adjusted_excludes.append(file_pattern)
+            proj.excludefiles = adjusted_excludes
+            
+            # 3. Fichiers main exclus (pour tests)
+            adjusted_main_excludes = []
+            for file_pattern in proj.excludemainfiles:
+                if '**' in file_pattern or '*' in file_pattern or '%{' in file_pattern:
+                    adjusted_main_excludes.append(file_pattern)
+                elif not Path(file_pattern).is_absolute():
+                    adjusted_main_excludes.append(resolve_path(file_pattern))
+                else:
+                    adjusted_main_excludes.append(file_pattern)
+            proj.excludemainfiles = adjusted_main_excludes
+            
+            # 4. Répertoires d'inclusion
+            proj.includedirs = [
+                resolve_path(path) if not Path(path).is_absolute() and '%{' not in path else path 
+                for path in proj.includedirs
+            ]
+            
+            # 5. Répertoires de bibliothèques
+            proj.libdirs = [
+                resolve_path(path) if not Path(path).is_absolute() and '%{' not in path else path 
+                for path in proj.libdirs
+            ]
+            
+            # 6. Fichiers de dépendances (à copier)
+            adjusted_dependfiles = []
+            for pattern in proj.dependfiles:
+                if '**' in pattern or '*' in pattern or '%{' in pattern:
+                    adjusted_dependfiles.append(pattern)
+                elif not Path(pattern).is_absolute():
+                    adjusted_dependfiles.append(resolve_path(pattern))
+                else:
+                    adjusted_dependfiles.append(pattern)
+            proj.dependfiles = adjusted_dependfiles
+            
+            # 7. Ressources embarquées
+            adjusted_resources = []
+            for resource in proj.embedresources:
+                if not Path(resource).is_absolute():
+                    adjusted_resources.append(resolve_path(resource))
+                else:
+                    adjusted_resources.append(resource)
+            proj.embedresources = adjusted_resources
+            
+            # 8. Précompiled headers
+            if proj.pchheader and not Path(proj.pchheader).is_absolute() and '%{' not in proj.pchheader:
+                proj.pchheader = resolve_path(proj.pchheader)
+            
+            if proj.pchsource and not Path(proj.pchsource).is_absolute() and '%{' not in proj.pchsource:
+                proj.pchsource = resolve_path(proj.pchsource)
+            
+            # 9. Test files
+            adjusted_testfiles = []
+            for pattern in proj.testfiles:
+                if '**' in pattern or '*' in pattern or '%{' in pattern:
+                    adjusted_testfiles.append(pattern)
+                elif not Path(pattern).is_absolute():
+                    adjusted_testfiles.append(resolve_path(pattern))
+                else:
+                    adjusted_testfiles.append(pattern)
+            proj.testfiles = adjusted_testfiles
+            
+            # 10. Test main file
+            if proj.testmainfile and not Path(proj.testmainfile).is_absolute() and '%{' not in proj.testmainfile:
+                proj.testmainfile = resolve_path(proj.testmainfile)
+            
+            # 11. Test main template
+            if proj.testmaintemplate and not Path(proj.testmaintemplate).is_absolute() and '%{' not in proj.testmaintemplate:
+                proj.testmaintemplate = resolve_path(proj.testmaintemplate)
+            
+            # 12. Chemins Android (si définis)
+            if hasattr(proj, 'androidkeystore') and proj.androidkeystore and not Path(proj.androidkeystore).is_absolute():
+                proj.androidkeystore = resolve_path(proj.androidkeystore)
+            
+            # 13. Output directories (objdir, targetdir) - les garder avec les variables
+            # Ces chemins utilisent généralement %{...} donc on ne les ajuste pas
+            
+            # ============================================================
+            # MARQUER COMME EXTERNE
+            # ============================================================
+            proj._external = True
+            proj._external_file = str(self.jenga_path)
+            proj._external_dir = str(self.external_dir)
+            proj._original_location = getattr(proj, '_original_location', proj.location)
+            
+            # ============================================================
+            # AJOUTER AU WORKSPACE PARENT
+            # ============================================================
+            self.parent_workspace.projects[proj_name] = proj
+            self.included_projects.append(proj_name)
+        
+        # Ajuster aussi les toolchains si nécessaire
+        for tc_name, tc in self.temp_workspace.toolchains.items():
+            if tc_name not in self.parent_workspace.toolchains:
+                # Ajuster les chemins dans le toolchain
+                if tc.sysroot and not Path(tc.sysroot).is_absolute():
+                    tc.sysroot = str(self.external_dir / Path(tc.sysroot))
+                
+                if tc.toolchain_dir and not Path(tc.toolchain_dir).is_absolute():
+                    tc.toolchain_dir = str(self.external_dir / Path(tc.toolchain_dir))
+                
+                # Marquer comme externe
+                tc._external = True
+                tc._external_file = str(self.jenga_path)
+                
+                # Ajouter au parent
+                self.parent_workspace.toolchains[tc_name] = tc
+        
+        # Journaliser le succès
+        if self.included_projects:
+            print(f"✅ Included {len(self.included_projects)} project(s) from {self.jenga_path.name}: {', '.join(self.included_projects)}")
+            # Debug: montrer les chemins résolus
+            for proj_name in self.included_projects:
+                proj = self.parent_workspace.projects[proj_name]
+                print(f"   {proj_name}:")
+                print(f"     Location: {proj.location}")
+                print(f"     Include dirs: {proj.includedirs}")
+                print(f"     Files: {proj.files[:3]}{'...' if len(proj.files) > 3 else ''}")
+        
+        return False
     
-    Les projets avec location="." sont relatifs au fichier .jenga externe.
+    def only(self, project_names: list):
+        """
+        Include only specified projects
+        
+        Usage:
+            with include("lib.jenga") as inc:
+                inc.only(["Logger", "Utils"])
+        """
+        self.filter_mode = 'only'
+        self.filter_projects = project_names
+        return self
+    
+    def skip(self, project_names: list):
+        """
+        Skip specified projects
+        
+        Usage:
+            with include("lib.jenga") as inc:
+                inc.skip(["Tests", "Examples"])
+        """
+        self.filter_mode = 'skip'
+        self.filter_projects = project_names
+        return self
+    
+    def _create_execution_context(self):
+        """Create isolated execution context for external file"""
+        import sys
+        from pathlib import Path
+        
+        # Create clean namespace
+        exec_globals = {
+            '__file__': str(self.jenga_path),
+            '__name__': '__external__',
+            '__builtins__': __builtins__,
+            'Path': Path,
+            
+            # CRITICAL: Inject state variables that will be used by exec()
+            '_current_workspace': self.temp_workspace,
+            '_current_project': None,
+            '_current_toolchain': None,
+            '_current_filter': None,
+        }
+        
+        # Inject all API classes and functions
+        current_module = sys.modules[__name__]
+        
+        exclude_items = {
+            # Don't inject include itself to avoid recursion issues
+            'include',
+            'get_current_workspace',
+            'reset_state',
+        }
+        
+        for name in dir(current_module):
+            if not name.startswith('_') and name not in exclude_items:
+                obj = getattr(current_module, name)
+                exec_globals[name] = obj
+        
+        return exec_globals
+    
+    # Dans la classe include, ajoutez:
+    def getprojects(self) -> dict:
+        """
+        Get dictionary of included projects with their properties
+        
+        Returns:
+            Dict mapping project names to their Project objects
+            
+        Example:
+            with include("libs/logger/logger.jenga") as inc:
+                projects = inc.get_projects()
+                for name, proj in projects.items():
+                    print(f"{name}: {proj.location}")
+        """
+        return self.temp_workspace.projects
+
+    def getproject(self, name: str):
+        """
+        Get specific included project
+        
+        Args:
+            name: Project name
+            
+        Returns:
+            Project object or None if not found
+            
+        Example:
+            with include("libs/logger/logger.jenga") as inc:
+                logger = inc.get_project("Logger")
+                if logger:
+                    print(f"Logger include dirs: {logger.includedirs}")
+        """
+        return self.temp_workspace.projects.get(name)
+
+
+# ============================================================================
+# ALTERNATIVE SYNTAXES (for backward compatibility or preference)
+# ============================================================================
+
+def addprojects(jenga_file: str, projects: list = None):
+    """
+    Function-based alternative to include context manager
+    For users who prefer function calls over context managers
+    
+    Usage:
+        with workspace("MyApp"):
+            # Include all projects
+            includeprojects("libs/logger/logger.jenga")
+            
+            # Include specific projects
+            includeprojects("libs/math/math.jenga", ["MathLib", "MathUtils"])
     """
     global _current_workspace
     
     if _current_workspace is None:
-        raise RuntimeError("include() must be called within a workspace")
+        raise RuntimeError("includeprojects() must be called within a workspace")
     
-    from pathlib import Path
+    # Use the include context manager internally
+    with include(jenga_file) as inc:
+        if projects:
+            inc.only(projects)
+
+    return inc.included_projects
+
+def useproject(project_name: str, copy_includes: bool = True, copy_defines: bool = True):
+    """
+    Use properties from another project in current project
     
-    jenga_path = Path(jenga_file)
+    Args:
+        project_name: Name of project to use
+        copy_includes: Whether to copy include directories
+        copy_defines: Whether to copy preprocessor defines
     
-    # Make relative to workspace location if not absolute
-    if not jenga_path.is_absolute():
-        workspace_dir = Path(_current_workspace.location) if _current_workspace.location else Path.cwd()
-        jenga_path = workspace_dir / jenga_path
+    Example:
+        with workspace("MyApp"):
+            with include("libs/logger/logger.jenga"):
+                pass
+            
+            with project("MyApp"):
+                # Use Logger project properties
+                use_project("Logger")
+                # Now MyApp has Logger's include dirs and defines
+                
+                # Optional: copy only specific properties
+                use_project("MathLib", copy_includes=True, copy_defines=False)
+    """
+    global _current_project, _current_workspace
     
-    if not jenga_path.exists():
-        raise FileNotFoundError(f"External .jenga file not found: {jenga_path}")
+    if not _current_project:
+        raise RuntimeError("use_project() must be called within a project context")
     
-    # Store the external file's directory for relative project locations
-    external_dir = jenga_path.parent.absolute()
+    if project_name not in _current_workspace.projects:
+        raise ValueError(f"Project '{project_name}' not found in workspace")
     
-    # Save current state
-    old_projects = dict(_current_workspace.projects)
-    old_location = _current_workspace.location
-    old_toolchains = dict(_current_workspace.toolchains)
+    source_project = _current_workspace.projects[project_name]
     
-    # Temporarily set workspace location to external directory
-    # This ensures that relative paths in external file are resolved correctly
-    original_location = _current_workspace.location
-    _current_workspace.location = str(external_dir)
+    # Copy properties as needed
+    if copy_includes and source_project.includedirs:
+        _current_project.includedirs.extend(source_project.includedirs)
     
-    # Read and execute the external file
-    with open(jenga_path, 'r', encoding='utf-8') as f:
-        external_code = f.read()
+    if copy_defines and source_project.defines:
+        _current_project.defines.extend(source_project.defines)
     
-    # Comment out imports
-    import re
-    external_code = re.sub(
-        r'^(\s*)(from\s+jenga\..*?import\s+.*?)$',
-        r'\1# \2  # Auto-commented by Jenga loader',
-        external_code,
-        flags=re.MULTILINE
-    )
+    # Always add as dependency
+    if project_name not in _current_project.dependson:
+        _current_project.dependson.append(project_name)
     
-    # Create execution context
-    exec_globals = {
-        '__file__': str(jenga_path.absolute()),
-        '__name__': '__external__',
-        '_current_workspace': _current_workspace,
-        '_external_include': True,  # Flag to indicate we're in an include
+    print(f"✅ Using properties from project '{project_name}'")
+
+
+def getpp(project_name: str = None):
+    """
+    Get properties of a project (current or specified)
+    
+    Args:
+        project_name: Name of project (None for current project)
+    
+    Returns:
+        Dict with project properties including:
+        - name, kind, language, location
+        - files, includedirs, libdirs
+        - defines, links, dependson
+        - targetdir, targetname
+        - is_test, parent_project (for tests)
+        - external (if included from external file)
+    
+    Example:
+        # Get current project properties
+        props = get_project_properties()
+        
+        # Get specific project properties
+        logger_props = get_project_properties("Logger")
+        
+        # Use in your project
+        with project("MyApp"):
+            logger_props = get_project_properties("Logger")
+            includedirs(logger_props['includedirs'])
+            links(logger_props['links'])
+    """
+    global _current_workspace, _current_project
+    
+    if not _current_workspace:
+        return None
+    
+    if project_name is None:
+        if _current_project:
+            project = _current_project
+        else:
+            return None
+    elif project_name in _current_workspace.projects:
+        project = _current_workspace.projects[project_name]
+    else:
+        return None
+    
+    # Extract all relevant properties
+    properties = {
+        'name': project.name,
+        'kind': project.kind.value,
+        'language': project.language.value,
+        'location': project.location,
+        'cppdialect': project.cppdialect,
+        'cdialect': project.cdialect,
+        'files': list(project.files),
+        'excludefiles': list(project.excludefiles),
+        'includedirs': list(project.includedirs),
+        'libdirs': list(project.libdirs),
+        'objdir': project.objdir,
+        'targetdir': project.targetdir,
+        'targetname': project.targetname,
+        'defines': list(project.defines),
+        'optimize': project.optimize.value,
+        'symbols': project.symbols,
+        'warnings': project.warnings,
+        'links': list(project.links),
+        'dependson': list(project.dependson),
+        'toolchain': project.toolchain,
+        'is_test': getattr(project, 'is_test', False),
+        'parent_project': getattr(project, 'parent_project', None),
     }
     
-    # Inject ALL API functions
+    # Add external project info if applicable
+    if hasattr(project, '_external'):
+        properties.update({
+            'external': True,
+            'external_file': getattr(project, '_external_file', 'unknown'),
+            'external_dir': getattr(project, '_external_dir', 'unknown'),
+        })
+    
+    return properties
+
+
+# ============================================================================
+# UTILITY FUNCTIONS FOR MANAGING INCLUDES
+# ============================================================================
+
+def listincludes() -> list:
+    """
+    List all included external projects in current workspace
+    
+    Returns:
+        List of dicts with project info
+    """
+    global _current_workspace
+    
+    if not _current_workspace:
+        return []
+    
+    includes = []
+    for name, proj in _current_workspace.projects.items():
+        if hasattr(proj, '_external') and proj._external:
+            includes.append({
+                'name': name,
+                'source_file': proj._external_file,
+                'source_dir': proj._external_dir,
+                'location': proj.location,
+            })
+    
+    return includes
+
+
+def validateincludes():
+    """
+    Validate all included projects have valid dependencies
+    Raises RuntimeError if issues found
+    """
+    global _current_workspace
+    
+    if not _current_workspace:
+        return
+    
+    errors = []
+    
+    for proj_name, proj in _current_workspace.projects.items():
+        # Check dependencies exist
+        for dep in proj.dependson:
+            if dep not in _current_workspace.projects:
+                errors.append(
+                    f"Project '{proj_name}' depends on '{dep}' which doesn't exist"
+                )
+    
+    if errors:
+        raise RuntimeError(
+            "Dependency validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
+        )
+    
+    print(f"✅ All {len(_current_workspace.projects)} projects validated successfully")
+
+
+def getincludeinfo(project_name: str) -> dict:
+    """
+    Get detailed information about an included project
+    
+    Args:
+        project_name: Name of the project
+    
+    Returns:
+        Dict with project information or None if not found
+    """
+    global _current_workspace
+    
+    if not _current_workspace or project_name not in _current_workspace.projects:
+        return None
+    
+    proj = _current_workspace.projects[project_name]
+    
+    info = {
+        'name': proj.name,
+        'kind': proj.kind.value,
+        'language': proj.language.value,
+        'location': proj.location,
+        'is_external': hasattr(proj, '_external') and proj._external,
+    }
+    
+    if info['is_external']:
+        info.update({
+            'source_file': proj._external_file,
+            'source_dir': proj._external_dir,
+        })
+    
+    return info
+
+
+
+# ============================================================================
+# ADVANCED FEATURES
+# ============================================================================
+
+class batch_include:
+    """
+    Include multiple .jenga files at once
+    
+    Usage:
+        with batch_include([
+            "libs/logger/logger.jenga",
+            "libs/math/math.jenga",
+            "libs/network/network.jenga"
+        ]):
+            # All projects from these files are included
+            pass
+        
+        # Or with filters
+        with batch_include({
+            "libs/logger/logger.jenga": None,  # Include all
+            "libs/math/math.jenga": ["MathLib"],  # Include only MathLib
+            "libs/network/network.jenga": None,  # Include all
+        }):
+            pass
+    """
+    
+    def __init__(self, includes):
+        """
+        Args:
+            includes: List of paths or dict of {path: project_filter}
+        """
+        if isinstance(includes, list):
+            self.includes = {path: None for path in includes}
+        else:
+            self.includes = includes
+        
+        self.included_projects = []
+    
+    def __enter__(self):
+        for jenga_file, projects in self.includes.items():
+            with include(jenga_file) as inc:
+                if projects:
+                    inc.only(projects)
+            
+            self.included_projects.extend(inc.included_projects)
+        
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.included_projects:
+            print(f"✅ Batch included {len(self.included_projects)} total projects")
+        return False
+
+
+def include_from_directory(directory: str, pattern: str = "*.jenga"):
+    """
+    Include all .jenga files from a directory
+    
+    Usage:
+        with workspace("MyApp"):
+            # Include all .jenga files from libs/
+            include_from_directory("libs")
+            
+            # Include only specific pattern
+            include_from_directory("libs", "*_lib.jenga")
+    """
+    from pathlib import Path
+    
+    dir_path = Path(directory)
+    if not dir_path.is_absolute():
+        global _current_workspace
+        if _current_workspace and _current_workspace.location:
+            dir_path = Path(_current_workspace.location) / dir_path
+    
+    jenga_files = list(dir_path.glob(pattern))
+    
+    if not jenga_files:
+        print(f"⚠️  No .jenga files found in {directory} matching {pattern}")
+        return []
+    
+    included = []
+    for jenga_file in jenga_files:
+        with include(str(jenga_file)):
+            pass
+        included.append(str(jenga_file))
+    
+    print(f"✅ Included {len(included)} .jenga files from {directory}")
+    return included
+
+
+def create_include_execution_context(temp_workspace, external_dir, jenga_path):
+    """Créer un contexte d'exécution SIMPLIFIÉ pour l'inclusion"""
     import sys
+    from pathlib import Path
     
-    # Dynamically get all API functions
+    # ⚠️ SOLUTION SIMPLE: Ne PAS créer de wrappers complexes
+    # Juste injecter toutes les classes et fonctions API originales
+    # Le _current_workspace sera mis à jour AVANT l'exec()
+    
+    exec_globals = {
+        '__file__': str(jenga_path),
+        '__name__': '__external__',
+        '__builtins__': __builtins__,
+        'Path': Path,
+    }
+    
+    # ============================================================
+    # INJECTION DE TOUTES LES CLASSES ET FONCTIONS API ORIGINALES
+    # ============================================================
     current_module = sys.modules[__name__]
+    
+    # Liste complète à exclure
+    exclude_items = {
+        'include', 'create_include_execution_context',
+        'lip', 'vip', 'get_current_workspace', 'reset_state',
+    }
+    
+    # Injecter TOUTES les classes et fonctions (y compris project, workspace, etc.)
     for name in dir(current_module):
-        if not name.startswith('_'):
+        if not name.startswith('_') and name not in exclude_items:
             obj = getattr(current_module, name)
-            if callable(obj) or isinstance(obj, (int, float, str, list, dict, type)):
-                exec_globals[name] = obj
+            exec_globals[name] = obj
     
-    # Also inject workspace class for standalone projects
-    exec_globals['Workspace'] = Workspace
+    return exec_globals
+
+
+# ============================================================
+# FONCTIONS UTILITAIRES SIMPLIFIÉES
+# ============================================================
+
+def lip():
+    """List all included (external) projects"""
+    if not _current_workspace:
+        return []
     
-    # Store projects defined outside of workspace
-    standalone_projects = {}
-    original_projects_count = len(_current_workspace.projects)
+    included = []
+    for name, proj in _current_workspace.projects.items():
+        if hasattr(proj, '_external') and proj._external:
+            included.append({
+                'name': name,
+                'external_file': getattr(proj, '_external_file', 'unknown'),
+                'location': proj.location,
+                'standalone': getattr(proj, '_standalone', False)
+            })
+    return included
+
+
+def vip():
+    """Validate that all included projects have valid dependencies"""
+    if not _current_workspace:
+        return
     
-    try:
-        # Execute external file in its own directory
-        original_cwd = Path.cwd()
-        os.chdir(external_dir)
-        
-        # Track if we're inside a workspace in the external file
-        external_workspace_active = False
-        
-        # Helper function to track workspace context
-        class _TrackedWorkspace(workspace):
-            def __enter__(self):
-                nonlocal external_workspace_active
-                external_workspace_active = True
-                return super().__enter__()
-            
-            def __exit__(self, exc_type, exc_val, exc_tb):
-                nonlocal external_workspace_active
-                result = super().__exit__(exc_type, exc_val, exc_tb)
-                external_workspace_active = False
-                return result
-        
-        exec_globals['workspace'] = _TrackedWorkspace
-        
-        # Execute the code
-        exec(external_code, exec_globals)
-        
-        # Check what was added
-        all_new_projects = set(_current_workspace.projects.keys()) - set(old_projects.keys())
-        
-        # If no workspace was active during execution, projects were defined standalone
-        # They are already in _current_workspace.projects
-        if not external_workspace_active and all_new_projects:
-            # These are standalone projects
-            standalone_projects = {name: _current_workspace.projects[name] for name in all_new_projects}
-        
-        # Filter projects if specific list provided
-        if projects is not None and "*" not in projects:
-            # Determine which projects to keep
-            projects_to_keep = set(projects)
-            
-            # Remove projects not in the inclusion list
-            for proj_name in list(_current_workspace.projects.keys()):
-                if proj_name in all_new_projects and proj_name not in projects_to_keep:
-                    del _current_workspace.projects[proj_name]
-                    if proj_name in standalone_projects:
-                        del standalone_projects[proj_name]
-        
-        # Adjust project locations for included projects
-        for proj_name, proj in _current_workspace.projects.items():
-            if proj_name in all_new_projects:
-                # Mark as external
-                proj._external = True
-                proj._external_file = str(jenga_path)
-                proj._external_dir = str(external_dir)
-                proj._standalone = proj_name in standalone_projects
-                
-                # Handle location: 
-                # - If location is "." or empty, set to external directory
-                # - If relative, make it relative to external directory (not main workspace)
-                if proj.location == "." or not proj.location:
-                    # Means "same directory as the external .jenga file"
-                    proj.location = str(external_dir)
-                elif not Path(proj.location).is_absolute():
-                    # Relative path - make it relative to external directory
-                    proj.location = str(external_dir / proj.location)
-                # If absolute, leave as is
-        
-        # Merge toolchains from external file
-        new_toolchains = set(_current_workspace.toolchains.keys()) - set(old_toolchains.keys())
-        for tc_name in new_toolchains:
-            # Mark as external toolchain
-            _current_toolchain = _current_workspace.toolchains[tc_name]
-            _current_toolchain._external = True
-            _current_toolchain._external_file = str(jenga_path)
-        
-        # Restore workspace location
-        _current_workspace.location = original_location
-        
-        # Restore original working directory
-        os.chdir(original_cwd)
-        
-        # Return list of included projects for user feedback
-        included_projects = list(set(_current_workspace.projects.keys()) - set(old_projects.keys()))
-        return included_projects
-        
-    except Exception as e:
-        # Restore on error
-        _current_workspace.location = original_location
-        
-        # Restore original working directory
-        os.chdir(original_cwd)
-        
-        raise RuntimeError(f"Error in included file {jenga_file}: {e}") from e
+    errors = []
+    for name, proj in _current_workspace.projects.items():
+        if hasattr(proj, '_external') and proj._external:
+            for dep in proj.dependson:
+                if dep not in _current_workspace.projects:
+                    errors.append(f"Project '{name}' depends on '{dep}' which doesn't exist")
+    
+    if errors:
+        raise RuntimeError(f"Dependency errors found:\n" + "\n".join(errors))
     
 
 # ============================================================================

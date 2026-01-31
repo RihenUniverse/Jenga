@@ -132,6 +132,15 @@ def main():
         except ImportError as e:
             Display.error(f"Failed to load create command: {e}")
             return 1
+
+    # Handle install command separately
+    if command == "install":
+        try:
+            from Commands.install import execute
+            return execute(options)
+        except ImportError as e:
+            Display.error(f"Failed to load install command: {e}")
+            return 1
     
     # Parse options
     options = parse_options(args[1:])
