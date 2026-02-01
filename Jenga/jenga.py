@@ -103,10 +103,10 @@ def print_help():
 def main():
     """Main entry point"""
     args = sys.argv[1:]
+    print_banner()
     
     # No arguments - show help
     if not args:
-        print_banner()
         print_help()
         return 0
     
@@ -114,13 +114,11 @@ def main():
     
     # Handle version command
     if command in ["--version", "-v", "version"]:
-        print_banner()
         print_version()
         return 0
     
     # Handle help command
     if command in ["help", "-h", "--help"]:
-        print_banner()
         print_help()
         return 0
     
@@ -154,7 +152,6 @@ def main():
         
         # Execute command
         if command in registry.commands:
-            print_banner()
             result = registry.execute(command, options)
             return 0 if result else 1
         else:
