@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nken Build System - Core API
+Jenga Build System - Core API
 Provides the DSL for configuring workspaces and projects
 """
 
@@ -10,6 +10,9 @@ from typing import List, Dict, Optional, Any, Tuple
 from pathlib import Path
 from enum import Enum
 import os
+import sys
+import re
+import json
 
 
 class ProjectKind(Enum):
@@ -1781,16 +1784,16 @@ def useproject(project_name: str, copy_includes: bool = True, copy_defines: bool
             
             with project("MyApp"):
                 # Use Logger project properties
-                use_project("Logger")
+                useproject("Logger")
                 # Now MyApp has Logger's include dirs and defines
                 
                 # Optional: copy only specific properties
-                use_project("MathLib", copy_includes=True, copy_defines=False)
+                useproject("MathLib", copy_includes=True, copy_defines=False)
     """
     global _current_project, _current_workspace
     
     if not _current_project:
-        raise RuntimeError("use_project() must be called within a project context")
+        raise RuntimeError("useproject() must be called within a project context")
     
     if project_name not in _current_workspace.projects:
         raise ValueError(f"Project '{project_name}' not found in workspace")
@@ -2631,6 +2634,1187 @@ def ndkversion(version: str):
     """
     if _current_project:
         _current_project.ndkversion = version
+
+@dataclass
+class ToolConfig:
+    """Configuration d'un outil externe"""
+    name: str
+    type: str  # 'compiler', 'sdk', 'ndk', 'emscripten', 'custom'
+    version: str = ""
+    path: str = ""
+    
+    # Compiler specific
+    cc: str = ""
+    cxx: str = ""
+    ar: str = ""
+    ld: str = ""
+    strip: str = ""
+    ranlib: str = ""
+    
+    # SDK specific
+    sdk_path: str = ""
+    include_paths: List[str] = field(default_factory=list)
+    library_paths: List[str] = field(default_factory=list)
+    frameworks: List[str] = field(default_factory=list)
+    
+    # Environment variables
+    env_vars: Dict[str, str] = field(default_factory=dict)
+    
+    # Tool flags
+    cflags: List[str] = field(default_factory=list)
+    cxxflags: List[str] = field(default_factory=list)
+    ldflags: List[str] = field(default_factory=list)
+    
+    # System configuration
+    sysroot: str = ""
+    target_triple: str = ""
+    
+    # Validation
+    validated: bool = False
+    validation_error: str = ""
+    
+    def validate(self) -> bool:
+        """Valider que l'outil existe et est fonctionnel"""
+        import subprocess
+        
+        # Vérifier le chemin de base
+        if self.path and not Path(self.path).exists():
+            self.validation_error = f"Tool path not found: {self.path}"
+            return False
+        
+        # Vérifier les exécutables
+        for executable in [self.cc, self.cxx, self.ar, self.ld]:
+            if executable:
+                try:
+                    # Vérifier si l'exécutable existe
+                    result = subprocess.run(
+                        [executable, '--version'] if not executable.endswith('.exe') else [executable],
+                        capture_output=True,
+                        text=True,
+                        timeout=2
+                    )
+                    if result.returncode != 0:
+                        self.validation_error = f"Tool not executable: {executable}"
+                        return False
+                except (FileNotFoundError, subprocess.TimeoutExpired):
+                    self.validation_error = f"Tool not found: {executable}"
+                    return False
+        
+        self.validated = True
+        return True
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convertir en dictionnaire pour serialisation"""
+        return {
+            'name': self.name,
+            'type': self.type,
+            'version': self.version,
+            'path': self.path,
+            'cc': self.cc,
+            'cxx': self.cxx,
+            'ar': self.ar,
+            'ld': self.ld,
+            'strip': self.strip,
+            'ranlib': self.ranlib,
+            'sdk_path': self.sdk_path,
+            'include_paths': self.include_paths,
+            'library_paths': self.library_paths,
+            'frameworks': self.frameworks,
+            'env_vars': self.env_vars,
+            'cflags': self.cflags,
+            'cxxflags': self.cxxflags,
+            'ldflags': self.ldflags,
+            'sysroot': self.sysroot,
+            'target_triple': self.target_triple,
+            'validated': self.validated
+        }
+
+
+class ExternalToolsManager:
+    """Gestionnaire d'outils externes"""
+    
+    def __init__(self):
+        self.tools: Dict[str, ToolConfig] = {}
+        self.active_tools: List[str] = []
+        self.tools_cache_file = Path(".jenga") / "tools_cache.json"
+        self._loaded = False
+    
+    def load_cache(self):
+        """Charger le cache depuis le disque"""
+        if not self._loaded and self.tools_cache_file.exists():
+            try:
+                with open(self.tools_cache_file, 'r') as f:
+                    data = json.load(f)
+                
+                for tool_name, tool_data in data.get('tools', {}).items():
+                    tool = ToolConfig(
+                        name=tool_data['name'],
+                        type=tool_data['type'],
+                        version=tool_data['version'],
+                        path=tool_data['path'],
+                        cc=tool_data.get('cc', ''),
+                        cxx=tool_data.get('cxx', ''),
+                        ar=tool_data.get('ar', ''),
+                        ld=tool_data.get('ld', ''),
+                        strip=tool_data.get('strip', ''),
+                        ranlib=tool_data.get('ranlib', ''),
+                        sdk_path=tool_data.get('sdk_path', ''),
+                        include_paths=tool_data.get('include_paths', []),
+                        library_paths=tool_data.get('library_paths', []),
+                        frameworks=tool_data.get('frameworks', []),
+                        env_vars=tool_data.get('env_vars', {}),
+                        cflags=tool_data.get('cflags', []),
+                        cxxflags=tool_data.get('cxxflags', []),
+                        ldflags=tool_data.get('ldflags', []),
+                        sysroot=tool_data.get('sysroot', ''),
+                        target_triple=tool_data.get('target_triple', ''),
+                        validated=tool_data.get('validated', False)
+                    )
+                    self.tools[tool_name] = tool
+                
+                self.active_tools = data.get('active_tools', [])
+                self._loaded = True
+                
+            except Exception as e:
+                print(f"⚠️ Warning: Could not load tools cache: {e}")
+    
+    def save_cache(self):
+        """Sauvegarder le cache sur le disque"""
+        try:
+            self.tools_cache_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            data = {
+                'tools': {name: tool.to_dict() for name, tool in self.tools.items()},
+                'active_tools': self.active_tools
+            }
+            
+            with open(self.tools_cache_file, 'w') as f:
+                json.dump(data, f, indent=2)
+                
+        except Exception as e:
+            print(f"⚠️ Warning: Could not save tools cache: {e}")
+    
+    def add_tool(self, tool: ToolConfig, activate: bool = True) -> bool:
+        """Ajouter un outil au gestionnaire"""
+        if tool.validate():
+            self.tools[tool.name] = tool
+            if activate and tool.name not in self.active_tools:
+                self.active_tools.append(tool.name)
+            self.save_cache()
+            return True
+        else:
+            print(f"❌ Failed to add tool '{tool.name}': {tool.validation_error}")
+            return False
+    
+    def get_tool(self, name: str) -> Optional[ToolConfig]:
+        """Récupérer un outil par son nom"""
+        self.load_cache()
+        return self.tools.get(name)
+    
+    def get_active_tools(self) -> List[ToolConfig]:
+        """Récupérer tous les outils actifs"""
+        self.load_cache()
+        return [self.tools[name] for name in self.active_tools if name in self.tools]
+    
+    def activate_tool(self, name: str) -> bool:
+        """Activer un outil"""
+        self.load_cache()
+        if name in self.tools:
+            if name not in self.active_tools:
+                self.active_tools.append(name)
+            self.save_cache()
+            return True
+        return False
+    
+    def deactivate_tool(self, name: str) -> bool:
+        """Désactiver un outil"""
+        self.load_cache()
+        if name in self.active_tools:
+            self.active_tools.remove(name)
+            self.save_cache()
+            return True
+        return False
+    
+    def list_tools(self) -> List[Dict[str, Any]]:
+        """Lister tous les outils"""
+        self.load_cache()
+        return [
+            {
+                'name': tool.name,
+                'type': tool.type,
+                'version': tool.version,
+                'path': tool.path,
+                'active': tool.name in self.active_tools,
+                'validated': tool.validated
+            }
+            for tool in self.tools.values()
+        ]
+
+
+# Gestionnaire global
+_tools_manager = ExternalToolsManager()
+
+
+class addtools:
+    """
+    Context manager pour ajouter des outils externes au système de build
+    
+    Usage:
+        # 1. Fichier local
+        with workspace("MyProject"):
+            with addtools("android-tools.jenga"):
+                pass
+        
+        # 2. Outil intégré de Jenga
+        with addtools("android-ndk"):  # Cherche dans Jenga/Tools/android-ndk.jenga
+            pass
+        
+        # 3. Dict inline
+        with addtools({
+            "custom_gcc": {
+                "type": "compiler",
+                "path": "/opt/gcc-12"
+            }
+        }):
+            pass
+    """
+    
+    def __init__(self, tools_config, activate: bool = True):
+        """
+        Initialise le context manager
+        
+        Args:
+            tools_config: Peut être:
+                - Chemin vers fichier (.jenga, .json, .py)
+                - Nom d'outil intégré (cherche dans Jenga/Tools/)
+                - Dict de configuration inline
+            activate: Si True, active automatiquement les outils
+        """
+        self.tools_config = tools_config
+        self.activate = activate
+        self.resolved_path = None
+        self.loaded_tools = []
+        self.previous_active_tools = []
+    
+    def __enter__(self):
+        global _tools_manager
+        
+        # Sauvegarder l'état actuel
+        self.previous_active_tools = _tools_manager.active_tools.copy()
+        
+        # Résoudre la configuration
+        self._resolve_and_load_config()
+        
+        # Activer les outils si demandé
+        if self.activate:
+            for tool_name in self.loaded_tools:
+                _tools_manager.activate_tool(tool_name)
+        
+        # Appliquer les variables d'environnement
+        self._apply_environment_vars()
+        
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        global _tools_manager
+        
+        # Restaurer les variables d'environnement
+        self._restore_environment_vars()
+        
+        # Restaurer l'état des outils actifs
+        _tools_manager.active_tools = self.previous_active_tools
+        _tools_manager.save_cache()
+        
+        return False
+    
+    def _resolve_and_load_config(self):
+        """Résoudre et charger la configuration"""
+        global _tools_manager
+        
+        # 1. Si c'est un dict, charger directement
+        if isinstance(self.tools_config, dict):
+            self._load_from_dict(self.tools_config)
+            return
+        
+        # 2. Si c'est une chaîne, résoudre le chemin
+        config_str = str(self.tools_config)
+        
+        # 2a. D'abord vérifier si c'est un outil intégré
+        builtin_config = JengaToolsRegistry.load_builtin_tool_config(config_str)
+        if builtin_config:
+            self._load_from_dict(builtin_config)
+            return
+        
+        # 2b. Résoudre le chemin
+        self.resolved_path = self._resolve_tools_config(config_str)
+        if not self.resolved_path:
+            raise FileNotFoundError(
+                f"Tools config not found: {config_str}\n"
+                f"Searched in: current directory, workspace, Jenga/Tools/, ~/.jenga/tools/"
+            )
+        
+        # 2c. Charger selon l'extension
+        extension = self.resolved_path.suffix.lower()
+        
+        if extension == '.jenga':
+            self._load_from_jenga_file()
+        elif extension == '.json':
+            self._load_from_json_file()
+        elif extension == '.py':
+            self._load_from_python_file()
+        else:
+            # Essayer de détecter automatiquement
+            self._load_autodetect()
+    
+    def _resolve_tools_config(self, config_str: str) -> Optional[Path]:
+        """Résoudre le chemin de configuration avec recherche hiérarchique"""
+        from pathlib import Path
+        
+        # Liste des endroits où chercher
+        search_locations = []
+        
+        # a. Chemin courant
+        current = Path.cwd()
+        search_locations.extend([
+            current / config_str,
+            current / f"{config_str}.jenga",
+            current / f"{config_str}.json",
+            current / f"{config_str}.py"
+        ])
+        
+        # b. Workspace (si on en a un)
+        workspace_path = self._find_workspace_path()
+        if workspace_path:
+            search_locations.extend([
+                workspace_path / config_str,
+                workspace_path / f"{config_str}.jenga",
+                workspace_path / f"{config_str}.json",
+                workspace_path / f"{config_str}.py",
+                workspace_path / "tools" / config_str,
+                workspace_path / "tools" / f"{config_str}.jenga"
+            ])
+        
+        # c. Jenga/Tools/ (outils intégrés)
+        jenga_tools_path = self._get_jenga_tools_path()
+        if jenga_tools_path:
+            search_locations.extend([
+                jenga_tools_path / config_str,
+                jenga_tools_path / f"{config_str}.jenga",
+                jenga_tools_path / f"{config_str}.json",
+                jenga_tools_path / f"{config_str}.py"
+            ])
+        
+        # d. Environnement utilisateur
+        user_tools_path = Path.home() / ".jenga" / "tools"
+        if user_tools_path.exists():
+            search_locations.extend([
+                user_tools_path / config_str,
+                user_tools_path / f"{config_str}.jenga",
+                user_tools_path / f"{config_str}.json"
+            ])
+        
+        # Chercher le premier qui existe
+        for location in search_locations:
+            if location.exists():
+                return location
+        
+        return None
+    
+    def _get_jenga_tools_path(self) -> Optional[Path]:
+        """Trouver le chemin de Jenga/Tools/"""
+        import sys
+        import os
+        from pathlib import Path
+        
+        # Méthode 1: Chercher dans sys.path
+        for sys_path in sys.path:
+            if sys_path:
+                tools_path = Path(sys_path) / "Jenga" / "Tools"
+                if tools_path.exists():
+                    return tools_path
+        
+        # Méthode 2: Chercher à côté du module
+        try:
+            import Jenga
+            jenga_path = Path(Jenga.__file__).parent
+            tools_path = jenga_path / "Tools"
+            if tools_path.exists():
+                return tools_path
+        except:
+            pass
+        
+        # Méthode 3: Chercher dans l'installation
+        try:
+            import site
+            for site_packages in site.getsitepackages():
+                tools_path = Path(site_packages) / "Jenga" / "Tools"
+                if tools_path.exists():
+                    return tools_path
+        except:
+            pass
+        
+        return None
+    
+    def _load_tools_config(self):
+        """Charger la configuration d'outils depuis différents formats"""
+        global _tools_manager
+        
+        from pathlib import Path
+        
+        # Si c'est déjà un dict
+        if isinstance(self.tools_config, dict):
+            self._load_from_dict(self.tools_config)
+            return
+        
+        # Sinon, traiter comme un chemin
+        config_path = Path(self.tools_config)
+        
+        # Si chemin relatif, essayer de le résoudre
+        if not config_path.is_absolute():
+            # Chercher dans le répertoire courant
+            if config_path.exists():
+                self.config_path = config_path
+            else:
+                # Chercher dans le workspace
+                workspace_path = self._find_workspace_path()
+                if workspace_path:
+                    candidate = workspace_path / config_path
+                    if candidate.exists():
+                        self.config_path = candidate
+                    else:
+                        raise FileNotFoundError(f"Tools config not found: {config_path}")
+                else:
+                    raise FileNotFoundError(f"Tools config not found: {config_path}")
+        else:
+            self.config_path = config_path
+        
+        if not self.config_path.exists():
+            raise FileNotFoundError(f"Tools config not found: {self.config_path}")
+        
+        # Charger selon l'extension
+        extension = self.config_path.suffix.lower()
+        
+        if extension == '.jenga':
+            self._load_from_jenga_file()
+        elif extension == '.json':
+            self._load_from_json_file()
+        elif extension == '.py':
+            self._load_from_python_file()
+        else:
+            raise ValueError(f"Unsupported tools config format: {extension}")
+    
+    def _load_from_jenga_file(self):
+        """Charger depuis un fichier .jenga"""
+        global _tools_manager
+        
+        try:
+            # Lire le contenu du fichier
+            content = self.config_path.read_text(encoding='utf-8')
+            
+            # Extraire les définitions d'outils
+            # Format: tool_name = { ... }
+            import re
+            
+            # Pattern pour trouver les définitions d'outils
+            tool_pattern = r'(\w+)\s*=\s*(\{[^}]*\})'
+            
+            for match in re.finditer(tool_pattern, content, re.DOTALL):
+                tool_name = match.group(1)
+                tool_dict_str = match.group(2)
+                
+                try:
+                    # Évaluer le dict (sécurisé)
+                    tool_dict = self._safe_eval_dict(tool_dict_str)
+                    tool_dict['name'] = tool_name
+                    
+                    # Créer et ajouter l'outil
+                    tool = self._create_tool_from_dict(tool_dict)
+                    if tool:
+                        if _tools_manager.add_tool(tool, activate=self.activate):
+                            self.loaded_tools.append(tool_name)
+                            
+                except Exception as e:
+                    print(f"⚠️ Warning: Could not parse tool '{tool_name}': {e}")
+        
+        except Exception as e:
+            raise RuntimeError(f"Failed to load tools from {self.config_path}: {e}")
+    
+    def _load_from_json_file(self):
+        """Charger depuis un fichier JSON"""
+        global _tools_manager
+        
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if isinstance(data, dict):
+                for tool_name, tool_dict in data.items():
+                    if isinstance(tool_dict, dict):
+                        tool_dict['name'] = tool_name
+                        tool = self._create_tool_from_dict(tool_dict)
+                        if tool:
+                            if _tools_manager.add_tool(tool, activate=self.activate):
+                                self.loaded_tools.append(tool_name)
+        
+        except Exception as e:
+            raise RuntimeError(f"Failed to load tools from {self.config_path}: {e}")
+    
+    def _load_from_python_file(self):
+        """Charger depuis un fichier Python"""
+        global _tools_manager
+        
+        try:
+            # Créer un contexte d'exécution sécurisé
+            exec_globals = {
+                '__file__': str(self.config_path),
+                '__name__': '__tools_config__',
+                'Path': Path,
+            }
+            
+            # Exécuter le fichier
+            exec(self.config_path.read_text(encoding='utf-8'), exec_globals)
+            
+            # Chercher les variables qui sont des dicts (outils)
+            for var_name, var_value in exec_globals.items():
+                if not var_name.startswith('_') and isinstance(var_value, dict):
+                    if 'type' in var_value or 'path' in var_value:
+                        var_value['name'] = var_name
+                        tool = self._create_tool_from_dict(var_value)
+                        if tool:
+                            if _tools_manager.add_tool(tool, activate=self.activate):
+                                self.loaded_tools.append(var_name)
+        
+        except Exception as e:
+            raise RuntimeError(f"Failed to load tools from {self.config_path}: {e}")
+    
+    def _load_from_dict(self, config_dict: dict):
+        """Charger depuis un dict inline"""
+        global _tools_manager
+        
+        for tool_name, tool_dict in config_dict.items():
+            if isinstance(tool_dict, dict):
+                tool_dict['name'] = tool_name
+                tool = self._create_tool_from_dict(tool_dict)
+                if tool:
+                    if _tools_manager.add_tool(tool, activate=self.activate):
+                        self.loaded_tools.append(tool_name)
+    
+    def _create_tool_from_dict(self, tool_dict: dict) -> Optional[ToolConfig]:
+        """Créer un ToolConfig depuis un dict"""
+        
+        # Déterminer le type d'outil
+        tool_type = tool_dict.get('type', 'custom')
+        
+        # Remplacer les variables {path} par le chemin réel
+        path = tool_dict.get('path', '')
+        if path and '{' in path:
+            # Pour l'instant, on ne fait pas de remplacement complexe
+            pass
+        
+        # Créer la configuration
+        tool = ToolConfig(
+            name=tool_dict['name'],
+            type=tool_type,
+            version=tool_dict.get('version', ''),
+            path=tool_dict.get('path', ''),
+            cc=tool_dict.get('cc', ''),
+            cxx=tool_dict.get('cxx', ''),
+            ar=tool_dict.get('ar', ''),
+            ld=tool_dict.get('ld', ''),
+            strip=tool_dict.get('strip', ''),
+            ranlib=tool_dict.get('ranlib', ''),
+            sdk_path=tool_dict.get('sdk_path', ''),
+            include_paths=tool_dict.get('include_paths', []),
+            library_paths=tool_dict.get('library_paths', []),
+            frameworks=tool_dict.get('frameworks', []),
+            env_vars=tool_dict.get('env_vars', {}),
+            cflags=tool_dict.get('cflags', []),
+            cxxflags=tool_dict.get('cxxflags', []),
+            ldflags=tool_dict.get('ldflags', []),
+            sysroot=tool_dict.get('sysroot', ''),
+            target_triple=tool_dict.get('target_triple', '')
+        )
+        
+        return tool
+    
+    def _safe_eval_dict(self, dict_str: str) -> dict:
+        """Évaluer un dict de manière sécurisée"""
+        # Remplacer les références de chemin
+        dict_str = dict_str.replace('{path}', str(self.config_path.parent) if self.config_path else '')
+        
+        # Utiliser ast.literal_eval pour la sécurité
+        import ast
+        try:
+            return ast.literal_eval(dict_str)
+        except:
+            # Fallback: évaluation simple pour les dicts basiques
+            dict_str = dict_str.strip()
+            if dict_str.startswith('{') and dict_str.endswith('}'):
+                # Extraction manuelle
+                import re
+                result = {}
+                pairs = re.findall(r'"([^"]+)"\s*:\s*"([^"]*)"', dict_str)
+                for key, value in pairs:
+                    result[key] = value
+                return result
+        
+        return {}
+    
+    def _find_workspace_path(self) -> Optional[Path]:
+        """Trouver le chemin du workspace courant"""
+        from pathlib import Path
+        
+        current = Path.cwd()
+        for parent in [current] + list(current.parents):
+            if any(parent.glob("*.jenga")):
+                return parent
+        
+        return None
+    
+    def _apply_environment_vars(self):
+        """Appliquer les variables d'environnement des outils actifs"""
+        global _tools_manager
+        
+        self.original_env = {}
+        
+        for tool in _tools_manager.get_active_tools():
+            for env_var, value in tool.env_vars.items():
+                # Sauvegarder la valeur originale
+                if env_var in os.environ:
+                    self.original_env[env_var] = os.environ[env_var]
+                
+                # Appliquer la nouvelle valeur
+                os.environ[env_var] = value
+    
+    def _restore_environment_vars(self):
+        """Restaurer les variables d'environnement originales"""
+        for env_var, value in self.original_env.items():
+            os.environ[env_var] = value
+    
+    def get_tool_config(self, name: str) -> Optional[ToolConfig]:
+        """Récupérer la configuration d'un outil spécifique"""
+        global _tools_manager
+        return _tools_manager.get_tool(name)
+    
+    def list_loaded_tools(self) -> List[str]:
+        """Lister les outils chargés dans ce contexte"""
+        return self.loaded_tools.copy()
+    
+    def activate_tool(self, name: str) -> bool:
+        """Activer un outil spécifique"""
+        global _tools_manager
+        return _tools_manager.activate_tool(name)
+    
+    def deactivate_tool(self, name: str) -> bool:
+        """Désactiver un outil spécifique"""
+        global _tools_manager
+        return _tools_manager.deactivate_tool(name)
+
+
+# ============================================================================
+# FUNCTIONS POUR UTILISATION DIRECTE DANS .jenga FILES
+# ============================================================================
+
+def addexternaltools(tools_config: str, activate: bool = True):
+    """
+    Fonction pour ajouter des outils externes (compatibilité avec context manager)
+    
+    Usage:
+        addexternaltools("android-tools.jenga")
+        addexternaltools({
+            "custom_gcc": {
+                "type": "compiler",
+                "path": "/opt/gcc-12",
+                "cc": "/opt/gcc-12/bin/gcc"
+            }
+        })
+    """
+    global _tools_manager
+    
+    # Créer un contexte temporaire
+    with addtools(tools_config, activate):
+        pass
+
+
+def usetool(tool_name: str):
+    """
+    Utiliser un outil spécifique pour le projet courant
+    
+    Usage:
+        with project("MyApp"):
+            usetool("android-ndk-r25")
+    """
+    global _current_project, _tools_manager
+    
+    if not _current_project:
+        raise RuntimeError("usetool() must be called within a project context")
+    
+    tool = _tools_manager.get_tool(tool_name)
+    if not tool:
+        raise ValueError(f"Tool not found: {tool_name}")
+    
+    # Activer l'outil
+    _tools_manager.activate_tool(tool_name)
+    
+    # Configurer le projet pour utiliser cet outil
+    _current_project.toolchain = f"tool_{tool_name}"
+    
+    print(f"✅ Using tool: {tool_name}")
+
+
+def listtools() -> List[Dict[str, Any]]:
+    """Lister tous les outils disponibles"""
+    global _tools_manager
+    return _tools_manager.list_tools()
+
+
+def gettoolinfo(tool_name: str) -> Optional[Dict[str, Any]]:
+    """Obtenir des informations détaillées sur un outil"""
+    global _tools_manager
+    
+    tool = _tools_manager.get_tool(tool_name)
+    if not tool:
+        return None
+    
+    info = tool.to_dict()
+    info['active'] = tool_name in _tools_manager.active_tools
+    
+    return info
+
+
+def validatetools() -> List[Dict[str, Any]]:
+    """Valider tous les outils actifs"""
+    global _tools_manager
+    
+    results = []
+    for tool_name in _tools_manager.active_tools:
+        tool = _tools_manager.get_tool(tool_name)
+        if tool:
+            is_valid = tool.validate()
+            results.append({
+                'name': tool_name,
+                'valid': is_valid,
+                'error': tool.validation_error if not is_valid else '',
+                'type': tool.type
+            })
+    
+    return results
+
+
+class JengaToolsRegistry:
+    """Registre des outils intégrés de Jenga"""
+    
+    BUILTIN_TOOLS = {
+        # Android NDK
+        "android-ndk": {
+            "name": "android-ndk",
+            "type": "ndk",
+            "description": "Android Native Development Kit",
+            "config_template": "android_ndk.jenga",
+            "detect_function": "detect_android_ndk"
+        },
+        
+        # Emscripten
+        "emscripten": {
+            "name": "emscripten", 
+            "type": "emscripten",
+            "description": "Emscripten SDK for WebAssembly",
+            "config_template": "emscripten.jenga",
+            "detect_function": "detect_emscripten"
+        },
+        
+        # Visual Studio
+        "msvc": {
+            "name": "msvc",
+            "type": "compiler",
+            "description": "Microsoft Visual C++ Compiler",
+            "config_template": "msvc.jenga",
+            "detect_function": "detect_msvc"
+        },
+        
+        # Xcode
+        "xcode": {
+            "name": "xcode",
+            "type": "sdk",
+            "description": "Xcode SDK for macOS/iOS",
+            "config_template": "xcode.jenga",
+            "detect_function": "detect_xcode"
+        }
+    }
+    
+    @classmethod
+    def get_builtin_tool(cls, tool_name: str) -> Optional[Dict]:
+        """Récupérer un outil intégré par son nom"""
+        return cls.BUILTIN_TOOLS.get(tool_name)
+    
+    @classmethod
+    def list_builtin_tools(cls) -> List[Dict]:
+        """Lister tous les outils intégrés"""
+        return [
+            {
+                'name': tool['name'],
+                'type': tool['type'],
+                'description': tool['description']
+            }
+            for tool in cls.BUILTIN_TOOLS.values()
+        ]
+    
+    @classmethod
+    def load_builtin_tool_config(cls, tool_name: str) -> Optional[Dict]:
+        """Charger la configuration d'un outil intégré"""
+        import importlib.resources
+        
+        try:
+            # Essayer de charger depuis Jenga/Tools/
+            from Jenga import Tools
+            
+            # Construire le nom du module
+            module_name = f"Jenga.Tools.{tool_name}"
+            
+            try:
+                module = importlib.import_module(module_name)
+                
+                # Appeler la fonction de configuration
+                if hasattr(module, 'get_config'):
+                    return module.get_config()
+                
+                # Sinon, chercher un dict appelé CONFIG
+                if hasattr(module, 'CONFIG'):
+                    return getattr(module, 'CONFIG')
+                    
+            except ImportError:
+                # Essayer de charger depuis un fichier
+                tools_path = cls._get_tools_path()
+                config_files = [
+                    tools_path / f"{tool_name}.jenga",
+                    tools_path / f"{tool_name}.json",
+                    tools_path / f"{tool_name}.py"
+                ]
+                
+                for config_file in config_files:
+                    if config_file.exists():
+                        # Charger selon le type
+                        if config_file.suffix == '.jenga':
+                            return cls._load_jenga_config(config_file)
+                        elif config_file.suffix == '.json':
+                            return cls._load_json_config(config_file)
+                        elif config_file.suffix == '.py':
+                            return cls._load_python_config(config_file)
+                
+        except Exception as e:
+            print(f"⚠️ Warning: Could not load builtin tool '{tool_name}': {e}")
+        
+        return None
+    
+    @staticmethod
+    def _get_tools_path() -> Path:
+        """Trouver le chemin de Jenga/Tools/"""
+        import sys
+        from pathlib import Path
+        
+        # Chercher dans sys.path
+        for path in sys.path:
+            tools_path = Path(path) / "Jenga" / "Tools"
+            if tools_path.exists():
+                return tools_path
+        
+        # Chercher à côté du module
+        try:
+            import Jenga
+            jenga_path = Path(Jenga.__file__).parent
+            return jenga_path / "Tools"
+        except:
+            pass
+        
+        return None
+
+# ============================================================================
+# PRE-CONFIGURED TOOL TEMPLATES
+# ============================================================================
+
+def create_android_ndk_tool(ndk_path: str, api_level: int = 21, arch: str = "arm64-v8a"):
+    """
+    Créer un outil Android NDK pré-configuré
+    
+    Args:
+        ndk_path: Chemin vers Android NDK
+        api_level: Niveau API Android
+        arch: Architecture cible (arm64-v8a, armeabi-v7a, x86, x86_64)
+    """
+    
+    ndk_path = Path(ndk_path).absolute()
+    
+    # Déterminer le triple cible
+    triples = {
+        "arm64-v8a": f"aarch64-linux-android{api_level}",
+        "armeabi-v7a": f"armv7a-linux-androideabi{api_level}",
+        "x86": f"i686-linux-android{api_level}",
+        "x86_64": f"x86_64-linux-android{api_level}"
+    }
+    
+    target_triple = triples.get(arch, f"aarch64-linux-android{api_level}")
+    
+    # Trouver les chemins des outils
+    toolchain_dir = None
+    for potential in ndk_path.glob("toolchains/llvm/prebuilt/*"):
+        if potential.is_dir():
+            toolchain_dir = potential
+            break
+    
+    if not toolchain_dir:
+        raise FileNotFoundError(f"Could not find LLVM toolchain in {ndk_path}")
+    
+    tool_config = {
+        "name": f"android-ndk-api{api_level}-{arch}",
+        "type": "ndk",
+        "path": str(ndk_path),
+        "version": "r25",  # À détecter automatiquement si possible
+        "cc": str(toolchain_dir / "bin" / f"{target_triple}-clang"),
+        "cxx": str(toolchain_dir / "bin" / f"{target_triple}-clang++"),
+        "ar": str(toolchain_dir / "bin" / "llvm-ar"),
+        "ld": str(toolchain_dir / "bin" / "ld"),
+        "strip": str(toolchain_dir / "bin" / "llvm-strip"),
+        "ranlib": str(toolchain_dir / "bin" / "llvm-ranlib"),
+        "sysroot": str(toolchain_dir / "sysroot"),
+        "target_triple": target_triple,
+        "cflags": [
+            f"-DANDROID",
+            f"-D__ANDROID_API__={api_level}",
+            "-fPIC",
+            "-fno-exceptions",
+            "-fno-rtti"
+        ],
+        "cxxflags": [
+            "-std=c++17",
+            "-frtti",
+            "-fexceptions"
+        ],
+        "ldflags": [
+            "-llog",
+            "-landroid",
+            "-lEGL",
+            "-lGLESv3"
+        ],
+        "env_vars": {
+            "ANDROID_NDK_ROOT": str(ndk_path),
+            "ANDROID_NDK_HOME": str(ndk_path),
+            "ANDROID_API": str(api_level)
+        }
+    }
+    
+    return tool_config
+
+
+def create_emscripten_tool(emsdk_path: str):
+    """
+    Créer un outil Emscripten pré-configuré
+    
+    Args:
+        emsdk_path: Chemin vers Emscripten SDK
+    """
+    
+    emsdk_path = Path(emsdk_path).absolute()
+    
+    # Trouver emcc
+    emcc_path = None
+    for potential in [
+        emsdk_path / "emcc",
+        emsdk_path / "emsdk" / "emcc",
+        emsdk_path / "upstream" / "emscripten" / "emcc"
+    ]:
+        if potential.exists():
+            emcc_path = potential.parent
+            break
+    
+    if not emcc_path:
+        # Chercher dans le PATH
+        import shutil
+        emcc_path = shutil.which("emcc")
+        if emcc_path:
+            emcc_path = Path(emcc_path).parent
+    
+    if not emcc_path:
+        raise FileNotFoundError(f"Could not find emcc in {emsdk_path}")
+    
+    tool_config = {
+        "name": "emscripten",
+        "type": "emscripten",
+        "path": str(emsdk_path),
+        "cc": str(emcc_path / "emcc"),
+        "cxx": str(emcc_path / "em++"),
+        "ar": str(emcc_path / "emar"),
+        "cflags": [
+            "-D__EMSCRIPTEN__",
+            "-s WASM=1",
+            "-s USE_WEBGL2=1",
+            "-s USE_SDL=2"
+        ],
+        "cxxflags": [
+            "-std=c++17",
+            "-s USE_PTHREADS=1"
+        ],
+        "ldflags": [
+            "-s ALLOW_MEMORY_GROWTH=1",
+            "-s EXPORTED_FUNCTIONS='[\"_main\"]'",
+            "-s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\"]'"
+        ],
+        "env_vars": {
+            "EMSDK": str(emsdk_path),
+            "EMSCRIPTEN": str(emsdk_path / "upstream" / "emscripten")
+        }
+    }
+    
+    return tool_config
+
+
+def create_custom_gcc_tool(gcc_path: str, version: str = ""):
+    """
+    Créer un outil GCC personnalisé
+    
+    Args:
+        gcc_path: Chemin vers l'installation GCC
+        version: Version de GCC (ex: "12.2.0")
+    """
+    
+    gcc_path = Path(gcc_path).absolute()
+    
+    tool_config = {
+        "name": f"gcc-custom-{version}" if version else "gcc-custom",
+        "type": "compiler",
+        "path": str(gcc_path),
+        "version": version,
+        "cc": str(gcc_path / "bin" / "gcc"),
+        "cxx": str(gcc_path / "bin" / "g++"),
+        "ar": str(gcc_path / "bin" / "ar"),
+        "ld": str(gcc_path / "bin" / "ld"),
+        "strip": str(gcc_path / "bin" / "strip"),
+        "ranlib": str(gcc_path / "bin" / "ranlib"),
+        "cflags": [
+            "-march=native",
+            "-mtune=native",
+            "-O3",
+            "-pipe"
+        ],
+        "cxxflags": [
+            "-std=c++20",
+            "-fcoroutines"
+        ],
+        "env_vars": {
+            "CUSTOM_GCC_ROOT": str(gcc_path)
+        }
+    }
+    
+    return tool_config
+
+
+# ============================================================================
+# INTEGRATION WITH JENGA API
+# ============================================================================
+
+def get_current_toolchain_config() -> Optional[Dict[str, Any]]:
+    """
+    Obtenir la configuration de l'outil actuel pour le projet courant
+    
+    Returns:
+        Dict avec la configuration de l'outil ou None
+    """
+    global _current_project, _tools_manager
+    
+    if not _current_project or not _current_project.toolchain:
+        return None
+    
+    toolchain_name = _current_project.toolchain
+    
+    # Vérifier si c'est un outil personnalisé (préfixe tool_)
+    if toolchain_name.startswith("tool_"):
+        tool_name = toolchain_name[5:]  # Enlever "tool_"
+        tool = _tools_manager.get_tool(tool_name)
+        if tool:
+            return tool.to_dict()
+    
+    return None
+
+
+def inject_tool_flags_into_toolchain():
+    """
+    Injecter les flags des outils actifs dans le toolchain courant
+    
+    Cette fonction est appelée automatiquement par le système de build
+    """
+    global _current_toolchain, _tools_manager
+    
+    if not _current_toolchain:
+        return
+    
+    # Pour chaque outil actif, injecter ses flags
+    for tool in _tools_manager.get_active_tools():
+        # Injecter les flags C
+        if tool.cflags:
+            _current_toolchain.cflags.extend(tool.cflags)
+        
+        # Injecter les flags C++
+        if tool.cxxflags:
+            _current_toolchain.cxxflags.extend(tool.cxxflags)
+        
+        # Injecter les flags linker
+        if tool.ldflags:
+            _current_toolchain.ldflags.extend(tool.ldflags)
+        
+        # Configurer les chemins des compilateurs si spécifiés
+        if tool.cc and not _current_toolchain.ccompiler:
+            _current_toolchain.ccompiler = tool.cc
+            _current_toolchain.ccompiler_path = tool.cc
+        
+        if tool.cxx and not _current_toolchain.cppcompiler:
+            _current_toolchain.cppcompiler = tool.cxx
+            _current_toolchain.cppcompiler_path = tool.cxx
+        
+        if tool.ar and not _current_toolchain.archiver:
+            _current_toolchain.archiver = tool.ar
+            _current_toolchain.archiver_path = tool.ar
+        
+        if tool.ld and not _current_toolchain.linker:
+            _current_toolchain.linker = tool.ld
+            _current_toolchain.linker_path = tool.ld
+        
+        # Configurer sysroot
+        if tool.sysroot and not _current_toolchain.sysroot:
+            _current_toolchain.sysroot = tool.sysroot
+
+
+# ============================================================================
+# INITIALIZATION
+# ============================================================================
+
+def init_tools_system():
+    """Initialiser le système d'outils (appelé au démarrage de Jenga)"""
+    global _tools_manager
+    
+    # Charger le cache
+    _tools_manager.load_cache()
+    
+    # Appliquer les variables d'environnement des outils actifs
+    for tool in _tools_manager.get_active_tools():
+        for env_var, value in tool.env_vars.items():
+            os.environ[env_var] = value
+    
+    print(f"✅ Tools system initialized with {len(_tools_manager.active_tools)} active tools")
+
+
+# Exporter les fonctions principales
+__all__ = [
+    'addtools',
+    'usetool',
+    'listtools',
+    'gettoolinfo',
+    'validatetools',
+    'create_android_ndk_tool',
+    'create_emscripten_tool',
+    'create_custom_gcc_tool',
+    'get_current_toolchain_config',
+    'inject_tool_flags_into_toolchain',
+    'init_tools_system'
+]
 
 
 # ===========================================================================

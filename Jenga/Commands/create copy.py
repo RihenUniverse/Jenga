@@ -1305,88 +1305,6 @@ def print_workspace_creation_summary(
 # PROJECT CREATION
 # ============================================================================
 
-def attach_existing_project_to_workspace(
-    project_path: str,
-    workspace_dir: Path = None
-) -> int:
-    """
-    Attach an existing project to current workspace
-    
-    Args:
-        project_path: Path to existing project directory
-        workspace_dir: Workspace directory (auto-detected if None)
-    
-    Returns:
-        0 on success, 1 on error
-    """
-    
-    # Find workspace
-    if workspace_dir is None:
-        jenga_files = list(Path(".").glob("*.jenga"))
-        if not jenga_files:
-            print("❌ Error: No .jenga workspace file found in current directory")
-            print("💡 Hint: Run this command from workspace root")
-            return 1
-        workspace_dir = jenga_files[0].parent
-    
-    workspace_name = workspace_dir.name
-    
-    # Resolve project path
-    project_dir = Path(project_path)
-    if not project_dir.is_absolute():
-        project_dir = workspace_dir / project_path
-    
-    # Check if project exists
-    if not project_dir.exists():
-        print(f"❌ Error: Project directory not found: {project_dir}")
-        return 1
-    
-    # Find project .jenga file
-    project_jenga_files = list(project_dir.glob("*.jenga"))
-    if not project_jenga_files:
-        print(f"❌ Error: No .jenga file found in project directory: {project_dir}")
-        return 1
-    
-    project_jenga_file = project_jenga_files[0]
-    project_name = project_jenga_file.stem
-    
-    # Get relative path from workspace
-    try:
-        project_relative_path = project_dir.relative_to(workspace_dir)
-    except ValueError:
-        # Project is outside workspace, use absolute path
-        project_relative_path = str(project_dir)
-    
-    print(f"\n📦 Attaching existing project '{project_name}' to workspace...")
-    print(f"   Project location: {project_relative_path}")
-    print(f"   Workspace: {workspace_name}")
-    
-    # Read project file to get project name
-    try:
-        project_content = project_jenga_file.read_text(encoding='utf-8')
-        # Extract project name from with project("...")
-        match = re.search(r'with project\("([^"]+)"\)', project_content)
-        if match:
-            actual_project_name = match.group(1)
-            if actual_project_name != project_name:
-                print(f"⚠️  Warning: Project name in file ({actual_project_name}) doesn't match filename ({project_name})")
-                project_name = actual_project_name
-    except Exception as e:
-        print(f"⚠️  Warning: Could not read project file: {e}")
-    
-    # Update workspace to include the project
-    update_workspace_to_include_project(
-        workspace_dir=workspace_dir,
-        workspace_name=workspace_name,
-        project_name=project_name,
-        project_relative_path=str(project_relative_path)
-    )
-    
-    print(f"\n✅ Project '{project_name}' attached to workspace successfully!")
-    print(f"   You can now build it with: jenga build --project {project_name}")
-    
-    return 0
-
 def create_project_interactive() -> int:
     """Interactive project creation."""
     print("\n" + "="*60)
@@ -2256,295 +2174,6 @@ def create_precompiled_header(
 # FILE CREATION FUNCTIONS
 # ============================================================================
 
-
-def update_project_jenga_with_file(project_dir: Path, project_name: str, 
-                                   file_path: Path, file_type: str) -> bool:
-    """Update project .jenga file to include new file patterns if needed"""
-    
-    jenga_file = project_dir / f"{project_name}.jenga"
-    if not jenga_file.exists():
-        return False
-    
-    content = jenga_file.read_text(encoding='utf-8')
-    
-    # Get relative path from project directory
-    try:
-        rel_path = file_path.relative_to(project_dir)
-    except ValueError:
-        # File is outside project directory
-        return False
-    
-    # Determine patterns to add based on file type
-    patterns_to_add = []
-    
-    if file_type in ['class', 'struct', 'cpp', 'source', 'c', 'm', 'mm']:
-        # Source files
-        if file_path.suffix == '.cpp':
-            patterns_to_add.append(f"src/%{{prj.name}}/**{file_path.name}")
-        elif file_path.suffix == '.c':
-            patterns_to_add.append(f"src/%{{prj.name}}/**{file_path.name}")
-        elif file_path.suffix == '.m':
-            patterns_to_add.append(f"src/%{{prj.name}}/**{file_path.name}")
-        elif file_path.suffix == '.mm':
-            patterns_to_add.append(f"src/%{{prj.name}}/**{file_path.name}")
-    
-    elif file_type in ['header', 'h', 'hpp', 'interface', 'enum']:
-        # Header files
-        patterns_to_add.append(f"include/%{{prj.name}}/**{file_path.name}")
-    
-    # Check if patterns are already in files list
-    files_section_match = re.search(r'files\(\[(.*?)\]\)', content, re.DOTALL)
-    if files_section_match:
-        files_content = files_section_match.group(1)
-        
-        # Check each pattern
-        for pattern in patterns_to_add:
-            # Escape pattern for regex
-            pattern_escaped = re.escape(pattern)
-            if not re.search(pattern_escaped, files_content):
-                # Add pattern to files list
-                new_files_content = files_content.rstrip()
-                if not new_files_content.endswith(','):
-                    new_files_content += ','
-                new_files_content += f'\n        "{pattern}"'
-                
-                # Update content
-                content = content.replace(files_content, new_files_content)
-                print(f"✅ Added pattern to project files: {pattern}")
-    
-    # Write updated content
-    jenga_file.write_text(content, encoding='utf-8')
-    return True
-
-
-def create_custom_file(
-    name: str,
-    template_type: str,
-    project_dir: Path,
-    project_name: str,
-    namespace: str = None,
-    custom_content: str = None
-) -> Path:
-    """
-    Create a custom file from template
-    
-    Args:
-        name: File name without extension
-        template_type: Type of template (custom_xxx)
-        project_dir: Project directory
-        project_name: Name of the project
-        namespace: Optional namespace
-        custom_content: Optional custom content (overrides template)
-    
-    Returns:
-        Path to created file
-    """
-    
-    # Map template types to extensions and content
-    templates = {
-        'custom_cpp': {
-            'ext': '.cpp',
-            'template': '''#include <iostream>
-
-// TODO: Implement {name}
-void {name}_function() {{
-    std::cout << "{name} function called" << std::endl;
-}}
-'''
-        },
-        'custom_h': {
-            'ext': '.h',
-            'template': '''#pragma once
-
-// {name} declarations
-void {name}_function();
-'''
-        },
-        'custom_util': {
-            'ext': '.cpp',
-            'template': '''#include "{name}.h"
-
-namespace {namespace} {{
-
-// Utility implementation for {name}
-void {name}_function() {{
-    // TODO: Implement utility function
-}}
-
-}} // namespace {namespace}
-'''
-        },
-        'custom_class_template': {
-            'ext': '.h',
-            'template': '''#pragma once
-#include <type_traits>
-
-template<typename T>
-class {name} {{
-public:
-    {name}() = default;
-    
-    void process(const T& value) {{
-        // TODO: Implement template processing
-    }}
-    
-private:
-    T data;
-}};
-'''
-        },
-    }
-    
-    if template_type not in templates:
-        raise ValueError(f"Unknown template type: {template_type}")
-    
-    template_info = templates[template_type]
-    file_ext = template_info['ext']
-    template_content = custom_content or template_info['template']
-    
-    # Determine target directory
-    if file_ext in ['.h', '.hpp']:
-        target_dir = project_dir / "include" / project_name
-    else:
-        target_dir = project_dir / "src" / project_name
-    
-    target_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Create file path
-    file_path = target_dir / f"{name}{file_ext}"
-    
-    # Format template
-    formatted_content = template_content.format(
-        name=name,
-        namespace=namespace or project_name.lower(),
-        project=project_name
-    )
-    
-    # Add header
-    header = get_file_header(
-        filename=f"{name}{file_ext}",
-        description=f"Custom {template_type.replace('custom_', '')} for {project_name}",
-        file_type=file_ext.lstrip('.')
-    )
-    
-    # Add footer
-    footer = get_file_footer(f"{name}{file_ext}", file_ext.lstrip('.'))
-    
-    # Write file
-    full_content = header + formatted_content + footer
-    file_path.write_text(full_content, encoding='utf-8')
-    
-    print(f"✅ Created custom file: {file_path.relative_to(Path.cwd())}")
-    return file_path
-
-
-def create_file_with_auto_update(
-    name: str,
-    file_type: str = "class",
-    project: str = None,
-    location: str = None,
-    namespace: str = None,
-    auto_update_jenga: bool = True
-) -> int:
-    """
-    Create a source file and optionally update project .jenga file
-    """
-    
-    # Find project
-    if project is None:
-        # Auto-detect project
-        current_path = Path.cwd()
-        
-        # Look for .jenga files
-        jenga_files = list(current_path.rglob("*.jenga"))
-        
-        if not jenga_files:
-            print("❌ Error: No project found")
-            print("💡 Hint: Run from project directory or specify --project")
-            return 1
-        
-        # Find a project .jenga file
-        project_dir = None
-        for jenga_file in jenga_files:
-            content = jenga_file.read_text()
-            if "with project" in content:
-                project_dir = jenga_file.parent
-                break
-        
-        if project_dir is None:
-            project_dir = jenga_files[0].parent
-    else:
-        # Find project by name
-        project_dirs = list(Path(".").rglob(f"*/{project}"))
-        if not project_dirs:
-            print(f"❌ Error: Project '{project}' not found")
-            return 1
-        project_dir = project_dirs[0]
-    
-    project_name = project_dir.name
-    
-    print(f"\n📝 Creating {file_type} '{name}'...")
-    print(f"   Project: {project_name}")
-    
-    # Determine target directory
-    if location:
-        target_dir = project_dir / location
-    elif file_type in ["header", "h", "hpp", "interface", "enum"]:
-        # Headers go to include/project_name
-        target_dir = project_dir / "include" / project_name
-    elif file_type in ["class", "struct", "cpp", "source", "c", "m", "mm"]:
-        # Sources go to src/project_name
-        target_dir = project_dir / "src" / project_name
-    else:
-        # Default to src
-        target_dir = project_dir / "src" / project_name
-    
-    target_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Create file
-    created_files = []
-    
-    if file_type in ["class", "struct", "enum", "interface"]:
-        create_cpp_composite_file(name, file_type, target_dir, project_name, namespace)
-        created_files.extend([
-            target_dir / f"{name}.h",
-            target_dir / f"{name}.cpp" if file_type in ["class", "struct"] else None
-        ])
-    elif file_type in ["header", "h"]:
-        create_header_file_simple(name, target_dir, project_name, namespace)
-        created_files.append(target_dir / f"{name}.h")
-    elif file_type == "hpp":
-        create_header_file_simple(name, target_dir, project_name, namespace)
-        created_files.append(target_dir / f"{name}.hpp")
-    elif file_type in ["source", "cpp"]:
-        create_source_file_simple(name, "cpp", target_dir, project_name, namespace)
-        created_files.append(target_dir / f"{name}.cpp")
-    elif file_type == "c":
-        create_source_file_simple(name, "c", target_dir, project_name, namespace)
-        created_files.append(target_dir / f"{name}.c")
-    elif file_type == "m":
-        create_source_file_simple(name, "m", target_dir, project_name, namespace)
-        created_files.append(target_dir / f"{name}.m")
-    elif file_type == "mm":
-        create_source_file_simple(name, "mm", target_dir, project_name, namespace)
-        created_files.append(target_dir / f"{name}.mm")
-    elif file_type == "text":
-        create_text_file_simple(name, target_dir)
-        created_files.append(target_dir / f"{name}.txt")
-    else:
-        print(f"❌ Unknown file type: {file_type}")
-        return 1
-    
-    # Update project .jenga file if requested
-    if auto_update_jenga:
-        for file_path in created_files:
-            if file_path and file_path.exists():
-                update_project_jenga_with_file(project_dir, project_name, file_path, file_type)
-    
-    print(f"✅ File(s) created successfully!")
-    return 0
-
-
 def create_file_interactive() -> int:
     """Interactive file creation."""
     print("\n" + "="*60)
@@ -2941,37 +2570,6 @@ Created with Jenga Build System v{VERSION}
     print(f"✅ Created: {text_file.relative_to(Path.cwd())}")
 
 
-def find_project_directory(project_name: str = None) -> Optional[Path]:
-    """Find project directory by name or current directory"""
-    
-    if project_name:
-        # Find project by name
-        project_dirs = list(Path(".").rglob(f"*/{project_name}"))
-        if not project_dirs:
-            print(f"❌ Error: Project '{project_name}' not found")
-            return None
-        return project_dirs[0]
-    else:
-        # Auto-detect from current directory
-        current_path = Path.cwd()
-        
-        # Look for .jenga files
-        jenga_files = list(current_path.rglob("*.jenga"))
-        
-        if not jenga_files:
-            print("❌ Error: No project found")
-            print("💡 Hint: Run from project directory or specify --project")
-            return None
-        
-        # Find a project .jenga file
-        for jenga_file in jenga_files:
-            content = jenga_file.read_text()
-            if "with project" in content:
-                return jenga_file.parent
-        
-        return jenga_files[0].parent
-
-
 # ============================================================================
 # COMMAND LINE INTERFACE
 # ============================================================================
@@ -2989,20 +2587,10 @@ Examples:
   jenga create project                    # Interactive project creation
   jenga create project Engine --type staticlib --language C
   jenga create project Tools --location utils/tools --language C++ --std C++17
-  
-  # File creation
   jenga create file                       # Interactive file creation
   jenga create file Player --type class
   jenga create file Config --type text --location config
   jenga create file MathUtils --type header --namespace math
-  
-  # Advanced file creation with auto-update
-  jenga create file-advanced MyClass --type class --auto-update
-  jenga create file-advanced Utilities --template custom_util
-  
-  # Attach existing project
-  jenga create attach-existing Core/Library
-  jenga create attach-existing ../External/Engine --name GameEngine
 
 Copyright © {COPYRIGHT_YEAR} {COMPANY_NAME}
 Jenga Build System v{VERSION}
@@ -3158,60 +2746,6 @@ Jenga Build System v{VERSION}
         help='Namespace for C++ files'
     )
     
-    # Advanced file command with auto-update
-    file_advanced_parser = subparsers.add_parser(
-        'file-advanced',
-        help='Create source file with automatic .jenga update'
-    )
-    file_advanced_parser.add_argument(
-        'name',
-        help='File/Class name (without extension)'
-    )
-    file_advanced_parser.add_argument(
-        '--type',
-        default='class',
-        choices=['class', 'struct', 'enum', 'interface', 'header', 'source', 
-                'cpp', 'c', 'm', 'mm', 'text', 'custom_cpp', 'custom_h', 
-                'custom_util', 'custom_class_template'],
-        help='File type or template'
-    )
-    file_advanced_parser.add_argument(
-        '--project',
-        help='Project name (auto-detected if not specified)'
-    )
-    file_advanced_parser.add_argument(
-        '--location',
-        help='Where to create file (relative to project)'
-    )
-    file_advanced_parser.add_argument(
-        '--namespace',
-        help='Namespace for C++ files'
-    )
-    file_advanced_parser.add_argument(
-        '--auto-update',
-        action='store_true',
-        default=True,
-        help='Automatically update project .jenga file (default: true)'
-    )
-    file_advanced_parser.add_argument(
-        '--custom-content',
-        help='Custom content for the file (overrides template)'
-    )
-    
-    # Attach existing project command
-    attach_parser = subparsers.add_parser(
-        'attach-existing',
-        help='Attach an existing project to current workspace'
-    )
-    attach_parser.add_argument(
-        'path',
-        help='Path to existing project directory'
-    )
-    attach_parser.add_argument(
-        '--name',
-        help='Override project name (default: derived from .jenga file)'
-    )
-    
     # Parse arguments
     parsed = parser.parse_args(args)
     
@@ -3254,70 +2788,19 @@ Jenga Build System v{VERSION}
             # Interactive creation
             return create_project_interactive()
     
-    # elif parsed.subcommand == 'file':
-    #     if parsed.name:
-    #         # Quick creation with arguments
-    #         return create_file(
-    #             name=parsed.name,
-    #             file_type=parsed.type,
-    #             project=parsed.project,
-    #             location=parsed.location,
-    #             namespace=parsed.namespace
-    #         )
-    #     else:
-    #         # Interactive creation
-    #         return create_file_interactive()
-    
     elif parsed.subcommand == 'file':
-        # Use new advanced version
-        return create_file_with_auto_update(
-            name=parsed.name,
-            file_type=parsed.type,
-            project=parsed.project,
-            location=parsed.location,
-            namespace=parsed.namespace,
-            auto_update_jenga=True
-        )
-    
-    elif parsed.subcommand == 'file-advanced':
-        # Handle custom templates
-        if parsed.type.startswith('custom_'):
-            # Find project
-            project_dir = find_project_directory(parsed.project)
-            if not project_dir:
-                return 1
-            
-            project_name = project_dir.name
-            create_custom_file(
-                name=parsed.name,
-                template_type=parsed.type,
-                project_dir=project_dir,
-                project_name=project_name,
-                namespace=parsed.namespace,
-                custom_content=parsed.custom_content
-            )
-            
-            if parsed.auto_update:
-                # Update .jenga file
-                file_path = project_dir / "src" / project_name / f"{parsed.name}.cpp"
-                update_project_jenga_with_file(project_dir, project_name, file_path, parsed.type)
-            
-            return 0
-        else:
-            # Standard file creation with auto-update
-            return create_file_with_auto_update(
+        if parsed.name:
+            # Quick creation with arguments
+            return create_file(
                 name=parsed.name,
                 file_type=parsed.type,
                 project=parsed.project,
                 location=parsed.location,
-                namespace=parsed.namespace,
-                auto_update_jenga=parsed.auto_update
+                namespace=parsed.namespace
             )
-    
-    elif parsed.subcommand == 'attach-existing':
-        return attach_existing_project_to_workspace(
-            project_path=parsed.path
-        )
+        else:
+            # Interactive creation
+            return create_file_interactive()
     
     else:
         parser.print_help()

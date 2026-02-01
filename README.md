@@ -1,3 +1,6 @@
+Voici le README.md mis à jour avec toutes vos nouvelles fonctionnalités :
+
+```markdown
 # 🏗️ Jenga Build System
 
 **Modern Multi-Platform C/C++ Build System with Unified Python DSL**
@@ -6,13 +9,29 @@
 [![Python](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org)
 [![Platforms](https://img.shields.io/badge/Platforms-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android%20%7C%20iOS%20%7C%20WebAssembly-green.svg)]()
 
+## ✨ What's New in v1.1.0
+
+### 🚀 Enhanced Creation Tools
+- **Intelligent File Creation**: Create classes, structs, enums, interfaces with auto-configuration
+- **Smart Project Attachment**: Attach existing projects to workspaces
+- **Template System**: Custom file templates for rapid development
+- **Auto-configuration**: Files automatically added to project `.jenga` configuration
+
+### 🔌 Advanced Dependency Management
+- **Context-Based Inclusion**: `include()` context manager for clean external project integration
+- **Project Filtering**: Include specific projects from external `.jenga` files
+- **Dependency Validation**: Automatic dependency graph validation
+- **Path Resolution**: Smart path handling for external projects
+
 ## 📋 Table of Contents
 
 - [✨ Features](#-features)
 - [🚀 Quick Start](#-quick-start)
 - [📦 Installation](#-installation)
 - [💡 Basic Usage](#-basic-usage)
-- [🏗️ Project Structure](#-project-structure)
+- [🏗️ Project Creation & Management](#-project-creation--management)
+- [📁 Advanced File Creation](#-advanced-file-creation)
+- [🔌 External Project Integration](#-external-project-integration)
 - [📚 Documentation](#-documentation)
 - [🔧 Advanced Features](#-advanced-features)
 - [📁 Project Examples](#-project-examples)
@@ -29,26 +48,25 @@
 - **Integrated Testing** - Built-in Unitest framework
 - **Zero Dependencies** - Pure Python 3, no external tools required
 
+### 🛠️ Advanced Creation Tools
+- **Smart File Creation** - Automatic `.jenga` configuration updates
+- **Multi-File Templates** - Class (.h + .cpp), Struct, Enum, Interface
+- **Custom Templates** - User-defined file templates
+- **Namespace Support** - Automatic namespace generation
+- **Platform Detection** - Smart file placement based on type
+
+### 🔌 External Project Management
+- **Context-Based Inclusion** - `include()` context manager
+- **Project Filtering** - Select specific projects to include
+- **Dependency Resolution** - Automatic path and dependency handling
+- **Workspace Attachment** - Attach existing projects to any workspace
+
 ### 🔧 Build System
 - **C/C++ Toolchains** - GCC, Clang, MSVC support
 - **Cross-Compilation** - Android NDK, Emscripten
 - **Parallel Builds** - Multi-core optimization
 - **Dependency Graph** - Automatic build ordering
 - **Smart File Tracking** - Changed files detection
-
-### 📦 Packaging & Distribution
-- **APK/AAB Generation** - Android packages
-- **IPA Creation** - iOS App Store packages
-- **Desktop Packages** - ZIP, DMG, AppImage
-- **Code Signing** - Android, iOS, Windows, macOS
-- **CI/CD Ready** - Automated pipeline integration
-
-### 🧪 Testing Framework
-- **Auto Test Discovery** - No manual test registration
-- **Parallel Test Execution** - Multi-threaded testing
-- **Elegant Reporting** - Colorful console output
-- **Performance Benchmarks** - Integrated profiling
-- **Code Coverage** - Built-in coverage tools
 
 ## 🚀 Quick Start
 
@@ -109,19 +127,6 @@ pip install -e .
 pip install .
 ```
 
-### Method 3: Manual Installation
-1. Download the latest release
-2. Extract to your preferred location
-3. Add to PATH:
-   - **Windows**: Add folder to system PATH
-   - **Linux/macOS**: `export PATH="$PATH:/path/to/jenga"`
-
-### ✅ Script Availability
-After installation, both `.sh` and `.bat` scripts are available:
-- **Linux/macOS**: `jenga` command globally available
-- **Windows**: `jenga.exe` or `jenga` command available
-- **All platforms**: `python -m Jenga.jenga` also works
-
 ## 💡 Basic Usage
 
 ### Project Configuration
@@ -175,49 +180,153 @@ jenga info
 
 # Generate project files (VS, Xcode, etc.)
 jenga gen
-
-# Package for distribution
-jenga package --platform Android --config Release
-
-# Code signing
-jenga keygen --platform Android
-jenga sign --platform Android
-
-# Run tests
-jenga run --project MyProject_Unit_Tests
 ```
 
-## 🏗️ Project Structure
+## 🏗️ Project Creation & Management
 
-```
-jenga-project/
-├── .jenga/                    # Build cache (auto-generated)
-├── Build/                     # Build artifacts
-│   ├── Bin/                  # Executables
-│   ├── Lib/                  # Libraries
-│   └── Obj/                  # Object files
-├── src/                       # Source code
-│   ├── core/                 # Core functionality
-│   ├── platform/             # Platform-specific code
-│   └── main.cpp
-├── tests/                     # Test files
-├── third_party/              # External dependencies
-└── myproject.jenga           # Jenga configuration
+### Creating New Projects
+```bash
+# Interactive project creation
+jenga create project
+
+# Quick creation with options
+jenga create project MyLibrary --type staticlib --language C++ --std C++20
+
+# Create in specific location
+jenga create project Tools --location utils/ --type consoleapp
 ```
 
-### Multi-Platform Structure
+### Attaching Existing Projects
+```bash
+# Attach existing project to current workspace
+jenga create attach-existing Core/ExistingLibrary
+
+# Attach with custom name
+jenga create attach-existing ../External/Engine --name GameEngine
 ```
-src/
-├── core/                     # Platform-independent
-│   ├── math.cpp
-│   └── graphics.cpp
-└── platform/
-    ├── windows/             # Windows-specific
-    │   └── window_win32.cpp
-    ├── linux/               # Linux-specific
-    │   └── window_x11.cpp
-    └── android/             # Android-specific
-        └── window_android.cpp
+
+### Workspace Management
+```bash
+# Create new workspace
+jenga create workspace MyGame
+
+# Create workspace with main project
+jenga create workspace MyApp --type windowedapp --platforms Windows,Linux
+
+# Interactive workspace creation
+jenga create workspace
+```
+
+## 📁 Advanced File Creation
+
+### Creating Source Files with Auto-Configuration
+```bash
+# Create a C++ class (header + source)
+jenga create file Player --type class --namespace game
+
+# Create a struct
+jenga create file Vector3 --type struct --namespace math
+
+# Create an enum
+jenga create file ErrorCode --type enum --namespace utils
+
+# Create a header-only file
+jenga create file Constants --type header --namespace app
+
+# Create source file
+jenga create file Utilities --type source
+
+# Create Objective-C file
+jenga create file IOSAppDelegate --type m
+
+# Create Objective-C++ file
+jenga create file IOSBridge --type mm
+```
+
+### Advanced File Creation with Templates
+```bash
+# Use custom utility template
+jenga create file-advanced StringUtils --template custom_util --namespace utils
+
+# Create template class
+jenga create file-advanced Container --template custom_class_template
+
+# Create with custom content
+jenga create file-advanced Specialized --type custom_cpp --custom-content "// Custom implementation"
+```
+
+### File Creation Options
+```bash
+# Specify project
+jenga create file MyClass --type class --project CoreLibrary
+
+# Specify location
+jenga create file Config --type header --location config/ --namespace config
+
+# Disable auto-configuration (for manual control)
+jenga create file-advanced ManualFile --type header --auto-update false
+```
+
+## 🔌 External Project Integration
+
+### Using `include()` Context Manager
+The `include()` context manager provides clean, safe external project integration:
+
+```python
+with workspace("MyApp"):
+    # Include all projects from external .jenga file
+    with include("libs/logger/logger.jenga"):
+        pass  # All projects included automatically
+    
+    # Include specific projects only
+    with include("libs/math/math.jenga") as math_inc:
+        math_inc.only(["MathLib", "VectorMath"])  # Include only these projects
+    
+    # Exclude specific projects
+    with include("libs/network/network.jenga") as net_inc:
+        net_inc.skip(["Tests", "Examples"])  # Skip these projects
+    
+    # Your main project
+    with project("MyApp"):
+        consoleapp()
+        dependson(["Logger", "MathLib", "VectorMath", "NetworkCore"])
+```
+
+### Legacy `addprojects()` Function
+For backward compatibility or simple use cases:
+
+```python
+with workspace("MyApp"):
+    # Include all projects from external file
+    addprojects("external/lib.jenga")
+    
+    # Include specific projects only
+    addprojects("external/engine.jenga", ["Core", "Renderer"])
+```
+
+### Smart Path Resolution
+Jenga automatically handles:
+- Relative and absolute paths
+- Project location resolution
+- Include directory adjustment
+- Dependency validation
+- Toolchain inheritance
+
+### Project Properties Access
+Access external project properties for configuration:
+
+```python
+with workspace("MyApp"):
+    with include("libs/logger/logger.jenga"):
+        pass
+    
+    with project("MyApp"):
+        # Access included project properties
+        logger_props = get_project_properties("Logger")
+        
+        # Use properties in your project
+        includedirs(logger_props['includedirs'])
+        links(logger_props['links'])
 ```
 
 ## 📚 Documentation
@@ -239,11 +348,6 @@ All documentation is included in the `Docs/` directory:
 | [🔄 MIGRATION_GUIDE.md](Docs/MIGRATION_GUIDE.md) | Migration from CMake/Make |
 | [🔍 TROUBLESHOOTING.md](Docs/TROUBLESHOOTING.md) | Troubleshooting Guide |
 | [📋 CHANGELOG.md](Docs/CHANGELOG_v1.0.2.md) | Version History |
-
-### Online Resources
-- **GitHub Repository**: https://github.com/RihenUniverse/Jenga
-- **Issue Tracker**: https://github.com/RihenUniverse/Jenga/issues
-- **Discussion Forum**: GitHub Discussions
 
 ## 🔧 Advanced Features
 
@@ -271,88 +375,127 @@ with workspace("CrossPlatformGame"):
             framework("OpenGLES")
 ```
 
-### External Project Inclusion
+### Advanced Dependency Management
 ```python
-with workspace("MyProject"):
-    # Include external libraries
-    include("external/mathlib/math.jenga")
-    include("third_party/logger.jenga", ["Logger"])
+with workspace("LargeProject"):
+    # Batch include multiple libraries
+    with include("libs/core.jenga"):
+        pass
     
-    with project("App"):
+    with include("libs/graphics.jenga") as gfx:
+        gfx.only(["Renderer", "ShaderSystem"])
+    
+    with include("libs/physics.jenga") as phys:
+        phys.skip(["Tests", "DebugTools"])
+    
+    # Complex dependency chain
+    with project("Game"):
         consoleapp()
-        dependson(["MathLib", "Logger"])
-```
-
-### Android APK Generation
-```python
-with workspace("AndroidApp"):
-    platforms(["Android"])
-    
-    with project("App"):
-        sharedlib()
-        androidapplicationid("com.company.app")
-        androidversioncode(1)
-        androidversionname("1.0.0")
-        
-        # Assets and resources
-        dependfiles([
-            "assets/**",
-            "res/**",
-            "AndroidManifest.xml"
+        dependson([
+            "CoreSystem",
+            "Renderer",
+            "ShaderSystem",
+            "PhysicsEngine"
         ])
-```
-
-### iOS IPA Generation
-```python
-with workspace("iOSApp"):
-    platforms(["iOS"])
-    
-    with project("App"):
-        consoleapp()
-        # iOS-specific settings
-        # TODO: Add iOS configuration API
+        
+        # Auto-configure based on dependencies
+        useproject("Renderer", copy_includes=True)
+        useproject("PhysicsEngine", copy_defines=True)
 ```
 
 ## 📁 Project Examples
 
-### Example 1: Simple Library
-```
-simple-lib/
-├── mathlib.jenga
-├── include/
-│   └── math.h
-└── src/
-    └── math.cpp
-```
-
-**mathlib.jenga:**
-```python
-with workspace("MathLib"):
-    with project("Math"):
-        staticlib()
-        files(["src/**.cpp"])
-        includedirs(["include"])
-        targetdir("Build/Lib/%{cfg.buildcfg}")
-```
-
-### Example 2: Game Engine
+### Example 1: Modular Game Engine
 ```
 game-engine/
 ├── engine.jenga
-├── Core/          # Math, Physics, etc.
-├── Rendering/     # OpenGL, Vulkan
-├── Audio/         # Sound system
-└── Game/          # Game logic
+├── Core/              # Core systems
+├── Math/              # Mathematics library
+├── Render/            # Rendering system
+├── Audio/             # Audio system
+├── Physics/           # Physics engine
+└── Game/              # Game-specific code
 ```
 
-### Example 3: Mobile App
+**engine.jenga:**
+```python
+with workspace("GameEngine"):
+    configurations(["Debug", "Release", "Profile"])
+    platforms(["Windows", "Linux", "Android"])
+    
+    # Include external math library
+    with include("third_party/glm/glm.jenga"):
+        pass
+    
+    # Core engine systems
+    with project("CoreSystem"):
+        staticlib()
+        files(["Core/src/**.cpp"])
+        includedirs(["Core/include"])
+    
+    with project("Renderer"):
+        sharedlib()
+        files(["Render/src/**.cpp"])
+        includedirs(["Render/include"])
+        dependson(["CoreSystem", "glm"])
+    
+    # Game project
+    with project("MyGame"):
+        windowedapp()
+        files(["Game/src/**.cpp"])
+        dependson(["CoreSystem", "Renderer"])
+        
+        # Auto-create files as needed
+        # jenga create file Player --type class --namespace game
 ```
-mobile-app/
-├── app.jenga
-├── native/        # C++ core
-├── android/       # Android-specific
-├── ios/          # iOS-specific
-└── shared/        # Common assets
+
+### Example 2: Plugin-Based Application
+```python
+with workspace("PluginApp"):
+    # Main application
+    with project("AppCore"):
+        staticlib()
+        files(["core/src/**.cpp"])
+    
+    # Plugins as separate projects
+    with project("ImagePlugin"):
+        sharedlib()
+        files(["plugins/image/src/**.cpp"])
+        dependson(["AppCore"])
+    
+    with project("AudioPlugin"):
+        sharedlib()
+        files(["plugins/audio/src/**.cpp"])
+        dependson(["AppCore"])
+    
+    # Main executable
+    with project("Application"):
+        consoleapp()
+        files(["app/src/**.cpp"])
+        dependson(["AppCore", "ImagePlugin", "AudioPlugin"])
+```
+
+### Example 3: Cross-Platform Library
+```python
+with workspace("CrossPlatformLib"):
+    platforms(["Windows", "Linux", "macOS", "Android", "iOS"])
+    
+    with project("PlatformAbstraction"):
+        staticlib()
+        files(["src/common/**.cpp"])
+        
+        # Platform-specific implementations
+        with filter("system:Windows"):
+            files(["src/windows/**.cpp"])
+            defines(["PLATFORM_WINDOWS"])
+        
+        with filter("system:Linux"):
+            files(["src/linux/**.cpp"])
+            defines(["PLATFORM_LINUX"])
+        
+        with filter("system:Android"):
+            files(["src/android/**.cpp"])
+            defines(["PLATFORM_ANDROID"])
 ```
 
 ## 🤝 Contributing
@@ -370,14 +513,8 @@ We welcome contributions! Here's how you can help:
 3. Discuss implementation
 
 ### Code Contributions
-1. Fork the repository
-2. Create a feature branch
-3. Write tests for new features
-4. Submit a pull request
-
-### Development Setup
 ```bash
-# Clone and setup
+# Development setup
 git clone https://github.com/RihenUniverse/Jenga.git
 cd Jenga
 pip install -e .[dev]
@@ -416,66 +553,11 @@ Copyright © 2026 Rihen. All rights reserved.
 ❌ **Liability** - Rihen not liable for damages  
 ❌ **Patent Claims** - No patent licenses granted  
 
-#### License Text
-```
-Jenga Build System
-Copyright (c) 2026 Rihen
-
-This software is provided under the Rihen Proprietary License.
-You may use, modify, and distribute this software for any purpose,
-provided that you include this license and copyright notice in all
-copies or substantial portions of the software.
-
-THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
-Rihen SHALL NOT BE LIABLE FOR ANY DAMAGES ARISING FROM
-THE USE OF THIS SOFTWARE.
-
-For complete terms, see the LICENSE file included with this distribution.
-```
-
-#### For Your Projects
-Include this notice in your project's documentation:
-```
-This project uses Jenga Build System
-Licensed under Rihen Proprietary License
-Copyright © 2026 Rihen
-```
-
 ## ⚖️ Disclaimer
-
-### Important Legal Notice
 
 **NO WARRANTY**: Jenga Build System is provided "AS IS" without any warranty of any kind, either expressed or implied, including but not limited to the implied warranties of merchantability and fitness for a particular purpose.
 
 **NO LIABILITY**: In no event shall Rihen or its contributors be liable for any direct, indirect, incidental, special, exemplary, or consequential damages (including, but not limited to, procurement of substitute goods or services; loss of use, data, or profits; or business interruption) however caused and on any theory of liability, whether in contract, strict liability, or tort (including negligence or otherwise) arising in any way out of the use of this software, even if advised of the possibility of such damage.
-
-**USER RESPONSIBILITY**: You are solely responsible for:
-1. Testing the software in your environment
-2. Ensuring compliance with applicable laws
-3. Backing up your data before use
-4. Verifying build results and outputs
-
-**THIRD-PARTY COMPONENTS**: Jenga may interact with third-party tools (compilers, SDKs, etc.). Rihen is not responsible for:
-- Availability or compatibility of third-party tools
-- Licensing requirements of third-party components
-- Issues arising from third-party tool changes
-
-**EXPORT COMPLIANCE**: You are responsible for complying with all applicable export control laws and regulations.
-
-**INDUSTRY STANDARDS**: While Jenga follows industry best practices, you should:
-- Review generated build files before production use
-- Perform security audits for sensitive applications
-- Maintain your own quality assurance processes
-
-By using Jenga Build System, you acknowledge that you have read this disclaimer, understand it, and agree to be bound by its terms.
-
----
-
-## 📞 Support & Contact
-
-- **GitHub Issues**: https://github.com/RihenUniverse/Jenga/issues
-- **Email**: rihen.universe@gmail.com
-- **Documentation**: https://github.com/RihenUniverse/Jenga/tree/main/Docs
 
 ---
 
@@ -483,107 +565,3 @@ By using Jenga Build System, you acknowledge that you have read this disclaimer,
   <p>Built with ❤️ by <a href="https://github.com/RihenUniverse">Rihen</a></p>
   <p>Jenga Build System - Making C++ builds simple across all platforms</p>
 </div>
-
----
-
-## 📄 Fichier de licence (LICENSE) :
-
-```text
-PROPRIETARY LICENSE AGREEMENT
-For Jenga Build System
-Copyright © 2026 Rihen
-
-IMPORTANT: READ CAREFULLY
-
-This Proprietary License Agreement ("Agreement") is a legal agreement between you 
-(either an individual or a single entity) and Rihen for the Jenga Build 
-System software product ("Software").
-
-BY INSTALLING, COPYING, OR OTHERWISE USING THE SOFTWARE, YOU AGREE TO BE BOUND 
-BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT AGREE TO THE TERMS OF THIS 
-AGREEMENT, DO NOT INSTALL OR USE THE SOFTWARE.
-
-1. GRANT OF LICENSE
-Rihen grants you a non-exclusive, worldwide, royalty-free license to:
-   a) Use the Software for any purpose, personal or commercial
-   b) Modify the source code to create derivative works
-   c) Distribute the Software or derivative works
-   
-   CONDITIONS:
-   - You must include this license in all distributions
-   - You must preserve all copyright notices
-   - You cannot remove license headers from source files
-
-2. RESTRICTIONS
-You may not:
-   a) Sell the Software as a standalone product
-   b) Grant sublicenses to others
-   c) Use the Rihen name for endorsement without permission
-   d) Remove or alter any proprietary notices
-
-3. COPYRIGHT
-All title and copyrights in and to the Software are owned by Rihen. 
-This license does not transfer ownership of the copyright.
-
-4. NO WARRANTY
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL 
-Rihen OR ITS CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
-THE SOFTWARE.
-
-5. TERMINATION
-This license is effective until terminated. Your rights under this license will 
-terminate automatically without notice from Rihen if you fail to comply 
-with any term(s) of this license.
-
-6. GOVERNING LAW
-This Agreement shall be governed by the laws of the jurisdiction where 
-Rihen is established, without regard to its conflict of law provisions.
-
-7. ENTIRE AGREEMENT
-This Agreement constitutes the entire agreement between the parties concerning 
-the Software and supersedes all prior or contemporaneous oral or written 
-agreements, proposals, representations, and communications.
-
-8. ACKNOWLEDGMENT
-YOU ACKNOWLEDGE THAT YOU HAVE READ THIS AGREEMENT, UNDERSTAND IT, AND AGREE 
-TO BE BOUND BY ITS TERMS AND CONDITIONS.
-
-For questions about this license, contact: rihen.universe@gmail.com
-
-Version 1.0 - Effective Date: [Current Date]
-```
-
----
-
-## Réponses à vos questions :
-
-### 1. **Disponibilité des scripts après installation** :
-✅ **Oui, les scripts seront disponibles** :
-- Sur Windows : `jenga` ou `jenga.bat` fonctionnera
-- Sur Linux/macOS : `jenga` ou `jenga.sh` fonctionnera
-- Le `setup.py` configure correctement les entry points
-- Alternative : `python -m Jenga.jenga` toujours disponible
-
-### 2. **Licence propriétaire** :
-La licence que j'ai rédigée :
-- ✅ Permet l'utilisation gratuite (personnelle et commerciale)
-- ✅ Permet les modifications du code source
-- ✅ Exige la mention de Rihen
-- ✅ Exige l'inclusion de la licence dans les distributions
-- ✅ Se dédouane de toute responsabilité (clause "AS IS")
-- ✅ Interdit la revente comme produit autonome
-- ✅ Protège votre propriété intellectuelle
-
-### 3. **Structure complète** :
-Le README inclut :
-- Toutes les fonctionnalités documentées
-- Tous les guides de vos fichiers Docs/
-- Des exemples pratiques
-- Instructions d'installation détaillées
-- Section contribution
-- Licence complète
-- Clause de non-responsabilité légale

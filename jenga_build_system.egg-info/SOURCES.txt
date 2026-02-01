@@ -39,6 +39,7 @@ Jenga/Commands/__init__.py
 Jenga/Commands/add.py
 Jenga/Commands/build.py
 Jenga/Commands/clean.py
+Jenga/Commands/create copy.py
 Jenga/Commands/create.py
 Jenga/Commands/export.py
 Jenga/Commands/gen.py
