@@ -28,7 +28,7 @@ if os.path.exists(unitest_dir):
 
 setup(
     name="jenga-build-system",
-    version="1.0.2",
+    version="1.0.3",
     author="Rihen",
     author_email="rihen.universe@gmail.com",
     description="Modern multi-platform C/C++ build system with unified Python DSL",

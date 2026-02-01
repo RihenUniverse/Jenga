@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jenga-build-system"
-version = "1.0.2"
+version = "1.0.3"
 description = "Modern multi-platform C/C++ build system with unified Python DSL"
 readme = "README.md"
 authors = [

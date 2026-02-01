@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: jenga-build-system
-Version: 1.0.2
+Version: 1.0.3
 Summary: Modern multi-platform C/C++ build system with unified Python DSL
 Home-page: https://github.com/RihenUniverse/Jenga
 Author: Rihen
