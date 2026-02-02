@@ -1029,3 +1029,22 @@ class Compiler:
                         Display.warning(f"Failed to copy {src_path}: {e}")
             else:
                 Display.warning(f"Depend file not found: {expanded_pattern}")
+
+    def _get_main_file_for_platform(project, platform):
+        """Retourne le fichier main approprié selon la plateforme"""
+        
+        if platform == "Android":
+            # Android NDK utilise android_main
+            return "Platform/Android/AndroidMain.cpp"
+        
+        elif platform == "Emscripten":
+            # Emscripten utilise main classique mais avec SetMainLoop
+            return "Platform/Emscripten/EmscriptenMain.cpp"
+        
+        elif platform in ["iOS"]:
+            # iOS utilise UIApplicationMain
+            return "Platform/iOS/iOSMain.mm"
+        
+        else:
+            # Desktop: main.cpp standard
+            return "Main.cpp"

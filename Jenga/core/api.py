@@ -1632,15 +1632,15 @@ class include:
                 self.parent_workspace.toolchains[tc_name] = tc
         
         # Journaliser le succès
-        if self.included_projects:
-            print(f"✅ Included {len(self.included_projects)} project(s) from {self.jenga_path.name}: {', '.join(self.included_projects)}")
-            # Debug: montrer les chemins résolus
-            for proj_name in self.included_projects:
-                proj = self.parent_workspace.projects[proj_name]
-                print(f"   {proj_name}:")
-                print(f"     Location: {proj.location}")
-                print(f"     Include dirs: {proj.includedirs}")
-                print(f"     Files: {proj.files[:3]}{'...' if len(proj.files) > 3 else ''}")
+        # if self.included_projects:
+        #     print(f"✅ Included {len(self.included_projects)} project(s) from {self.jenga_path.name}: {', '.join(self.included_projects)}")
+        #     # Debug: montrer les chemins résolus
+        #     for proj_name in self.included_projects:
+        #         proj = self.parent_workspace.projects[proj_name]
+        #         print(f"   {proj_name}:")
+        #         print(f"     Location: {proj.location}")
+        #         print(f"     Include dirs: {proj.includedirs}")
+        #         print(f"     Files: {proj.files[:3]}{'...' if len(proj.files) > 3 else ''}")
         
         return False
     
