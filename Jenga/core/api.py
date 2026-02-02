@@ -605,6 +605,13 @@ def dependson(deps: List[str]):
     """Add project dependencies"""
     if _current_project:
         _current_project.dependson.extend(deps)
+        if _current_filter and "system:" in _current_filter:
+            system = _current_filter.split(":")[1]
+            if system not in _current_project.system_links:
+                _current_project.system_links[system] = []
+            _current_project.system_links[system].extend(deps)
+        else:
+            _current_project.links.extend(deps)
 
 
 # Compiler settings
