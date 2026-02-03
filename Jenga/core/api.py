@@ -338,8 +338,8 @@ class filter:
 
 class test:
     """Test suite context manager - Creates a test project automatically"""
-    def __init__(self, name: str):
-        self.name = name
+    def __init__(self, subname: str):
+        self.subname = subname
         self.project = None
         self.parent_project = None
         
@@ -376,7 +376,10 @@ class test:
         self.project.parent_project = self.parent_project.name
         
         # Set default location
-        self.project.location = "."
+        if self.parent_project and self.parent_project.location:
+            self.project.location = self.parent_project.location
+        else:
+            self.project.location = "."
         
         # AUTOMATIC: Add dependencies
         # 1. Parent project (to access its code)
@@ -408,6 +411,40 @@ class test:
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         global _current_project
+        
+        # ========== AJOUTEZ CE BLOC ICI ==========
+        # AUTOMATIC: Copy testfiles to files for compilation
+        if self.project.testfiles:
+            # Resolve test file patterns
+            from pathlib import Path
+            
+            # Use parent project location as base
+            base_dir = self.parent_project.location if self.parent_project else _current_workspace.location
+            
+            # Import resolve_file_list from variables module
+            from .variables import resolve_file_list, VariableExpander
+            
+            # Create temporary expander
+            expander = VariableExpander(_current_workspace, self.project, "Debug", "Windows")
+            
+            # Resolve patterns
+            resolved_test_files = resolve_file_list(self.project.testfiles, base_dir, expander)
+            
+            # Add to project files
+            self.project.files.extend(resolved_test_files)
+            
+            # Also copy parent's source files (excluding main)
+            if self.parent_project and self.parent_project.files:
+                parent_files = resolve_file_list(self.parent_project.files, 
+                                                self.parent_project.location or _current_workspace.location,
+                                                expander)
+                
+                # Filter out main file if specified
+                if self.project.testmainfile:
+                    main_file_resolved = expander.expand(self.project.testmainfile)
+                    parent_files = [f for f in parent_files if f != main_file_resolved]
+                
+                self.project.files.extend(parent_files)
         
         # AUTOMATIC: Inject test main if not provided
         if not self.project.testmaintemplate:
@@ -739,6 +776,8 @@ def testfiles(patterns: List[str]):
     """
     if _current_project:
         _current_project.testfiles.extend(patterns)
+        for pattern in patterns:
+            _current_project.files.append(pattern)
 
 
 def testmainfile(main_file: str):
@@ -1649,7 +1688,44 @@ class include:
         #         print(f"     Include dirs: {proj.includedirs}")
         #         print(f"     Files: {proj.files[:3]}{'...' if len(proj.files) > 3 else ''}")
         
+        # Ajouter la détection des tests
+        test_projects_found = []
+        for proj_name in projects_to_include:
+            proj = self.temp_workspace.projects[proj_name]
+            if proj.is_test:
+                test_projects_found.append({
+                    'name': proj_name,
+                    'parent': proj.parent_project,
+                    'files': proj.testfiles
+                })
+        
+                # 1. Vérifier si __Unitest__ existe dans le workspace parent
+                if "__Unitest__" not in self.parent_workspace.projects:
+                    print(f"  ⚠️  Attention: __Unitest__ non trouvé pour {proj_name}")
+                else:
+                    unitest_project = self.parent_workspace.projects["__Unitest__"]
+                    proj.dependson.append("__Unitest__")
+                    proj.includedirs.append(unitest_project.location + "/src")
+                    proj.files.append(unitest_project.location + "/AutoMainTemplate/Entry.cpp")
+        
+        # if test_projects_found:
+        #     print(f"📋 Tests détectés dans {self.jenga_path.name}:")
+        #     for test in test_projects_found:
+        #         print(f"  • {test['name']} (pour {test['parent']})")
+        
         return False
+    
+    def get_test_projects(self):
+        """Récupère les projets de test spécifiques à cet include"""
+        test_projects = {}
+        for name, proj in self.temp_workspace.projects.items():
+            if proj.is_test:
+                test_projects[name] = {
+                    'parent': proj.parent_project,
+                    'testfiles': proj.testfiles,
+                    'location': proj.location
+                }
+        return test_projects
     
     def only(self, project_names: list):
         """

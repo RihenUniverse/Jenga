@@ -3,14 +3,13 @@
 """
 Jenga Build System - Enhanced Run Command
 Supports running executables with debuggers (GDB, GGDB, LLDB)
-and running unit tests
 """
 
 import sys
 import subprocess
 import shlex
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -54,154 +53,6 @@ DEBUGGERS = {
 
 
 # ============================================================================
-# UNIT TEST SUPPORT
-# ============================================================================
-
-def find_test_project(workspace, project_name: Optional[str] = None) -> Optional[Dict]:
-    """Find test project for a given project"""
-    
-    if project_name:
-        # Look for specific project's tests
-        test_project_name = f"{project_name}_Tests"
-        if test_project_name in workspace.projects:
-            project = workspace.projects[test_project_name]
-            if hasattr(project, 'is_test') and project.is_test:
-                return {
-                    'name': test_project_name,
-                    'project': project,
-                    'parent': project.parent_project
-                }
-    else:
-        # Find default project's tests
-        default_project = workspace.startproject
-        if default_project:
-            test_project_name = f"{default_project}_Tests"
-            if test_project_name in workspace.projects:
-                project = workspace.projects[test_project_name]
-                if hasattr(project, 'is_test') and project.is_test:
-                    return {
-                        'name': test_project_name,
-                        'project': project,
-                        'parent': project.parent_project
-                    }
-    
-    # Search all test projects
-    test_projects = []
-    for name, proj in workspace.projects.items():
-        if hasattr(proj, 'is_test') and proj.is_test:
-            test_projects.append({
-                'name': name,
-                'project': proj,
-                'parent': proj.parent_project
-            })
-    
-    if test_projects:
-        if project_name:
-            # Try to find test project by parent name
-            for test_proj in test_projects:
-                if test_proj['parent'] == project_name:
-                    return test_proj
-        else:
-            # Return first test project
-            return test_projects[0]
-    
-    return None
-
-
-def get_all_test_projects(workspace) -> List[Dict]:
-    """Get all test projects in workspace"""
-    test_projects = []
-    for name, proj in workspace.projects.items():
-        if hasattr(proj, 'is_test') and proj.is_test:
-            test_projects.append({
-                'name': name,
-                'project': proj,
-                'parent': proj.parent_project
-            })
-    return test_projects
-
-
-def run_test_project(workspace, test_info: Dict, config: str, platform: str, 
-                    debugger: str, test_args: List[str]) -> int:
-    """Run a test project"""
-    
-    test_project = test_info['project']
-    expander = VariableExpander(workspace, test_project, config, platform)
-    
-    # Get executable path
-    target_dir = Path(expander.expand(test_project.targetdir))
-    target_name = expander.expand(test_project.targetname) if test_project.targetname else test_info['name']
-    
-    if platform == "Windows":
-        executable = target_dir / f"{target_name}.exe"
-    else:
-        executable = target_dir / target_name
-    
-    if not executable.exists():
-        Display.error(f"Test executable not found: {executable}")
-        Display.info("Build tests first with: jenga build")
-        return 1
-    
-    # Add test-specific arguments from project configuration
-    if hasattr(test_project, 'testoptions'):
-        test_args = list(test_project.testoptions) + test_args
-    
-    Display.section(f"Running Tests: {test_info['name']}")
-    Display.info(f"Parent Project: {test_info['parent']}")
-    Display.info(f"Executable: {executable}")
-    
-    # Run with debugger or directly
-    workspace_dir = Path(workspace.location) if workspace.location else Path.cwd()
-    
-    if debugger == 'none':
-        return run_direct(executable, test_args, workspace_dir)
-    else:
-        return run_with_debugger(executable, debugger, test_args, workspace_dir)
-
-
-def run_all_tests(workspace, config: str, platform: str, 
-                 debugger: str, test_args: List[str]) -> bool:
-    """Run all test projects"""
-    
-    test_projects = get_all_test_projects(workspace)
-    
-    if not test_projects:
-        Display.error("No test projects found in workspace")
-        Display.info("Create tests using 'test' context in .jenga file")
-        return False
-    
-    Display.info(f"Found {len(test_projects)} test project(s)")
-    
-    results = []
-    for test_info in test_projects:
-        result = run_test_project(workspace, test_info, config, platform, 
-                                debugger, test_args)
-        results.append((test_info['name'], result))
-        
-        # Add separator between test runs
-        if test_info != test_projects[-1]:
-            print("\n" + "=" * 70 + "\n")
-    
-    # Summary
-    Display.section("Test Summary")
-    passed = 0
-    failed = 0
-    
-    for name, result in results:
-        if result == 0:
-            Display.success(f"✓ {name}: PASSED")
-            passed += 1
-        else:
-            Display.error(f"✗ {name}: FAILED (code: {result})")
-            failed += 1
-    
-    Display.info(f"\nTotal: {len(results)} test project(s)")
-    Display.info(f"Passed: {passed}, Failed: {failed}")
-    
-    return failed == 0
-
-
-# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
@@ -215,7 +66,7 @@ def find_executable(workspace, config: str, platform: str, project_name: Optiona
     if not project_name:
         # Find first executable project
         for name, proj in workspace.projects.items():
-            if proj.kind in [ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE]:
+            if proj.kind in [ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP]:
                 project_name = name
                 break
     
@@ -376,7 +227,6 @@ def execute(options: dict) -> bool:
     platform = options.get("platform", "Windows")
     project_name = options.get("project")
     debugger = options.get("debug", "none")
-    run_tests = options.get("test")
     program_args = options.get("args", [])
     
     # Auto-detect platform if not specified
@@ -393,32 +243,7 @@ def execute(options: dict) -> bool:
         Display.info(f"Available: {', '.join(['none'] + list(DEBUGGERS.keys()))}")
         return False
     
-    if run_tests:
-        if run_tests == 'all':
-            test_projects = get_all_test_projects(workspace)
-            executed_any = True
-            for test_info in test_projects:
-                executed_any = run_test_project(workspace, test_info, config, platform, debugger, program_args) and executed_any
-            return executed_any
-        test_info = find_test_project(workspace, run_tests)
-        if not test_info:
-            Display.error(f"No test project found for '{run_tests or workspace.startproject or 'default'}'")
-            
-            # Show available test projects
-            test_projects = get_all_test_projects(workspace)
-            if test_projects:
-                Display.info("\nAvailable test projects:")
-                for tp in test_projects:
-                    Display.info(f"  • {tp['name']} (parent: {tp['parent']})")
-                Display.info("\nRun all tests with: jenga run --alltest")
-            else:
-                Display.info("\nNo test projects found. Create tests using 'test' context.")
-            
-            return False
-        
-        return run_test_project(workspace, test_info, config, platform, debugger, program_args) == 0
-    
-    # Normal executable run
+    # Find executable
     executable, project = find_executable(workspace, config, platform, project_name)
     if not executable:
         return False
@@ -457,7 +282,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="Run executable projects and unit tests",
+        description="Run executable projects",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -474,25 +299,13 @@ Examples:
   jenga run --project MyApp
   
   # Run with arguments
-  jenga run --verbose --config=test.json
+  jenga run -- --verbose --config=test.json
   
   # Run Release build
   jenga run --config Release
   
   # Run with Valgrind memory check
   jenga run --debug=valgrind
-  
-  # Run unit tests for default project
-  jenga run --test
-  
-  # Run unit tests for specific project
-  jenga run --test MyApp
-  
-  # Run all unit tests in workspace
-  jenga run --alltest
-  
-  # Run tests with custom arguments
-  jenga run --test --verbose --filter=Math*
   
 Debuggers:
   none      - Run directly (default)
@@ -528,28 +341,18 @@ Debuggers:
     )
     
     parser.add_argument(
-        '--test',
-        help='Run unit tests for the project'
-    )
-    
-    parser.add_argument(
         'args',
         nargs='*',
-        help='Arguments to pass to the executable or test runner'
+        help='Arguments to pass to the executable'
     )
     
-    # Validate mutual exclusivity
     parsed = parser.parse_args()
-    
-    if parsed.test and parsed.alltest:
-        parser.error("--test and --alltest are mutually exclusive")
     
     options = {
         'config': parsed.config,
         'platform': parsed.platform,
         'project': parsed.project,
         'debug': parsed.debug,
-        'test': parsed.test,
         'args': parsed.args,
     }
     

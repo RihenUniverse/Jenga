@@ -49,11 +49,14 @@ Jenga/Commands/install.py
 Jenga/Commands/keygen.py
 Jenga/Commands/package.py
 Jenga/Commands/rebuild.py
+Jenga/Commands/run copy.py
 Jenga/Commands/run.py
 Jenga/Commands/sign.py
 Jenga/Commands/template.py
+Jenga/Commands/test.py
 Jenga/Commands/watch.py
 Jenga/Unitest/AutoMainTemplate/Entry.cpp
+Jenga/Unitest/AutoMainTemplate/Main.cpp
 Jenga/Unitest/AutoMainTemplate/test_main.cpp
 Jenga/Unitest/src/Unitest/AutoMain.h
 Jenga/Unitest/src/Unitest/Benchmark.cpp

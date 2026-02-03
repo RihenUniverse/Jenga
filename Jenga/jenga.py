@@ -62,6 +62,7 @@ def print_help():
   rebuild    - Clean and build the workspace/project
   clean      - Clean build artifacts
   run        - Run the built executable
+  test       - Run the built executable with test framework
   package    - Package the application (APK, AAB, ZIP, DMG, etc.)
   sign       - Sign the application (Android APK, iOS IPA, etc.)
   keygen     - Generate keystore for signing
