@@ -947,6 +947,14 @@ class Compiler:
             
             if lib_file.exists():
                 dest_file = target_dir / lib_file.name
+                
+                # Vérifier si le fichier existe déjà
+                if dest_file.exists():
+                    # Comparer la date de modification
+                    if lib_file.stat().st_mtime <= dest_file.stat().st_mtime:
+                        Reporter.detail(f"  Already exists (same or newer): {lib_file.name}")
+                        continue
+                
                 try:
                     shutil.copy2(lib_file, dest_file)
                     Reporter.detail(f"  Copied: {lib_file.name}")

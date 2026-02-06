@@ -1108,7 +1108,7 @@ Copyright © {COPYRIGHT_YEAR} {COMPANY_NAME}
     # .gitignore
     gitignore_content = '''# Jenga Build System
 Build/
-.jenga/
+.cjenga/
 bin/
 obj/
 out/
