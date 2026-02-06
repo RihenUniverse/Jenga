@@ -1,6 +1,3 @@
-Voici le README.md mis à jour avec toutes vos nouvelles fonctionnalités :
-
-```markdown
 # 🏗️ Jenga Build System
 
 **Modern Multi-Platform C/C++ Build System with Unified Python DSL**
