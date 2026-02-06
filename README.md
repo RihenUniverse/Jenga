@@ -1,10 +1,14 @@
-# 🏗️ Jenga Build System
+# Jenga Build System v1.1.0
 
-**Modern Multi-Platform C/C++ Build System with Unified Python DSL**
+**🚀 Un système de build moderne et puissant pour C/C++**
 
 [![License](https://img.shields.io/badge/License-Proprietary-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org)
 [![Platforms](https://img.shields.io/badge/Platforms-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android%20%7C%20iOS%20%7C%20WebAssembly-green.svg)]()
+
+## 🏗️ Jenga Build System
+
+**Modern Multi-Platform C/C++ Build System with Unified Python DSL**
 
 ## ✨ What's New in v1.1.0
 
@@ -493,6 +497,248 @@ with workspace("CrossPlatformLib"):
         with filter("system:Android"):
             files(["src/android/**.cpp"])
             defines(["PLATFORM_ANDROID"])
+```
+
+## 🧪 Tests Unitaires Avancés
+
+### Framework de Test Intégré
+
+Jenga inclut un framework de tests unitaires puissant avec des assertions riches :
+
+```cpp
+#include <Unitest/Unitest.h>  // Macros de test de Jenga
+
+// Tests basiques
+TEST(Calculator_Addition) {
+    ASSERT_EQUAL(5, Calculator::add(2, 3));
+    ASSERT_EQUAL(0, Calculator::add(-1, 1));
+    ASSERT_EQUAL(-5, Calculator::add(-2, -3));
+}
+
+TEST(Calculator_Multiplication) {
+    ASSERT_EQUAL(6, Calculator::multiply(2, 3));
+    ASSERT_EQUAL(0, Calculator::multiply(0, 100));
+    ASSERT_EQUAL(-6, Calculator::multiply(2, -3));
+}
+
+TEST(Calculator_Division) {
+    ASSERT_NEAR(5.0, Calculator::divide(10.0, 2.0), 0.001);
+    ASSERT_NEAR(-2.5, Calculator::divide(5.0, -2.0), 0.001);
+    
+    // Test division par zéro
+    ASSERT_THROWS(std::invalid_argument, Calculator::divide(1.0, 0.0));
+}
+
+TEST(Calculator_EdgeCases) {
+    // Test avec grands nombres
+    ASSERT_EQUAL(2000000000, Calculator::add(1000000000, 1000000000));
+    
+    // Test avec nombres négatifs
+    ASSERT_EQUAL(1, Calculator::add(-10, 11));
+    
+    // Performance test
+    ASSERT_EXECUTION_TIME_LESS([]() {
+        for (int i = 0; i < 1000; ++i) {
+            Calculator::add(i, i);
+        }
+    }, 10.0);  // Doit prendre moins de 10ms
+}
+```
+
+### Macros de Test Disponibles
+
+#### Assertions Basiques
+```cpp
+// Assertions simples
+ASSERT_EQUAL(expected, actual)
+ASSERT_NOT_EQUAL(expected, actual)
+ASSERT_TRUE(condition)
+ASSERT_FALSE(condition)
+ASSERT_NULL(ptr)
+ASSERT_NOT_NULL(ptr)
+
+// Avec messages personnalisés
+ASSERT_EQUAL_MSG(expected, actual, "Message personnalisé")
+ASSERT_TRUE_MSG(condition, "Doit être vrai")
+```
+
+#### Comparaisons Numériques
+```cpp
+// Comparaisons avec tolérance
+ASSERT_LESS(left, right)
+ASSERT_LESS_EQUAL(left, right)
+ASSERT_GREATER(left, right)
+ASSERT_GREATER_EQUAL(left, right)
+ASSERT_NEAR(expected, actual, tolerance)
+ASSERT_EQUAL_TOLERANCE(expected, actual, tolerance)
+```
+
+#### Gestion des Exceptions
+```cpp
+// Tests d'exceptions
+ASSERT_THROWS(std::exception, expression)
+ASSERT_NO_THROW(expression)
+ASSERT_THROWS_MSG(std::exception, expression, "Message")
+ASSERT_NO_THROW_MSG(expression, "Message")
+```
+
+#### Collections et Conteneurs
+```cpp
+// Tests sur collections
+ASSERT_CONTAINS(container, value)
+ASSERT_NOT_CONTAINS(container, value)
+ASSERT_CONTAINS_MSG(container, value, "Message")
+ASSERT_NOT_CONTAINS_MSG(container, value, "Message")
+```
+
+#### Performance et Benchmarking
+```cpp
+// Tests de performance
+ASSERT_EXECUTION_TIME_LESS(expression, maxTimeMs)
+ASSERT_EXECUTION_TIME_BETWEEN(expression, minTimeMs, maxTimeMs)
+
+// Benchmarks
+RUN_BENCHMARK("nom", fonction, iterations)
+ASSERT_BENCHMARK_FASTER(benchmarkA, benchmarkB)
+ASSERT_BENCHMARK_FASTER_WITH_LIMIT(benchmarkA, benchmarkB, limite)
+
+// Profiling
+BEGIN_PROFILING_SESSION("session")
+END_PROFILING_SESSION_AND_REPORT("session")
+PROFILE_TEST_SCOPE(testName, code_a_profiler)
+```
+
+### Exemple Complet de Suite de Tests
+
+```cpp
+// tests/MathTest.cpp
+#include <Unitest/Unitest.h>
+#include "../src/math/Calculator.h"
+
+// Test de base
+TEST(Math_BasicOperations) {
+    ASSERT_EQUAL(4, Calculator::add(2, 2));
+    ASSERT_EQUAL(6, Calculator::multiply(2, 3));
+    ASSERT_NEAR(2.0, Calculator::divide(6.0, 3.0), 0.001);
+}
+
+// Test avec fixture
+class CalculatorFixture : public TestFixture {
+protected:
+    Calculator* calc;
+    
+    void SetUp() override {
+        calc = new Calculator();
+    }
+    
+    void TearDown() override {
+        delete calc;
+    }
+};
+
+TEST_FIXTURE(CalculatorFixture, AdditionWithFixture) {
+    ASSERT_EQUAL(5, calc->add(2, 3));
+    ASSERT_EQUAL(0, calc->add(-1, 1));
+}
+
+// Test de performance
+TEST_BENCHMARK_SIMPLE(Performance_Addition, "AdditionBenchmark", []() {
+    volatile int result = 0;
+    for (int i = 0; i < 10000; ++i) {
+        result += Calculator::add(i, i);
+    }
+}, 1000)
+
+// Test avec profiling
+PROFILE_TEST_SCOPE(Profile_Addition, {
+    for (int i = 0; i < 1000; ++i) {
+        Calculator::add(i, i + 1);
+    }
+})
+
+// Test de régression
+TEST_BENCHMARK_WITH_BASELINE(Regression_Addition, "Addition", []() {
+    Calculator::add(100, 200);
+}, 1000, baseline_benchmark)
+
+// Test avec comparaison
+COMPARE_BENCHMARKS(Comparison_Operations,
+    "Addition", []() { Calculator::add(1, 2); },
+    "Multiplication", []() { Calculator::multiply(1, 2); },
+    1000, 1.5)
+```
+
+### Configuration des Tests dans .jenga
+
+```python
+with workspace("MyProject"):
+    configurations(["Debug", "Release"])
+    
+    # Projet principal
+    with project("Calculator"):
+        staticlib()
+        files(["src/**.cpp", "src/**.h"])
+        includedirs(["src"])
+        targetdir("Build/Lib/%{cfg.buildcfg}")
+    
+        # Suite de tests
+        with test("CalculatorTests"):
+            testfiles(["tests/**.cpp"])
+            testmainfile("src/main.cpp")  # Exclure le main de l'appli
+            
+            # Options de test
+            testoptions([
+                "--verbose",
+                "--stop-on-failure",
+                "--filter=Math*"
+            ])
+            
+            # Configuration spécifique aux tests
+            with filter("configurations:Debug"):
+                defines(["ENABLE_TESTING", "DEBUG_TESTS"])
+            
+            # Répertoires de sortie pour les tests
+            targetdir("Build/Tests/%{cfg.buildcfg}")
+            
+            # Dépendances des tests
+            dependson(["Calculator"])
+            includedirs(["tests/include"])
+            
+            # Fichiers de test supplémentaires
+            dependfiles([
+                "tests/data/**",
+                "tests/config/test.conf"
+            ])
+```
+
+### Commandes de Test Avancées
+
+```bash
+# Exécuter tous les tests
+jenga test
+
+# Exécuter avec débogage
+jenga test --debug=gdb
+jenga test --debug=valgrind  # Détection de fuites mémoire
+jenga test --debug=helgrind  # Détection de courses
+
+# Exécuter un test spécifique
+jenga test --project CalculatorTests
+
+# Exécuter avec options personnalisées
+jenga test -- --verbose --filter=Math* --parallel=4
+
+# Lister les tests disponibles
+jenga test --list
+
+# Construire seulement les tests
+jenga test --build
+
+# Tests avec couverture
+jenga test --coverage
+
+# Tests avec profiling
+jenga test --profile
 ```
 
 ## 🤝 Contributing
