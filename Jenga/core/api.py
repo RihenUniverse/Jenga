@@ -234,8 +234,8 @@ class workspace:
         unitest_proj.includedirs = [f"{unitest_proj.location}/src"]
         
         # Output
-        unitest_proj.targetdir = "%{wks.location}/Build/Lib/%{cfg.buildcfg}"
-        unitest_proj.objdir = "%{wks.location}/Build/Obj/%{cfg.buildcfg}/__Unitest__"
+        unitest_proj.targetdir = "%{wks.location}/Build/Lib/%{cfg.buildcfg}-%{cfg.system}"
+        unitest_proj.objdir = "%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/__Unitest__"
         unitest_proj.targetname = "__Unitest__"
         
         # Add to workspace (hidden with __ prefix)

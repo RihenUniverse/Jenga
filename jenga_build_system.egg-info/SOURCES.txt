@@ -1,4 +1,5 @@
 LICENSE
+LIVRE_JENGA.md
 MANIFEST.in
 README.md
 description.md
