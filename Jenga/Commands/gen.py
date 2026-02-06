@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nken Build System - Gen Command
+jenga Build System - Gen Command
 Generate IDE configuration files (VSCode, Visual Studio, etc.)
 """
 
@@ -151,11 +151,11 @@ def generate_tasks(workspace, config: str, platform: str, vscode_dir: Path) -> b
         "version": "2.0.0",
         "tasks": [
             {
-                "label": "Nken: Build",
+                "label": "jenga: Build",
                 "type": "shell",
                 "command": "python3",
                 "args": [
-                    "Tools/nken.py",
+                    "Jenga/jenga.py",
                     "build",
                     "--config", config
                 ],
@@ -170,11 +170,11 @@ def generate_tasks(workspace, config: str, platform: str, vscode_dir: Path) -> b
                 }
             },
             {
-                "label": "Nken: Clean",
+                "label": "jenga: Clean",
                 "type": "shell",
                 "command": "python3",
                 "args": [
-                    "Tools/nken.py",
+                    "Jenga/jenga.py",
                     "clean"
                 ],
                 "group": "build",
@@ -184,11 +184,11 @@ def generate_tasks(workspace, config: str, platform: str, vscode_dir: Path) -> b
                 }
             },
             {
-                "label": "Nken: Rebuild",
+                "label": "jenga: Rebuild",
                 "type": "shell",
                 "command": "python3",
                 "args": [
-                    "Tools/nken.py",
+                    "Jenga/jenga.py",
                     "rebuild",
                     "--config", config
                 ],
@@ -199,11 +199,11 @@ def generate_tasks(workspace, config: str, platform: str, vscode_dir: Path) -> b
                 }
             },
             {
-                "label": "Nken: Run",
+                "label": "jenga: Run",
                 "type": "shell",
                 "command": "python3",
                 "args": [
-                    "Tools/nken.py",
+                    "Jenga/jenga.py",
                     "run",
                     "--config", config
                 ],
@@ -258,7 +258,7 @@ def generate_launch(workspace, config: str, platform: str, vscode_dir: Path) -> 
             "environment": [],
             "externalConsole": False,
             "MIMode": "gdb",
-            "preLaunchTask": "Nken: Build",
+            "preLaunchTask": "jenga: Build",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
