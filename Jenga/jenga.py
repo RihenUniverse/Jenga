@@ -17,7 +17,7 @@ from core.commands import CommandRegistry
 from utils.display import Display, Colors
 from utils.reporter import Reporter
 
-__version__ = "1.0.3"  # Mettre à jour avec votre version actuelle
+__version__ = "1.1.0"  # Mettre à jour avec votre version actuelle
 
 
 def print_banner():

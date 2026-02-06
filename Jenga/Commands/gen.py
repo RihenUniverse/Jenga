@@ -5,7 +5,7 @@ jenga Build System - Gen Command
 Generate IDE configuration files (VSCode, Visual Studio, etc.)
 """
 
-import sys
+import sys, os
 import json
 from pathlib import Path
 
@@ -86,7 +86,10 @@ def generate_cpp_properties(workspace, config: str, platform: str, vscode_dir: P
             # Add project includes
             for inc_dir in project.includedirs:
                 expanded = proj_expander.expand(inc_dir)
-                include_paths.add(expanded)
+                
+                # Vérifier si le répertoire existe
+                if os.path.exists(expanded) and os.path.isdir(expanded):
+                    include_paths.add(expanded)
             
             # Add project defines
             for define in project.defines:
