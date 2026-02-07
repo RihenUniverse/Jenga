@@ -67,6 +67,12 @@ License-File: LICENSE
 - **Dependency Validation**: Automatic dependency graph validation
 - **Path Resolution**: Smart path handling for external projects
 
+### 📚 Advanced Documentation Extraction
+- **Automatic API Documentation**: Extract documentation from C/C++ source files
+- **Multi-Format Output**: Generate Markdown with links compatible across all platforms
+- **Intelligent Parsing**: Support for Doxygen, JavaDoc, Qt-style comments, and NK sections
+- **Comprehensive Statistics**: Detailed metrics and insights about your codebase
+
 ## 📋 Table of Contents
 
 - [✨ Features](#-features)
@@ -77,6 +83,7 @@ License-File: LICENSE
 - [📁 Advanced File Creation](#-advanced-file-creation)
 - [🔌 External Project Integration](#-external-project-integration)
 - [📚 Documentation](#-documentation)
+- [📊 Documentation Extraction](#-documentation-extraction)
 - [🔧 Advanced Features](#-advanced-features)
 - [📁 Project Examples](#-project-examples)
 - [🤝 Contributing](#-contributing)
@@ -104,6 +111,13 @@ License-File: LICENSE
 - **Project Filtering** - Select specific projects to include
 - **Dependency Resolution** - Automatic path and dependency handling
 - **Workspace Attachment** - Attach existing projects to any workspace
+
+### 📚 Documentation Tools
+- **Multi-Format Comment Parsing** - Doxygen, JavaDoc, Qt, NK sections, inline ///
+- **Automatic Markdown Generation** - Fully linked documentation with statistics
+- **Cross-Platform Compatibility** - Links work in VS Code, GitHub, MkDocs, GitBook
+- **Advanced Statistics** - Codebase metrics, type distribution, namespace analysis
+- **Intelligent Navigation** - Multiple views (by file, namespace, type, search)
 
 ### 🔧 Build System
 - **C/C++ Toolchains** - GCC, Clang, MSVC support
@@ -393,6 +407,382 @@ All documentation is included in the `Docs/` directory:
 | [🔍 TROUBLESHOOTING.md](Docs/TROUBLESHOOTING.md) | Troubleshooting Guide |
 | [📋 CHANGELOG.md](Docs/CHANGELOG_v1.0.2.md) | Version History |
 
+## 📊 Documentation Extraction
+
+Jenga includes a powerful documentation extractor that automatically generates comprehensive API documentation from your C/C++ source code comments.
+
+### Quick Start with Documentation
+
+```bash
+# Extract documentation from all projects in workspace
+jenga docs extract
+
+# Extract from specific project
+jenga docs extract --project Engine
+
+# Include private members
+jenga docs extract --include-private
+
+# Show documentation statistics
+jenga docs stats
+
+# Clean generated documentation
+jenga docs clean
+```
+
+### Features
+
+#### 🔍 Intelligent Comment Parsing
+- **Multiple Comment Styles**: Doxygen (`/** ... */`), JavaDoc (`/*! ... */`), Qt (`/*! ... */`), NK sections (`// -----`), inline (`///`)
+- **Automatic Element Detection**: Classes, structs, enums, functions, methods, variables, namespaces
+- **Tag Support**: `@brief`, `@param`, `@return`, `@throws`, `@example`, `@note`, `@warning`, `@see`, etc.
+- **Template Parameter Detection**: Automatic extraction of template parameters
+
+#### 📁 Multi-View Organization
+Generated documentation is organized in multiple views:
+- **By File**: All elements grouped by source file
+- **By Namespace**: Organized by C++ namespace
+- **By Type**: Classes, structs, enums, functions separately
+- **Alphabetical Search**: Complete alphabetical index
+- **API Overview**: Complete API listing
+
+#### 📈 Comprehensive Statistics
+- **Element Counts**: Total documented elements by type
+- **File Analysis**: Files with most documentation
+- **Namespace Distribution**: Elements per namespace
+- **Code Insights**: Automatic insights about your codebase
+- **Progress Metrics**: Documentation coverage metrics
+
+### Documentation Commands
+
+```bash
+# Extract documentation with various options
+jenga docs extract --project MyLibrary --output ./docs --include-private
+jenga docs extract --format markdown --no-split-namespace
+jenga docs extract --exclude-dirs "ThirdParty" "Tests" --exclude-projects Sandbox
+
+# View statistics
+jenga docs stats --project Engine --json
+jenga docs stats  # Text format
+
+# List projects available for documentation
+jenga docs list
+
+# Clean generated files
+jenga docs clean --project Engine
+jenga docs clean  # Clean all documentation
+```
+
+### Comment Examples
+
+#### Doxygen Style
+```cpp
+/**
+ * @brief Calculates the length of a 3D vector
+ * 
+ * Computes the Euclidean norm (magnitude) of the vector.
+ * 
+ * @param[in] x X component
+ * @param[in] y Y component
+ * @param[in] z Z component
+ * 
+ * @return Vector length (magnitude)
+ * @retval 0.0f For zero vector
+ * 
+ * @complexity O(1)
+ * @threadsafe
+ * 
+ * @example Basic usage
+ * @code
+ * float len = VectorLength(3.0f, 4.0f, 0.0f);  // Returns 5.0f
+ * @endcode
+ * 
+ * @see Normalize()
+ * @note This function is constexpr in C++17 and later
+ * 
+ * @author Rihen
+ * @date 2026-02-07
+ */
+constexpr float VectorLength(float x, float y, float z);
+```
+
+#### NK Section Style
+```cpp
+// ----------------------------------------------------------------------------
+// CLASSE: NkVector3
+// DESCRIPTION: 3D vector class for positions and directions
+// AUTEUR: Rihen
+// DATE: 2026-02-07
+// ----------------------------------------------------------------------------
+class NK_API NkVector3 {
+public:
+    /// @brief X component
+    /// X coordinate in right-handed coordinate system
+    float x;
+    
+    /// @brief Y component  
+    /// Y coordinate in right-handed coordinate system
+    float y;
+    
+    /// @brief Z component
+    /// Z coordinate in right-handed coordinate system
+    float z;
+    
+    /**
+     * @brief Default constructor
+     * 
+     * Initializes all components to zero.
+     * 
+     * @example
+     * @code
+     * NkVector3 v;  // (0, 0, 0)
+     * @endcode
+     */
+    NkVector3() : x(0), y(0), z(0) {}
+};
+```
+
+### Generated Documentation Structure
+
+```
+docs/
+├── MyProject/
+│   └── markdown/
+│       ├── index.md              # Home page with overview
+│       ├── SUMMARY.md            # Complete table of contents
+│       ├── api.md                # Complete API listing
+│       ├── search.md             # Alphabetical search index
+│       ├── stats.md              # Detailed statistics
+│       ├── files/                # Documentation by file
+│       │   ├── index.md
+│       │   ├── NkVector3_h.md
+│       │   └── NkMatrix4_h.md
+│       ├── namespaces/           # Documentation by namespace
+│       │   ├── index.md
+│       │   ├── nk.md
+│       │   └── nk_math.md
+│       └── types/                # Documentation by type
+│           ├── index.md
+│           ├── classes.md
+│           ├── structs.md
+│           └── functions.md
+└── AnotherProject/
+    └── markdown/
+        └── ...
+```
+
+### Cross-Platform Compatibility
+
+The generated documentation works perfectly with:
+
+| Platform | Support | Features |
+|----------|---------|----------|
+| **VS Code** | ✅ Perfect | Ctrl+click navigation, preview mode |
+| **GitHub/GitLab** | ✅ Perfect | Native web navigation |
+| **MkDocs** | ✅ Perfect | Direct integration |
+| **GitBook** | ✅ Perfect | Full compatibility |
+| **Obsidian/Typora** | ✅ Perfect | Advanced markdown editors |
+| **GitHub Pages** | ✅ Perfect | Ready to deploy |
+
+### Integration with Development Workflow
+
+#### Add to Build Tasks
+```python
+# In your .jenga workspace file
+addtarget("docs", "jenga docs extract --include-private")
+addtarget("docs-clean", "jenga docs clean")
+```
+
+#### CI/CD Integration
+```yaml
+# .github/workflows/docs.yml
+name: Documentation
+on: [push, pull_request]
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: pip install jenga-build-system
+      - run: jenga docs extract --verbose
+      - run: touch docs/.nojekyll  # For GitHub Pages
+```
+
+#### Script Automation
+```python
+#!/usr/bin/env python3
+"""Automated documentation generation"""
+import subprocess
+import sys
+
+def generate_docs():
+    """Generate documentation for all projects"""
+    print("📚 Generating documentation...")
+    
+    result = subprocess.run([
+        "jenga", "docs", "extract",
+        "--exclude-projects", "Tests", "Sandbox",
+        "--include-private",
+        "--verbose"
+    ])
+    
+    if result.returncode == 0:
+        print("✅ Documentation generated successfully")
+        
+        # Generate stats
+        subprocess.run(["jenga", "docs", "stats"])
+        
+        print("\n📂 Open docs/[project]/markdown/index.md")
+        return 0
+    else:
+        print("❌ Failed to generate documentation")
+        return result.returncode
+
+if __name__ == "__main__":
+    sys.exit(generate_docs())
+```
+
+### Advanced Usage Examples
+
+#### Complex Class Documentation
+```cpp
+/**
+ * @brief Template container class
+ * 
+ * Implements a dynamic array with value semantics.
+ * 
+ * @tparam T Type of elements (must be copyable)
+ * @tparam Allocator Memory allocator type (default: std::allocator<T>)
+ * 
+ * @example Basic usage
+ * @code
+ * NkArray<int> numbers;
+ * numbers.push_back(42);
+ * numbers.push_back(100);
+ * 
+ * for (int n : numbers) {
+ *     std::cout << n << std::endl;
+ * }
+ * @endcode
+ * 
+ * @example With custom allocator
+ * @code
+ * NkArray<int, MyCustomAllocator> customArray;
+ * customArray.reserve(1000);
+ * @endcode
+ * 
+ * @complexity
+ * - Access: O(1)
+ * - Insertion at end: O(1) amortized
+ * - Insertion elsewhere: O(n)
+ * - Deletion: O(n)
+ * 
+ * @threadsafe No (external synchronization required)
+ * 
+ * @warning Not exception safe for non-trivial types
+ * 
+ * @since Version 2.0.0
+ * @deprecated Will be replaced by NkVector<T> in version 3.0
+ */
+template<typename T, typename Allocator = std::allocator<T>>
+class NkArray {
+    // Implementation...
+};
+```
+
+#### Function with Exception Specification
+```cpp
+/**
+ * @brief Loads a texture from file
+ * 
+ * @param[in] filepath Path to texture file
+ * @param[in] async Load asynchronously
+ * @param[in] generateMipmaps Generate mipmap chain
+ * 
+ * @return Texture handle
+ * 
+ * @throw NkFileNotFoundException If file doesn't exist
+ * @throw NkInvalidFormatException If unsupported format
+ * @throw NkOutOfMemoryException If insufficient GPU memory
+ * 
+ * @warning In async mode, texture is not immediately usable
+ * @warning generateMipmaps=true increases load time significantly
+ * 
+ * @note Supported formats: PNG, JPEG, BMP, TGA, DDS
+ * @note For DDS files, mipmaps are loaded from file
+ * 
+ * @see LoadFromMemory()
+ * @see Unload()
+ * 
+ * @example Error handling
+ * @code
+ * try {
+ *     NkTextureHandle tex = NkTexture::Load("character.png");
+ *     Renderer::Draw(tex, position);
+ * } catch (const NkFileNotFoundException& e) {
+ *     Logger::Error("Texture not found: {}", e.what());
+ *     return;
+ * }
+ * @endcode
+ */
+static NkTextureHandle Load(
+    const std::string& filepath,
+    bool async = false,
+    bool generateMipmaps = true
+);
+```
+
+### Statistics and Insights
+
+The documentation extractor provides valuable insights:
+
+```bash
+📊 EXTRACTION SUMMARY
+══════════════════════════════════════════════════════════════════════
+✅ Projects processed: 3
+📁 Total files: 156
+🧩 Total elements: 1,247
+📂 Documentation generated in: docs/
+   Each project has its own subdirectory
+
+📈 Sample Statistics Page Content:
+• 45.3% Classes, 22.1% Functions, 15.8% Methods, 8.4% Structs
+• Top namespace: nk (312 elements)
+• Most documented file: Core/Nkentseu.h (89 elements)
+• Documentation density: 8.0 elements/file
+```
+
+### Troubleshooting Documentation Extraction
+
+#### Problem: No comments extracted
+**Solution**: Ensure your comments use supported formats:
+- Doxygen: `/** ... */`
+- NK sections: `// -----` with proper headers
+- Inline: `///` for brief documentation
+
+#### Problem: Links don't work in VS Code
+**Solution**: Update to v1.1.0+ which fixes all relative paths.
+
+#### Problem: Missing files
+**Solution**: Check that source directories exist in project configuration.
+
+#### Problem: Encoding issues
+**Solution**: Ensure source files are UTF-8 encoded.
+
+### Best Practices
+
+1. **Consistent Formatting**: Use consistent comment style throughout project
+2. **Complete Documentation**: Document all public APIs
+3. **Examples**: Include usage examples for complex functions
+4. **Error Handling**: Document exceptions and error conditions
+5. **Performance Notes**: Include complexity and thread safety information
+6. **Version Information**: Use `@since` and `@deprecated` tags
+7. **Cross-References**: Use `@see` to link related functions
+
 ## 🔧 Advanced Features
 
 ### Multi-Platform Configuration
@@ -491,6 +881,9 @@ with workspace("GameEngine"):
         
         # Auto-create files as needed
         # jenga create file Player --type class --namespace game
+        
+        # Generate documentation
+        # jenga docs extract --project MyGame
 ```
 
 ### Example 2: Plugin-Based Application
@@ -850,5 +1243,6 @@ Copyright © 2026 Rihen. All rights reserved.
 <div align="center">
   <p>Built with ❤️ by <a href="https://github.com/RihenUniverse">Rihen</a></p>
   <p>Jenga Build System - Making C++ builds simple across all platforms</p>
+  <p>📚 Documentation Extractor v1.1.0 - Automatic API documentation generation</p>
 </div>
 
