@@ -128,7 +128,7 @@ class ProgressBar:
         if exc_type is None:
             Display.progress(self.total, self.total, f"{self.message} - Complete")
     
-    def update(self, increment: int = 1, message: str = None):
+    def update(self, increment: int = 1, message: str = ""):
         """Update progress"""
         self.current += increment
         msg = message or self.message
