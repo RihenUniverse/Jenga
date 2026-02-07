@@ -253,12 +253,67 @@ def expand_path_patterns(pattern: str, base_dir: str = ".") -> list:
         if Path(working_pattern).is_absolute():
             file_path = Path(working_pattern)
         else:
-            file_path = base_path / working_pattern
-        
+            file_path = base_path / remove_first_dir(working_pattern, True)
+
         if file_path.exists() and file_path.is_file():
             results.append((str(file_path), exclude))
     
     return results
+
+
+def remove_first_dir(path: str, keep_empty: bool = False) -> str:
+    """
+    Retire le premier répertoire d'un chemin
+    
+    Args:
+        path: Le chemin à transformer
+        keep_empty: Si True, retourne "" si le chemin devient vide
+    
+    Exemples:
+        "src/main.cpp" → "main.cpp"
+        "include/utils/header.h" → "utils/header.h"
+        "main.cpp" → "" (ou "main.cpp" si keep_empty=True)
+        "C:\\src\\app.cpp" → "src\\app.cpp"
+        "/usr/bin/app" → "usr/bin/app"
+        "./src/app.cpp" → "src/app.cpp"
+        "../src/app.cpp" → "src/app.cpp"
+    """
+    # Gérer les chemins vides
+    if not path:
+        return "" if keep_empty else path
+    
+    # Gérer les chemins commençant par ./ ou ../
+    if path.startswith("./"):
+        path = path[2:]
+    elif path.startswith("../"):
+        path = path[3:]  # On enlève le .. aussi
+    
+    # Utiliser pathlib pour une gestion propre
+    p = Path(path)
+    
+    # Obtenir toutes les parties du chemin
+    parts = list(p.parts)
+    
+    # Si on a une partie vide (pour les chemins Unix absolus comme "/usr/bin")
+    if parts and parts[0] == "":
+        parts = parts[1:]  # Retirer la partie vide
+    
+    # Si on a une lettre de lecteur (Windows: "C:")
+    if len(parts) > 0 and re.match(r'^[A-Za-z]:$', parts[0]):
+        parts = parts[1:]  # Retirer la lettre de lecteur
+    
+    # Maintenant retirer le premier répertoire valide
+    if len(parts) > 1:
+        result = Path(*parts[1:])
+        return str(result)
+    elif len(parts) == 1:
+        # Un seul élément : c'est soit un fichier soit un répertoire terminal
+        if keep_empty:
+            return str(p)
+        else:
+            return ""  # Plus rien après retrait
+    else:
+        return ""
 
 
 def resolve_file_list(patterns: list, base_dir: str = ".", expander: VariableExpander = None) -> list:
