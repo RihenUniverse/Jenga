@@ -112,5 +112,4 @@ jenga_build_system.egg-info/SOURCES.txt
 jenga_build_system.egg-info/dependency_links.txt
 jenga_build_system.egg-info/entry_points.txt
 jenga_build_system.egg-info/not-zip-safe
-jenga_build_system.egg-info/requires.txt
 jenga_build_system.egg-info/top_level.txt

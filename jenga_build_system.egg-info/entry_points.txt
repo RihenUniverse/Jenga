@@ -1,3 +1,2 @@
 [console_scripts]
 jenga = Jenga.jenga:main
-
