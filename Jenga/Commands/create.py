@@ -1803,39 +1803,137 @@ def update_workspace_to_include_project(
 ) -> None:
     """Update workspace .jenga file to include the new project."""
     
-    workspace_jenga_file = workspace_dir / f"{workspace_name}.jenga"
-    content = workspace_jenga_file.read_text(encoding='utf-8')
+    # Trouver le vrai fichier workspace (pas forcément .jenga)
+    workspace_file = None
     
-    # Check if already included
-    include_pattern = f'addprojects("{project_relative_path}/{project_name}.jenga"'
-    if include_pattern in content:
-        print(f"⚠️  Project already included in workspace")
+    # 1. Chercher salutation.jenga
+    if (workspace_dir / "salutation.jenga").exists():
+        workspace_file = workspace_dir / "salutation.jenga"
+    # 2. Chercher HELLO.jenga
+    elif (workspace_dir / "HELLO.jenga").exists():
+        workspace_file = workspace_dir / "HELLO.jenga"
+    # 3. Chercher tout fichier .jenga
+    else:
+        jenga_files = list(workspace_dir.glob("*.jenga"))
+        if jenga_files:
+            workspace_file = jenga_files[0]
+    
+    if not workspace_file:
+        print(f"⚠️  No workspace .jenga file found in {workspace_dir}")
+        # Créer un workspace minimal
+        create_minimal_workspace(workspace_dir, workspace_name)
+        workspace_file = workspace_dir / f"{workspace_name}.jenga"
+    
+    try:
+        content = workspace_file.read_text(encoding='utf-8')
+    except Exception as e:
+        print(f"⚠️  Could not read workspace file: {e}")
         return
     
-    # Find the end of the workspace context
+    # Check if already included
+    include_patterns = [
+        f'addprojects("{project_relative_path}/{project_name}.jenga"',
+        f'include("{project_relative_path}/{project_name}.jenga"',
+        f'with include("{project_relative_path}/{project_name}.jenga"'
+    ]
+    
+    for pattern in include_patterns:
+        if pattern in content:
+            print(f"⚠️  Project already included in workspace")
+            return
+    
+    # Insérer l'inclusion au bon endroit
+    updated_content = insert_include_into_workspace(
+        content, 
+        project_relative_path, 
+        project_name
+    )
+    
+    try:
+        workspace_file.write_text(updated_content, encoding='utf-8')
+        print(f"✅ Added project to workspace: {project_relative_path}/{project_name}.jenga")
+    except Exception as e:
+        print(f"⚠️  Failed to update workspace: {e}")
+
+
+def insert_include_into_workspace(
+    content: str,
+    project_relative_path: str,
+    project_name: str
+) -> str:
+    """Insère une inclusion de projet dans le contenu du workspace."""
+    
     lines = content.split('\n')
+    
+    # Chercher où insérer
     insert_index = -1
     
-    # Look for the last line before the footer
+    # Option 1: Après le dernier include/addprojects
+    last_include_idx = -1
     for i, line in enumerate(lines):
-        if line.strip().startswith('# END OF FILE:') or line.strip().startswith('// END OF FILE:'):
-            insert_index = i
-            break
+        if 'addprojects(' in line or 'include(' in line or 'with include(' in line:
+            last_include_idx = i
     
+    if last_include_idx != -1:
+        # Trouver la ligne vide après le dernier include
+        for i in range(last_include_idx + 1, len(lines)):
+            if i + 1 < len(lines) and not lines[i].strip() and not lines[i + 1].strip():
+                insert_index = i + 1
+                break
+    
+    # Option 2: Avant la fin du workspace
     if insert_index == -1:
-        # If no footer, insert at end
+        for i, line in enumerate(lines):
+            if line.strip() == 'with workspace' or line.strip().startswith('with workspace('):
+                # Trouver la fin correspondante
+                indent_level = len(line) - len(line.lstrip())
+                for j in range(i + 1, len(lines)):
+                    if lines[j].strip() and len(lines[j]) - len(lines[j].lstrip()) <= indent_level:
+                        insert_index = j
+                        break
+                if insert_index != -1:
+                    break
+    
+    # Option 3: À la fin du fichier
+    if insert_index == -1:
         insert_index = len(lines)
     
-    # Prepare line to insert
+    # Construire la ligne d'inclusion
     include_line = f'    addprojects("{project_relative_path}/{project_name}.jenga", ["{project_name}"])'
     
-    # Insert before footer
-    lines.insert(insert_index, include_line)
-    lines.insert(insert_index, '')
-    lines.insert(insert_index, f'    # Included project: {project_name}')
+    # Insérer avec espacement approprié
+    if insert_index > 0 and lines[insert_index - 1].strip():
+        lines.insert(insert_index, '')
+        insert_index += 1
     
-    workspace_jenga_file.write_text('\n'.join(lines), encoding='utf-8')
-    print(f"✅ Added project to workspace: {project_relative_path}/{project_name}.jenga")
+    lines.insert(insert_index, f'    # Included project: {project_name}')
+    lines.insert(insert_index + 1, include_line)
+    
+    return '\n'.join(lines)
+
+
+def create_minimal_workspace(workspace_dir: Path, workspace_name: str):
+    """Crée un workspace minimal si aucun n'existe."""
+    
+    content = f'''#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from Jenga.core.api import *
+
+with workspace("{workspace_name}"):
+    configurations(["Debug", "Release"])
+    platforms(["Windows", "Linux", "MacOS"])
+    
+    with toolchain("default", "g++"):
+        cflags(["-Wall", "-Wextra"])
+        cxxflags(["-std=c++17"])
+        
+    # Projects will be added here
+'''
+    
+    workspace_file = workspace_dir / f"{workspace_name}.jenga"
+    workspace_file.write_text(content, encoding='utf-8')
+    print(f"✅ Created minimal workspace: {workspace_name}.jenga")
 
 
 # ============================================================================
