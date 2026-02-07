@@ -46,13 +46,16 @@ setup(
     package_data={
         'Jenga': [
             '*.py',
+            'py.typed',  # ← Important pour les type hints
+            '*.pyi',     # ← Fichiers stub
             'Commands/*.py',
             'core/*.py',
+            'core/*.pyi',  # ← Stubs pour core
             'utils/*.py',
             'Unitest/**/*.cpp',
             'Unitest/**/*.h',
-            'Unitest/**/*.txt',
-            'Unitest/**/*.md',
+            '*.jenga',
+            '**/*.jenga',
         ],
     },
     

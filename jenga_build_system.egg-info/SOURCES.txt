@@ -34,14 +34,18 @@ Jenga/__init__.py
 Jenga/core.py
 Jenga/diagnose.py
 Jenga/jenga.py
+Jenga/jenga_loader.py
 Jenga/jenga_stubs.py
 Jenga/nken_stubs.py
+Jenga/py.typed
 Jenga/Commands/__init__.py
 Jenga/Commands/add.py
 Jenga/Commands/build.py
 Jenga/Commands/clean.py
 Jenga/Commands/create copy.py
 Jenga/Commands/create.py
+Jenga/Commands/docs copy.py
+Jenga/Commands/docs.py
 Jenga/Commands/export.py
 Jenga/Commands/gen.py
 Jenga/Commands/info.py
@@ -91,6 +95,7 @@ Jenga/Unitest/src/Unitest/Unitest.h
 Jenga/core/__init__.py
 Jenga/core/androidsystem.py
 Jenga/core/api.py
+Jenga/core/api.pyi
 Jenga/core/buildsystem.py
 Jenga/core/commands.py
 Jenga/core/emscripten.py
@@ -98,6 +103,7 @@ Jenga/core/loader.py
 Jenga/core/testbuilder.py
 Jenga/core/variables.py
 Jenga/core/variables_fix.py
+Jenga/tools/android-tools.jenga
 Jenga/utils/__init__.py
 Jenga/utils/display.py
 Jenga/utils/reporter.py
@@ -106,4 +112,5 @@ jenga_build_system.egg-info/SOURCES.txt
 jenga_build_system.egg-info/dependency_links.txt
 jenga_build_system.egg-info/entry_points.txt
 jenga_build_system.egg-info/not-zip-safe
+jenga_build_system.egg-info/requires.txt
 jenga_build_system.egg-info/top_level.txt

@@ -101,76 +101,6 @@ def print_help():
     print(help_text)
 
 
-def main():
-    """Main entry point"""
-    args = sys.argv[1:]
-    print_banner()
-    
-    # No arguments - show help
-    if not args:
-        print_help()
-        return 0
-    
-    command = args[0]
-    
-    # Handle version command
-    if command in ["--version", "-v", "version"]:
-        print_version()
-        return 0
-    
-    # Handle help command
-    if command in ["help", "-h", "--help"]:
-        print_help()
-        return 0
-    
-    # Handle create command separately
-    if command == "create":
-        try:
-            from Commands.create import execute
-            return execute(args[1:])
-        except ImportError as e:
-            Display.error(f"Failed to load create command: {e}")
-            return 1
-
-    # Handle install command separately
-    if command == "install":
-        try:
-            from Commands.install import execute
-            return execute(options)
-        except ImportError as e:
-            Display.error(f"Failed to load install command: {e}")
-            return 1
-    
-    # Parse options
-    options = parse_options(args[1:])
-    
-    # Initialize reporter
-    Reporter.verbose = options.get("verbose", False)
-    
-    try:
-        # Load command registry
-        registry = CommandRegistry()
-        
-        # Execute command
-        if command in registry.commands:
-            result = registry.execute(command, options)
-            return 0 if result else 1
-        else:
-            Display.error(f"Unknown command: {command}")
-            print_help()
-            return 1
-            
-    except KeyboardInterrupt:
-        Display.warning("\nBuild interrupted by user")
-        return 130
-    except Exception as e:
-        Display.error(f"Fatal error: {e}")
-        if options.get("verbose"):
-            import traceback
-            traceback.print_exc()
-        return 1
-
-
 def parse_options(args):
     """Parse command line options"""
     import platform as plat
@@ -206,7 +136,12 @@ def parse_options(args):
                 i += 1
             # Options with values
             elif i + 1 < len(args):
-                options[option_name.replace("-", "_")] = args[i + 1]
+                value = args[i + 1]
+                # Convertir les valeurs booléennes si nécessaire
+                if option_name in ["verbose"]:
+                    options[option_name.replace("-", "_")] = value.lower() in ["true", "yes", "1", "on"]
+                else:
+                    options[option_name.replace("-", "_")] = value
                 i += 2
             else:
                 Display.warning(f"Option {arg} requires a value")
@@ -221,5 +156,85 @@ def parse_options(args):
     return options
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+def main():
+    """Main entry point"""
+    args = sys.argv[1:]
+    print_banner()
+    
+    # No arguments - show help
+    if not args:
+        print_help()
+        return 0
+    
+    command = args[0]
+    
+    # Handle version command
+    if command in ["--version", "-v", "version"]:
+        print_version()
+        return 0
+    
+    # Handle help command
+    if command in ["help", "-h", "--help"]:
+        print_help()
+        return 0
+    
+    # Handle create command separately
+    if command == "create":
+        try:
+            from Commands.create import execute
+            return execute(args[1:])
+        except ImportError as e:
+            Display.error(f"Failed to load create command: {e}")
+            return 1
+    
+    # Parse options
+    options = parse_options(args[1:])
+
+    # Handle install command separately
+    if command == "install":
+        try:
+            from Commands.install import execute
+            return execute(options)
+        except ImportError as e:
+            Display.error(f"Failed to load install command: {e}")
+            return 1
+
+    # Handle docs command separately
+    if command == "docs":
+        try:
+            from Commands.docs import execute
+            return execute(args[1:])  # Passer les arguments directement
+        except ImportError as e:
+            Display.error(f"Failed to load docs command: {e}")
+            return 1
+    
+    # Initialize reporter - S'assurer que verbose est un booléen
+    verbose_value = options.get("verbose", False)
+    # Si c'est une chaîne, la convertir en booléen
+    if isinstance(verbose_value, str):
+        Reporter.verbose = verbose_value.lower() in ["true", "yes", "1", "on"]
+    else:
+        Reporter.verbose = bool(verbose_value)
+    
+    try:
+        # Load command registry
+        registry = CommandRegistry()
+        
+        # Execute command
+        if command in registry.commands:
+            result = registry.execute(command, options)
+            return 0 if result else 1
+        else:
+            Display.error(f"Unknown command: {command}")
+            print_help()
+            return 1
+            
+    except KeyboardInterrupt:
+        Display.warning("\nBuild interrupted by user")
+        return 130
+    except Exception as e:
+        Display.error(f"Fatal error: {e}")
+        if options.get("verbose"):
+            import traceback
+            traceback.print_exc()
+        return 1

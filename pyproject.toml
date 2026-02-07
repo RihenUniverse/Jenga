@@ -27,5 +27,10 @@ Documentation = "https://github.com/RihenUniverse/Jenga/tree/main/Docs"
 Repository = "https://github.com/RihenUniverse/Jenga"
 Changelog = "https://github.com/RihenUniverse/Jenga/blob/main/Docs/CHANGELOG_v1.0.2.md"
 
+[tool.setuptools.package-data]
+"*" = ["*.jenga", "**/*.jenga", "py.typed"]
+"Jenga" = ["*.py", "*.pyi", "py.typed", "**/*.jenga"]
+"Jenga.core" = ["*.py", "*.pyi"]
+
 [project.scripts]
 jenga = "Jenga.jenga:main"

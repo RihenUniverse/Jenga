@@ -1,0 +1,15 @@
+{
+    "include": [
+        "**/*.py",
+        "**/*.jenga"
+    ],
+    "extraPaths": [
+        "."
+    ],
+    "typeCheckingMode": "basic",
+    "reportMissingImports": false,
+    "reportUndefinedVariable": false,
+    "stubPath": "Jenga",
+    "venvPath": ".",
+    "venv": ".venv"
+}
