@@ -7,13 +7,21 @@ Loads and executes .jenga files
 
 import sys
 from pathlib import Path
-from typing import Optional
 import importlib.util
 import re
+
+import os
+import json
+import time
+import hashlib
+from typing import Optional, Dict, Any, List
+from dataclasses import asdict
+import pickle
 
 # Fix imports to work from any context
 try:
     from .api import get_current_workspace, reset_state, _current_project, _current_workspace
+    from .variables import VariableExpander, resolve_file_list
 except ImportError:
     from core.api import get_current_workspace, reset_state
     try:
@@ -21,11 +29,476 @@ except ImportError:
     except ImportError:
         _current_project = None
         _current_workspace = None
+    try:
+        from core.variables import VariableExpander, resolve_file_list
+    except ImportError:
+        # Fallback minimal implementation
+        class VariableExpander:
+            def __init__(self, workspace, project, config, platform):
+                self.workspace = workspace
+                self.project = project
+                self.config = config
+                self.platform = platform
+            
+            def expand(self, text: str) -> str:
+                return text.replace("%{wks.location}", self.workspace.location or ".")
 
 try:
     from ..utils.display import Display
 except ImportError:
     from utils.display import Display
+
+
+class JengaCache:
+    """Gestionnaire de cache pour les configurations .jenga"""
+    
+    def __init__(self, jenga_file: Path):
+        """
+        Initialise le système de cache
+        
+        Args:
+            jenga_file: Chemin vers le fichier .jenga principal
+        """
+        self.jenga_file = jenga_file.resolve()
+        self.cache_dir = self.jenga_file.parent / ".jenga_cache"
+        self.cache_file = self.cache_dir / f"{self.jenga_file.stem}.cache.json"
+        self.files_cache_file = self.cache_dir / f"{self.jenga_file.stem}.files.json"
+        
+        # Créer le répertoire de cache si nécessaire
+        self.cache_dir.mkdir(exist_ok=True)
+        
+        # Version du cache (invalide le cache si format change)
+        self.cache_version = "2.0"
+        
+        # Cache des patterns de fichiers
+        self.files_cache: Dict[str, Dict[str, Any]] = {}
+        self._load_files_cache()
+    
+    def _load_files_cache(self):
+        """Charger le cache des fichiers"""
+        if self.files_cache_file.exists():
+            try:
+                with open(self.files_cache_file, 'r', encoding='utf-8') as f:
+                    self.files_cache = json.load(f)
+            except:
+                self.files_cache = {}
+    
+    def _save_files_cache(self):
+        """Sauvegarder le cache des fichiers"""
+        try:
+            with open(self.files_cache_file, 'w', encoding='utf-8') as f:
+                json.dump(self.files_cache, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to save files cache: {e}")
+    
+    def get_file_hash(self, file_path: str) -> str:
+        """Calculer un hash rapide pour un fichier (mtime + taille)"""
+        try:
+            path = Path(file_path)
+            if not path.exists():
+                return ""
+            
+            # Utiliser mtime et taille pour un hash rapide
+            stat = path.stat()
+            mtime = stat.st_mtime
+            size = stat.st_size
+            
+            hasher = hashlib.md5()
+            hasher.update(f"{mtime}:{size}:{file_path}".encode())
+            return hasher.hexdigest()
+        except:
+            return ""
+    
+    def _resolve_patterns_with_cache(self, patterns: List[str], base_dir: str, 
+                                   expander: VariableExpander, cache_key: str) -> List[str]:
+        """
+        Résoudre les patterns avec cache intelligent
+        
+        Args:
+            patterns: Liste des patterns à résoudre
+            base_dir: Répertoire de base pour la résolution
+            expander: Expander pour les variables
+            cache_key: Clé unique pour ce projet/contexte
+        
+        Returns:
+            Liste des fichiers résolus
+        """
+        from pathlib import Path
+        
+        resolved_files = []
+        
+        for pattern in patterns:
+            # Expander les variables dans le pattern
+            expanded_pattern = expander.expand(pattern)
+            
+            # Créer une clé de cache pour ce pattern
+            pattern_hash = hashlib.md5(f"{cache_key}:{expanded_pattern}".encode()).hexdigest()[:16]
+            cache_entry_key = f"{pattern_hash}"
+            
+            # Vérifier si le pattern est dans le cache et encore valide
+            if cache_entry_key in self.files_cache:
+                cache_entry = self.files_cache[cache_entry_key]
+                
+                # Vérifier si le pattern a changé
+                if cache_entry.get("pattern") == expanded_pattern:
+                    # Vérifier si les fichiers existent toujours
+                    cached_files = cache_entry.get("files", [])
+                    all_files_exist = True
+                    
+                    for file_path in cached_files:
+                        if not Path(file_path).exists():
+                            all_files_exist = False
+                            break
+                    
+                    if all_files_exist:
+                        resolved_files.extend(cached_files)
+                        continue
+            
+            # Si pas dans le cache ou invalide, résoudre normalement
+            # Utiliser glob pour la résolution des patterns
+            import glob
+            
+            # Convertir le pattern en chemin absolu
+            if Path(expanded_pattern).is_absolute():
+                search_pattern = expanded_pattern
+            else:
+                search_pattern = str(Path(base_dir) / expanded_pattern)
+            
+            # Résoudre avec glob
+            try:
+                matched_files = glob.glob(search_pattern, recursive=True)
+                
+                # Filtrer seulement les fichiers (pas les répertoires)
+                matched_files = [f for f in matched_files if Path(f).is_file()]
+                
+                # Ajouter au cache
+                self.files_cache[cache_entry_key] = {
+                    "pattern": expanded_pattern,
+                    "base_dir": base_dir,
+                    "files": matched_files,
+                    "timestamp": time.time()
+                }
+                
+                resolved_files.extend(matched_files)
+                
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to resolve pattern {pattern}: {e}")
+                # Fallback: utiliser le pattern tel quel
+                if Path(expanded_pattern).exists():
+                    resolved_files.append(expanded_pattern)
+        
+        # Sauvegarder le cache après chaque résolution
+        self._save_files_cache()
+        
+        return list(set(resolved_files))  # Supprimer les doublons
+    
+    def needs_rebuild(self, workspace_hash: str = None) -> bool:
+        """
+        Vérifier si le cache doit être reconstruit
+        
+        Args:
+            workspace_hash: Hash du workspace actuel (optionnel)
+        
+        Returns:
+            True si le cache doit être reconstruit
+        """
+        # Pas de cache fichier → rebuild nécessaire
+        if not self.cache_file.exists():
+            return True
+        
+        # .jenga modifié plus récemment que le cache → rebuild
+        jenga_mtime = self.jenga_file.stat().st_mtime
+        cache_mtime = self.cache_file.stat().st_mtime
+        
+        if jenga_mtime > cache_mtime:
+            return True
+        
+        try:
+            # Charger le cache pour vérifier la version
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+            
+            # Vérifier la version du cache
+            if cache_data.get("version") != self.cache_version:
+                return True
+            
+            # Vérifier le hash du workspace (si fourni)
+            if workspace_hash and cache_data.get("workspace_hash") != workspace_hash:
+                return True
+            
+            return False
+            
+        except:
+            return True
+    
+    def save_workspace(self, workspace, additional_info: Dict[str, Any] = None):
+        """
+        Sauvegarder un workspace dans le cache
+        
+        Args:
+            workspace: Workspace à sauvegarder
+            additional_info: Informations supplémentaires à sauvegarder
+        """
+        from .api import Workspace, Project, Toolchain
+        
+        # Calculer un hash pour le workspace
+        workspace_hash = self._calculate_workspace_hash(workspace)
+        
+        # Préparer les données à sauvegarder
+        cache_data = {
+            "version": self.cache_version,
+            "timestamp": time.time(),
+            "jenga_file": str(self.jenga_file),
+            "workspace_hash": workspace_hash,
+            "workspace": {
+                "name": workspace.name,
+                "location": workspace.location,
+                "configurations": workspace.configurations,
+                "platforms": workspace.platforms,
+                "startproject": workspace.startproject,
+            },
+            "projects": {},
+            "toolchains": {},
+            "additional_info": additional_info or {}
+        }
+        
+        # Sauvegarder les projets (sans les fichiers résolus)
+        for name, project in workspace.projects.items():
+            cache_data["projects"][name] = self._serialize_project(project)
+        
+        # Sauvegarder les toolchains
+        for name, toolchain in workspace.toolchains.items():
+            cache_data["toolchains"][name] = self._serialize_toolchain(toolchain)
+        
+        # Sauvegarder le cache
+        try:
+            with open(self.cache_file, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, indent=2, ensure_ascii=False)
+            
+            # print(f"✅ Cache sauvegardé: {self.cache_file}")
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to save cache: {e}")
+    
+    def load_workspace(self):
+        """
+        Charger un workspace depuis le cache
+        
+        Returns:
+            Workspace chargé ou None
+        """
+        from .api import Workspace, Project, Toolchain, ProjectKind, Language, Optimization
+        
+        if not self.cache_file.exists():
+            return None
+        
+        try:
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+            
+            # Vérifier la version
+            if cache_data.get("version") != self.cache_version:
+                return None
+            
+            # Créer le workspace
+            ws_data = cache_data["workspace"]
+            workspace = Workspace(
+                name=ws_data["name"],
+                location=ws_data.get("location", ""),
+                configurations=ws_data.get("configurations", ["Debug", "Release"]),
+                platforms=ws_data.get("platforms", ["Windows"]),
+                startproject=ws_data.get("startproject", "")
+            )
+            
+            # Restaurer les toolchains
+            for name, tc_data in cache_data.get("toolchains", {}).items():
+                toolchain = Toolchain(
+                    name=name,
+                    compiler=tc_data.get("compiler", "")
+                )
+                
+                # Restaurer les attributs
+                for key, value in tc_data.items():
+                    if key != "name" and hasattr(toolchain, key):
+                        setattr(toolchain, key, value)
+                
+                workspace.toolchains[name] = toolchain
+            
+            # Restaurer les projets
+            for name, proj_data in cache_data.get("projects", {}).items():
+                # Créer le projet
+                project = Project(
+                    name=name,
+                    kind=ProjectKind(proj_data["kind"]) if proj_data.get("kind") else ProjectKind.CONSOLE_APP,
+                    language=Language(proj_data["language"]) if proj_data.get("language") else Language.CPP,
+                    location=proj_data.get("location", ".")
+                )
+                
+                # Restaurer les attributs simples
+                simple_attrs = [
+                    'cppdialect', 'cdialect', 'pchheader', 'pchsource',
+                    'objdir', 'targetdir', 'targetname', 'warnings',
+                    'toolchain', '_explicit_toolchain', 'is_test',
+                    'parent_project', 'testmainfile', 'testmaintemplate',
+                    'androidapplicationid', 'androidversioncode', 
+                    'androidversionname', 'androidminsdk', 'androidtargetsdk',
+                    'androidsign', 'androidkeystore', 'androidkeystorepass',
+                    'androidkeyalias', 'iosbundleid', 'iosversion', 'iosminsdk'
+                ]
+                
+                for attr in simple_attrs:
+                    if attr in proj_data:
+                        setattr(project, attr, proj_data[attr])
+                
+                # Restaurer les listes
+                list_attrs = [
+                    'files', 'excludefiles', 'excludemainfiles',
+                    'includedirs', 'libdirs', 'links', 'dependson',
+                    'dependfiles', 'embedresources', 'defines',
+                    'prebuildcommands', 'postbuildcommands',
+                    'prelinkcommands', 'postlinkcommands',
+                    'testoptions', 'testfiles'
+                ]
+                
+                for attr in list_attrs:
+                    if attr in proj_data:
+                        setattr(project, attr, proj_data[attr])
+                
+                # Restaurer les dicts
+                if 'system_defines' in proj_data:
+                    project.system_defines = proj_data['system_defines']
+                if 'system_links' in proj_data:
+                    project.system_links = proj_data['system_links']
+                if '_filtered_defines' in proj_data:
+                    project._filtered_defines = proj_data['_filtered_defines']
+                if '_filtered_optimize' in proj_data:
+                    project._filtered_optimize = {
+                        k: Optimization(v) for k, v in proj_data['_filtered_optimize'].items()
+                    }
+                if '_filtered_symbols' in proj_data:
+                    project._filtered_symbols = proj_data['_filtered_symbols']
+                
+                # Restaurer l'optimization
+                if 'optimize' in proj_data:
+                    project.optimize = Optimization(proj_data['optimize'])
+                
+                # Restaurer symbols
+                if 'symbols' in proj_data:
+                    project.symbols = proj_data['symbols']
+                
+                # Ajouter au workspace
+                workspace.projects[name] = project
+            
+            # print(f"✅ Cache chargé: {len(workspace.projects)} projets")
+            return workspace
+            
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to load cache: {e}")
+            return None
+    
+    def _serialize_project(self, project) -> Dict[str, Any]:
+        """Sérialiser un projet pour le cache"""
+        # Exclure les attributs temporaires et les gros objets
+        exclude_attrs = {
+            '_current_filter', '_in_workspace', '_standalone',
+            '_external', '_external_file', '_external_dir',
+            '_original_location'
+        }
+        
+        serialized = {}
+        
+        for attr_name in dir(project):
+            # Ignorer les attributs privés spéciaux et méthodes
+            if attr_name.startswith('__') or callable(getattr(project, attr_name)):
+                continue
+            
+            # Ignorer les attributs exclus
+            if attr_name in exclude_attrs:
+                continue
+            
+            try:
+                value = getattr(project, attr_name)
+                
+                # Gérer les types spéciaux
+                if hasattr(value, 'value'):  # Enum
+                    serialized[attr_name] = value.value
+                elif isinstance(value, (str, int, float, bool, type(None))):
+                    serialized[attr_name] = value
+                elif isinstance(value, (list, tuple)):
+                    serialized[attr_name] = list(value)
+                elif isinstance(value, dict):
+                    serialized[attr_name] = dict(value)
+                # Ignorer les autres types (comme les objets complexes)
+                
+            except:
+                pass
+        
+        return serialized
+    
+    def _serialize_toolchain(self, toolchain) -> Dict[str, Any]:
+        """Sérialiser un toolchain pour le cache"""
+        serialized = {}
+        
+        for attr_name in dir(toolchain):
+            if attr_name.startswith('_') or callable(getattr(toolchain, attr_name)):
+                continue
+            
+            try:
+                value = getattr(toolchain, attr_name)
+                
+                if isinstance(value, (str, int, float, bool, type(None))):
+                    serialized[attr_name] = value
+                elif isinstance(value, (list, tuple)):
+                    serialized[attr_name] = list(value)
+                elif isinstance(value, dict):
+                    serialized[attr_name] = dict(value)
+                    
+            except:
+                pass
+        
+        return serialized
+    
+    def _calculate_workspace_hash(self, workspace) -> str:
+        """Calculer un hash pour le workspace"""
+        import hashlib
+        
+        hasher = hashlib.md5()
+        
+        # Inclure les métadonnées du workspace
+        hasher.update(workspace.name.encode())
+        hasher.update(workspace.location.encode())
+        hasher.update(str(workspace.configurations).encode())
+        hasher.update(str(workspace.platforms).encode())
+        
+        # Inclure les noms des projets et toolchains
+        hasher.update(str(sorted(workspace.projects.keys())).encode())
+        hasher.update(str(sorted(workspace.toolchains.keys())).encode())
+        
+        return hasher.hexdigest()
+    
+    def clear(self):
+        """Effacer le cache"""
+        try:
+            if self.cache_file.exists():
+                self.cache_file.unlink()
+            if self.files_cache_file.exists():
+                self.files_cache_file.unlink()
+            # print("✅ Cache effacé")
+        except:
+            pass
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Obtenir des statistiques sur le cache"""
+        stats = {
+            "cache_file_exists": self.cache_file.exists(),
+            "files_cache_entries": len(self.files_cache),
+            "cache_dir": str(self.cache_dir)
+        }
+        
+        if self.cache_file.exists():
+            stats["cache_size"] = self.cache_file.stat().st_size
+            stats["cache_mtime"] = time.ctime(self.cache_file.stat().st_mtime)
+        
+        return stats
 
 
 class ConfigurationLoader:

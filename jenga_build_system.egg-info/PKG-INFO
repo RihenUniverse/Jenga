@@ -1,27 +1,45 @@
-Metadata-Version: 2.4
+Metadata-Version: 2.1
 Name: jenga-build-system
 Version: 1.1.0
 Summary: Modern multi-platform C/C++ build system with unified Python DSL
 Home-page: https://github.com/RihenUniverse/Jenga
 Author: Rihen
-Author-email: Rihen <rihen.universe@gmail.com>
-License: MIT
-Project-URL: Homepage, https://github.com/RihenUniverse/Jenga
+Author-email: rihen.universe@gmail.com
+License: UNKNOWN
 Project-URL: Documentation, https://github.com/RihenUniverse/Jenga/tree/main/Docs
-Project-URL: Repository, https://github.com/RihenUniverse/Jenga
+Project-URL: Source Code, https://github.com/RihenUniverse/Jenga
+Project-URL: Bug Tracker, https://github.com/RihenUniverse/Jenga/issues
 Project-URL: Changelog, https://github.com/RihenUniverse/Jenga/blob/main/Docs/CHANGELOG_v1.0.2.md
-Keywords: build-system,c++,cross-platform,android,ios
+Keywords: build-system,c++,cmake,make,cross-platform,android,ios,embedded,testing,ci-cd
+Platform: UNKNOWN
 Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Build Tools
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
 Classifier: Operating System :: OS Independent
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: Microsoft :: Windows :: Windows 10
+Classifier: Operating System :: Microsoft :: Windows :: Windows 11
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Environment :: Console
+Classifier: Natural Language :: English
+Classifier: Topic :: Software Development :: Compilers
+Classifier: Topic :: Software Development :: Embedded Systems
+Classifier: Topic :: Software Development :: Testing
+Classifier: Topic :: System :: Software Distribution
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
+Provides-Extra: dev
+Provides-Extra: docs
 License-File: LICENSE
-Dynamic: author
-Dynamic: home-page
-Dynamic: license-file
-Dynamic: requires-python
 
 # Jenga Build System v1.1.0
 
@@ -1227,3 +1245,4 @@ Copyright © 2026 Rihen. All rights reserved.
   <p>Jenga Build System - Making C++ builds simple across all platforms</p>
   <p>📚 Documentation Extractor v1.1.0 - Automatic API documentation generation</p>
 </div>
+

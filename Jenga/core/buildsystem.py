@@ -398,27 +398,42 @@ class Compiler:
             if result.returncode != 0:
                 # Format error output beautifully
                 source_name = Path(unit.source_file).name
-                Display.error(f"\n╔{'═' * 78}╗")
-                Display.error(f"║ Compilation Error: {source_name:<60} ║")
-                Display.error(f"╠{'═' * 78}╣")
                 
                 # MSVC outputs to stdout, not stderr
                 error_output = result.stderr if result.stderr else result.stdout
                 
                 if error_output:
-                    # Parse and format compiler errors
-                    for line in error_output.split('\n'):
-                        if line.strip():
-                            # Colorize error/warning keywords
-                            if 'error' in line.lower():
-                                line = line.replace('error', f'{Colors.RED}error{Colors.RESET}')
-                                line = line.replace('Error', f'{Colors.RED}Error{Colors.RESET}')
-                            elif 'warning' in line.lower():
-                                line = line.replace('warning', f'{Colors.YELLOW}warning{Colors.RESET}')
-                                line = line.replace('Warning', f'{Colors.YELLOW}Warning{Colors.RESET}')
-                            Display.error(f"║ {line[:76]:<76} ║")
+                    # Print full error with proper formatting
+                    print(f"\n{Colors.RED}╔{'═' * 98}╗{Colors.RESET}")
+                    print(f"{Colors.RED}║{Colors.RESET} {Colors.BRIGHT_WHITE}Compilation Failed: {source_name:<78}{Colors.RED} ║{Colors.RESET}")
+                    print(f"{Colors.RED}╠{'═' * 98}╣{Colors.RESET}")
+                    
+                    # Split error into lines and display ALL
+                    error_lines = error_output.strip().split('\n')
+                    for line in error_lines:
+                        # Remove trailing whitespace but keep structure
+                        line = line.rstrip()
+                        
+                        # Colorize keywords
+                        if 'error:' in line.lower():
+                            line = line.replace('error:', f'{Colors.BRIGHT_RED}error:{Colors.RESET}')
+                        elif 'warning:' in line.lower():
+                            line = line.replace('warning:', f'{Colors.YELLOW}warning:{Colors.RESET}')
+                        elif 'note:' in line.lower():
+                            line = line.replace('note:', f'{Colors.CYAN}note:{Colors.RESET}')
+                        
+                        # Print without truncation
+                        if len(line) <= 96:
+                            print(f"{Colors.RED}║{Colors.RESET} {line:<96} {Colors.RED}║{Colors.RESET}")
+                        else:
+                            # Wrap very long lines
+                            import textwrap
+                            wrapped = textwrap.wrap(line, width=96, break_long_words=False)
+                            for w_line in wrapped:
+                                print(f"{Colors.RED}║{Colors.RESET} {w_line:<96} {Colors.RED}║{Colors.RESET}")
+                    
+                    print(f"{Colors.RED}╚{'═' * 98}╝{Colors.RESET}\n")
                 
-                Display.error(f"╚{'═' * 78}╝\n")
                 return False
             
             return True
@@ -517,6 +532,13 @@ class Compiler:
                 # Add library directories
                 for lib_dir in lib_dirs:
                     cmd.append(f"-L{lib_dir}")
+            
+                # CRITICAL: Add rpath to tell the executable where to find shared libraries
+                # This should point to the directory where the executable is located
+                output_dir = Path(output_file).parent
+                cmd.append(f"-Wl,-rpath,'$ORIGIN'")  # Look in the same directory as the executable
+                # Alternatively, for more flexibility:
+                cmd.append(f"-Wl,-rpath,{output_dir}")
                 
                 # Add libraries - with intelligent handling
                 for link in links:
@@ -537,6 +559,10 @@ class Compiler:
                             else:
                                 Display.warning(f"Library not found: {lib_file}")
                         else:
+                            # Shared library - use -l flag with directory
+                            # Add the library's directory to rpath
+                            if dep_target_dir.exists():
+                                cmd.append(f"-Wl,-rpath,{dep_target_dir}")
                             # Shared library - use -l flag
                             cmd.append(f"-l{dep_name}")
                     
