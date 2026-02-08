@@ -159,6 +159,9 @@ class Project:
     _filtered_optimize: Dict[str, Optimization] = field(default_factory=dict)
     _filtered_symbols: Dict[str, bool] = field(default_factory=dict)
 
+    _in_workspace = True
+    _standalone = True
+
 
 @dataclass
 class Workspace:
@@ -256,30 +259,38 @@ class project:
     def __enter__(self):
         global _current_workspace, _current_project
         
-        if _current_workspace is None:
-            raise RuntimeError("Project must be defined within a workspace")
-        
         self.project = Project(name=self.name)
         
-        # MANDATORY: Set default location to "." (current workspace dir)
-        # self.project.location = "."  # Déjà fait dans la dataclass
+        if _current_workspace:
+            # Si on est dans un workspace, ajouter au workspace
+            self.project.location = "."  # Par défaut dans le workspace
+            
+            # MANDATORY: Set default toolchain if not specified
+            if not self.project.toolchain and _current_workspace.toolchains:
+                if 'default' in _current_workspace.toolchains:
+                    self.project.toolchain = 'default'
+                else:
+                    self.project.toolchain = list(_current_workspace.toolchains.keys())[0]
+            
+            _current_workspace.projects[self.name] = self.project
+            self.project._in_workspace = True
+        else:
+            # ✅ Projet standalone - ne pas lever d'erreur
+            self.project._in_workspace = False
+            self.project._standalone = True
+            # Ne pas définir de location par défaut ici, le loader s'en chargera
         
-        # MANDATORY: Set default toolchain if not specified
-        if not self.project.toolchain and _current_workspace.toolchains:
-            # Use 'default' toolchain if exists, otherwise first available
-            if 'default' in _current_workspace.toolchains:
-                self.project.toolchain = 'default'
-            else:
-                self.project.toolchain = list(_current_workspace.toolchains.keys())[0]
-        
-        _current_workspace.projects[self.name] = self.project
         _current_project = self.project
-        
         return self.project
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        global _current_project
-        _current_project = None
+        global _current_project, _current_workspace
+        
+        # Only clear if we're in a workspace context
+        if _current_workspace is not None:
+            _current_project = None
+        # else: keep _current_project for standalone detection
+        
         return False
 
 

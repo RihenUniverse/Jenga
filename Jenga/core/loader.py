@@ -13,9 +13,14 @@ import re
 
 # Fix imports to work from any context
 try:
-    from .api import get_current_workspace, reset_state
+    from .api import get_current_workspace, reset_state, _current_project, _current_workspace
 except ImportError:
     from core.api import get_current_workspace, reset_state
+    try:
+        from core.api import _current_project, _current_workspace
+    except ImportError:
+        _current_project = None
+        _current_workspace = None
 
 try:
     from ..utils.display import Display
@@ -279,13 +284,55 @@ class ConfigurationLoader:
             workspace = api.get_current_workspace()
             
             if workspace is None:
-                Display.error("No workspace defined in configuration file")
-                Display.info("Make sure your .jenga file contains: with workspace('YourName'): ...")
-                Display.info("Common issues:")
-                Display.info("  1. Missing 'with workspace(\"Name\"):' statement")
-                Display.info("  2. API functions called outside workspace context")
-                Display.info("  3. Syntax errors in the .jenga file")
-                return None
+                # ✅ SOLUTION: Check if a standalone project was defined
+                # Access the global variable directly from the api module
+                current_proj = getattr(api, '_current_project', None)
+                
+                if current_proj is not None:
+                    Display.info(f"Standalone project detected: {current_proj.name}")
+                    
+                    # Create automatic workspace for standalone project
+                    workspace = api.Workspace(name=f"Auto_{nken_path.stem}")
+                    workspace.location = str(nken_dir)
+                    workspace.configurations = ["Debug", "Release", "Dist"]
+                    workspace.platforms = ["Windows", "Linux", "MacOS"]
+                    
+                    # Add the standalone project to the workspace
+                    workspace.projects[current_proj.name] = current_proj
+                    
+                    # Set project location if not already set
+                    if not current_proj.location or current_proj.location == ".":
+                        current_proj.location = str(nken_dir)
+                    
+                    # Create default toolchain
+                    default_tc = api.Toolchain(name="default", compiler="clang++")
+                    default_tc.cppcompiler = "clang++"
+                    default_tc.ccompiler = "clang"
+                    default_tc.linker = "clang++"
+                    default_tc.archiver = "ar"
+                    workspace.toolchains["default"] = default_tc
+                    
+                    # Assign toolchain to project if not set
+                    if not current_proj.toolchain:
+                        current_proj.toolchain = "default"
+                    
+                    Display.success(f"Auto-created workspace '{workspace.name}' for standalone project '{current_proj.name}'")
+                else:
+                    Display.error("No workspace or project defined in configuration file")
+                    Display.info("Your .jenga file must contain either:")
+                    Display.info("  1. A workspace: with workspace('YourName'): ...")
+                    Display.info("  2. A standalone project: with project('YourName'): ...")
+                    Display.info("")
+                    Display.info("Debug info:")
+                    Display.info(f"  - File: {nken_path}")
+                    Display.info(f"  - api._current_project: {getattr(api, '_current_project', 'NOT FOUND')}")
+                    Display.info(f"  - api._current_workspace: {getattr(api, '_current_workspace', 'NOT FOUND')}")
+                    Display.info("")
+                    Display.info("Common issues:")
+                    Display.info("  - Missing 'with workspace(...)' or 'with project(...)' statement")
+                    Display.info("  - API functions called outside context")
+                    Display.info("  - Syntax errors in the .jenga file")
+                    return None
             
             # Set workspace location to the directory containing .jenga file
             if not workspace.location:
@@ -295,8 +342,11 @@ class ConfigurationLoader:
             if not workspace.toolchains:
                 Display.warning("No toolchains defined - creating default toolchain")
                 # Create a default toolchain
-                from .api import Toolchain
-                default_tc = Toolchain(name="default", compiler="clang++")
+                default_tc = api.Toolchain(name="default", compiler="clang++")
+                default_tc.cppcompiler = "clang++"
+                default_tc.ccompiler = "clang"
+                default_tc.linker = "clang++"
+                default_tc.archiver = "ar"
                 workspace.toolchains["default"] = default_tc
             
             Display.success(f"Workspace '{workspace.name}' loaded with {len(workspace.projects)} project(s)")

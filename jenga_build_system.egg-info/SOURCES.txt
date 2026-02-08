@@ -91,7 +91,6 @@ Jenga/Unitest/src/Unitest/TestRunner.h
 Jenga/Unitest/src/Unitest/UnitTestData.h
 Jenga/Unitest/src/Unitest/Unitest.cpp
 Jenga/Unitest/src/Unitest/Unitest.h
-Jenga/core/Incrementallinker.py
 Jenga/core/__init__.py
 Jenga/core/androidsystem.py
 Jenga/core/api.py
