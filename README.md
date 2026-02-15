@@ -8,11 +8,11 @@ Modern multi-platform C/C++ build system with a unified Python DSL.
 
 ## Documentation Links
 
-- Main README: [`README.md`](README.md)
-- Complete README: [`READMEV2.md`](READMEV2.md)
-- Wiki: [`wiki/README.md`](wiki/README.md) (home: [`wiki/Home.md`](wiki/Home.md))
-- User Guide: [`Jenga_User_Guide.md`](Jenga_User_Guide.md)
-- Developer Guide: [`Jenga_Developer_Guide.md`](Jenga_Developer_Guide.md)
+- Main README: [`README.md`](./README.md)
+- Complete README: [`READMEV2.md`](./READMEV2.md)
+- Wiki: [`wiki/README.md`](./wiki/README.md) (home: [`wiki/Home.md`](./wiki/Home.md))
+- User Guide: [`Jenga_User_Guide.md`](./Jenga_User_Guide.md)
+- Developer Guide: [`Jenga_Developer_Guide.md`](./Jenga_Developer_Guide.md)
 
 ## Overview
 
