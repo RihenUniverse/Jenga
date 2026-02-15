@@ -1,0 +1,28 @@
+import os
+from Jenga import *
+
+with workspace("CrossCompileDemo"):
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.LINUX, TargetOS.ANDROID])
+    targetarchs([TargetArch.X86_64, TargetArch.ARM64])
+
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
+
+    with toolchain("linux_cross", "clang"):
+        settarget("Linux", "x86_64", "gnu")
+        targettriple("x86_64-unknown-linux-gnu")
+        ccompiler("clang")
+        cppcompiler("clang++")
+        linker("clang++")
+        archiver("ar")
+        cflags(["--target=x86_64-unknown-linux-gnu"])
+        cxxflags(["--target=x86_64-unknown-linux-gnu"])
+        ldflags(["--target=x86_64-unknown-linux-gnu"])
+
+    usetoolchain("linux_cross")
+
+    with project("CrossCore"):
+        staticlib()
+        language("C++")
+        files(["src/**.cpp"])

@@ -1,37 +1,67 @@
-# Build outputs
-Build/
-build/
-bin/
-lib/
-*.o
-*.obj
-*.a
-*.lib
-*.so
-*.dll
-*.dylib
-*.exe
-
-# Cache
-.nken_cache/
+# Python caches/bytecode
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
 
-# IDE
-.vscode/
-.idea/
-*.suo
-*.user
-*.sln.docstates
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
 
-# OS
-.DS_Store
-Thumbs.db
-*.swp
-*~
+# Packaging/build (Python)
+build/
+Build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
 
-# Temporary files
+# Coverage/test artifacts
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Jenga build artifacts and local caches
+.jenga/
+**/.jenga/
+**/Build/
+
+# Local/generated sysroots
+sysroot/
+
+# Temporary docs/work folders
+docs/tmps/
+tmps/
+
+# CMake (if generated)
+CMakeFiles/
+CMakeCache.txt
+cmake-build-*/
+compile_commands.json
+
+# Logs and runtime temp files
 *.log
 *.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local env files
+.env
+.env.*

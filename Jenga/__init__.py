@@ -1,95 +1,127 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Jenga Build System
-A modern multi-platform C/C++ build system with unified Python DSL.
+Jenga – Système de build cross‑plateforme pour projets C/C++ et autres.
+Package principal exposant l'API publique, les commandes et les utilitaires.
 """
 
-__version__ = "1.1.0"
-__author__ = "Rihen"
-__email__ = "rihen.universe@gmail.com"
-
-import importlib.util
-import os
 import sys
-from pathlib import Path
+import types
 
-# Déclarer explicitement les modules pour aider les outils d'analyse
+__version__ = "2.0.0"
+__author__ = "Jenga Team"
+__license__ = "Proprietary"
+
+# Exposer l'API publique directement depuis le package racine
+from .Core.Api import (
+    # Enums
+    ProjectKind, Language, Optimization, WarningLevel,
+    TargetOS, TargetArch, TargetEnv, CompilerFamily,
+    # Context managers
+    workspace, project, toolchain, filter, unitest, test, include, batchinclude, addtools,
+    # User functions (lowercase DSL)
+    configurations, platforms, targetoses, targetarchs, targetos, targetarch, platform, architecture, startproject,
+    consoleapp, windowedapp, staticlib, sharedlib, testsuite, kind,
+    language, cppdialect, cdialect,
+    location, files, excludefiles, removefiles, excludemainfiles, removemainfiles,
+    includedirs, libdirs, objdir, targetdir, targetname,
+    links, dependson, dependfiles, embedresources,
+    defines, optimize, symbols, warnings,
+    pchheader, pchsource,
+    prebuild, postbuild, prelink, postlink,
+    usetoolchain,
+    androidsdkpath, androidndkpath, javajdkpath,
+    androidapplicationid, androidversioncode, androidversionname,
+    androidminsdk, androidtargetsdk, androidcompilesdk,
+    androidabis, androidproguard, androidproguardrules,
+    androidassets, androidpermissions, androidnativeactivity,
+    ndkversion, androidsign, androidkeystore, androidkeystorepass, androidkeyalias,
+    iosbundleid, iosversion, iosminsdk,
+    iossigningidentity, iosentitlements, iosappicon, iosbuildnumber,
+    testoptions, testfiles, testmainfile, testmaintemplate,
+    settarget, sysroot, targettriple, ccompiler, cppcompiler,
+    linker, archiver, addcflag, addcxxflag, addldflag,
+    cflags, cxxflags, ldflags, asmflags, arflags,
+    framework, frameworkpath, librarypath, library, rpath,
+    sanitize, nostdlib, nostdinc, pic, pie,
+    buildoption, buildoptions,
+    useproject, getprojectproperties,
+    includefromdirectory, listincludes, getincludeinfo, validateincludes,
+    lip, vip, getincludedprojects, generatedependencyreport, listallprojects,
+    getcurrentworkspace, resetstate,
+    # Tools
+    addtools, usetool, listtools, gettoolinfo, validatetools,
+    CreateAndroidNdkTool, CreateEmscriptenTool, CreateCustomGccTool,
+    inittools,
+)
+
+# Exposer les sous-packages en tant que modules
+from . import Commands
+from . import Core
+from . import Unitest
+from . import Utils
+from .GlobalToolchains import *
+
 __all__ = [
-    'jenga',
-    'Commands',
-    'core',
-    'utils',
+    # Version
+    '__version__',
+    # API (tous les symboles publics de Api.py)
+    'ProjectKind', 'Language', 'Optimization', 'WarningLevel',
+    'TargetOS', 'TargetArch', 'TargetEnv', 'CompilerFamily',
+    'workspace', 'project', 'toolchain', 'filter', 'unitest', 'test',
+    'include', 'batchinclude', 'addtools',
+    'configurations', 'platforms', 'targetoses', 'targetarchs', 'targetos', 'targetarch', 'platform', 'architecture', 'startproject',
+    'consoleapp', 'windowedapp', 'staticlib', 'sharedlib', 'testsuite', 'kind',
+    'language', 'cppdialect', 'cdialect',
+    'location', 'files', 'excludefiles', 'removefiles', 'excludemainfiles', 'removemainfiles',
+    'includedirs', 'libdirs', 'objdir', 'targetdir', 'targetname',
+    'links', 'dependson', 'dependfiles', 'embedresources',
+    'defines', 'optimize', 'symbols', 'warnings',
+    'pchheader', 'pchsource',
+    'prebuild', 'postbuild', 'prelink', 'postlink',
+    'usetoolchain',
+    'androidsdkpath', 'androidndkpath', 'javajdkpath',
+    'androidapplicationid', 'androidversioncode', 'androidversionname',
+    'androidminsdk', 'androidtargetsdk', 'androidcompilesdk',
+    'androidabis', 'androidproguard', 'androidproguardrules',
+    'androidassets', 'androidpermissions', 'androidnativeactivity',
+    'ndkversion', 'androidsign', 'androidkeystore', 'androidkeystorepass', 'androidkeyalias',
+    'iosbundleid', 'iosversion', 'iosminsdk',
+    'iossigningidentity', 'iosentitlements', 'iosappicon', 'iosbuildnumber',
+    'testoptions', 'testfiles', 'testmainfile', 'testmaintemplate',
+    'settarget', 'sysroot', 'targettriple', 'ccompiler', 'cppcompiler',
+    'linker', 'archiver', 'addcflag', 'addcxxflag', 'addldflag',
+    'cflags', 'cxxflags', 'ldflags', 'asmflags', 'arflags',
+    'framework', 'frameworkpath', 'librarypath', 'library', 'rpath',
+    'sanitize', 'nostdlib', 'nostdinc', 'pic', 'pie',
+    'buildoption', 'buildoptions',
+    'useproject', 'getprojectproperties',
+    'includefromdirectory', 'listincludes', 'getincludeinfo', 'validateincludes',
+    'lip', 'vip', 'getincludedprojects', 'generatedependencyreport', 'listallprojects',
+    'getcurrentworkspace', 'resetstate',
+    'addtools', 'usetool', 'listtools', 'gettoolinfo', 'validatetools',
+    'CreateAndroidNdkTool', 'CreateEmscriptenTool', 'CreateCustomGccTool',
+    'inittools',
+    # Sous-packages
+    'Commands', 'Core', 'Unitest', 'Utils',
+    # Toolchain
+    'ToolchainAndroidNDK', 'ToolchainClangCl', 'ToolchainClangCrossLinux', 'ToolchainClangMinGW',
+    'ToolchainEmscripten', 'ToolchainHostClang', 'ToolchainMinGW', 'ToolchainZigLinuxX64',
 ]
 
-# Fonction utilitaire pour charger les fichiers .jenga
-def load_jenga_module(name: str, filepath: str):
-    """Charge un module depuis un fichier .jenga"""
-    spec = importlib.util.spec_from_file_location(name, filepath)
-    if spec and spec.loader:
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[name] = module
-        spec.loader.exec_module(module)
-        return module
-    return None
+# Initialisation du système de tools au chargement du package
+inittools()
 
-# Charger automatiquement les fichiers .jenga dans le package
-_package_dir = Path(__file__).parent
+# Backward compatibility:
+# Some previously generated entry points import `Jenga.Jenga:main`.
+# Provide a lightweight module alias without importing `Jenga.jenga` eagerly.
+_legacy_module_name = __name__ + ".Jenga"
+if _legacy_module_name not in sys.modules:
+    _legacy_module = types.ModuleType(_legacy_module_name)
 
-# Chercher tous les fichiers .jenga et les exposer comme modules virtuels
-for jenga_file in _package_dir.rglob("*.jenga"):
-    if jenga_file.is_file():
-        # Créer un nom de module basé sur le chemin
-        rel_path = jenga_file.relative_to(_package_dir)
-        module_name = f"Jenga.{rel_path.with_suffix('').as_posix().replace('/', '.')}"
-        
-        # Charger le module
-        load_jenga_module(module_name, str(jenga_file))
+    def _legacy_main(*args, **kwargs):
+        from .jenga import main as _main
+        return _main(*args, **kwargs)
 
-# Alternative: Charger dynamiquement au moment de l'import
-class JengaLoader:
-    """Chargeur personnalisé pour les fichiers .jenga"""
-    
-    @staticmethod
-    def find_spec(fullname, path, target=None):
-        if fullname.startswith("Jenga."):
-            # Convertir le nom de module en chemin de fichier
-            module_path = fullname.replace("Jenga.", "").replace(".", "/")
-            
-            # Essayer plusieurs extensions
-            possible_paths = [
-                _package_dir / f"{module_path}.jenga",
-                _package_dir / f"{module_path}.py",
-                _package_dir / module_path / "__init__.jenga",
-                _package_dir / module_path / "__init__.py",
-            ]
-            
-            for filepath in possible_paths:
-                if filepath.exists():
-                    spec = importlib.util.spec_from_file_location(fullname, str(filepath))
-                    return spec
-        
-        return None
-
-# Ajouter le chargeur au système d'import
-if JengaLoader not in sys.meta_path:
-    sys.meta_path.insert(0, JengaLoader)
-
-# Exporter les modules principaux pour faciliter les imports
-try:
-    # Essayer d'importer les modules principaux
-    from . import Commands
-    from . import core
-    from . import utils
-    
-    __all__.extend(['Commands', 'core', 'utils'])
-except ImportError:
-    # Les imports échoueront pendant l'installation, c'est normal
-    pass
-
-# Fonctions utilitaires exposées
-def version():
-    """Retourne la version de Jenga"""
-    return __version__
-
-def author():
-    """Retourne l'auteur de Jenga"""
-    return __author__
+    _legacy_module.main = _legacy_main
+    sys.modules[_legacy_module_name] = _legacy_module

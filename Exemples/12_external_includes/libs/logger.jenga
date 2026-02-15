@@ -1,0 +1,8 @@
+from Jenga import *
+
+with project("Logger"):
+    staticlib()
+    language("C++")
+    location("logger")
+    files(["src/**.cpp"])
+    includedirs(["include"])

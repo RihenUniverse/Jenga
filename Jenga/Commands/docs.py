@@ -1,43 +1,40 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Jenga Documentation Command
-Commande principale pour générer la documentation des projets
+Docs command – Génère la documentation des projets à partir des commentaires Doxygen.
+Analyse le code C++, extrait les signatures et les commentaires, produit des pages Markdown/HTML/PDF.
+Fonctionnalités complètes : extraction, statistiques, listing, nettoyage.
+Format supportés : markdown, html, pdf, all.
 """
 
-import sys
 import argparse
-from pathlib import Path
+import sys
 import re
-from typing import List, Dict, Tuple, Optional, Set
+import io
+from pathlib import Path
+from typing import List, Dict, Optional, Tuple, Set
 from dataclasses import dataclass, field
-from collections import defaultdict
 from enum import Enum
+import json
+import shutil
+import time
 from datetime import datetime
 
-# Ajouter le répertoire parent pour les imports
-JENGA_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(JENGA_DIR))
+from ..Utils import Colored, Display, FileSystem
+from ..Core.Loader import Loader
+from ..Core.Cache import Cache
+from ..Core import Api
 
-from utils.display import Display
-from core.loader import load_workspace
-from core.api import Workspace, Project
-
-# from .jenga_docs_parser import CppSignatureParser, DoxygenParser
-# from jenga_docs_extractor import DocumentationExtractor, ProjectDocumentation
-# from jenga_docs_markdown import MarkdownGenerator
-
-
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
-
-VERSION = "1.2.0"
-SUPPORTED_FORMATS = ['markdown', 'html', 'pdf', 'all']
-
+# Fix encoding for Windows terminals that don't support UTF-8
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 # ============================================================================
-# TYPES ET STRUCTURES
+# TYPES D'ÉLÉMENTS C++
 # ============================================================================
 
 class ElementType(Enum):
@@ -52,7 +49,6 @@ class ElementType(Enum):
     MACRO = "macro"
     TYPEDEF = "typedef"
     NAMESPACE = "namespace"
-    TEMPLATE = "template"
     
     def __lt__(self, other):
         return self.value < other.value
@@ -119,6 +115,7 @@ class DocComment:
     # Métadonnées de localisation
     file_path: str = ""
     line_number: int = 0
+
 
 # ============================================================================
 # STRUCTURES D'INDEXATION
@@ -188,7 +185,7 @@ class ProjectDocumentation:
 class DocumentationExtractor:
     """Extracteur principal de documentation"""
     
-    SUPPORTED_EXTENSIONS = {'.h', '.hpp', '.hxx', '.hh', '.cpp', '.cxx', '.cc', '.c', '.inl'}
+    SUPPORTED_EXTENSIONS = {'.h', '.hpp', '.hxx', '.hh', '.cpp', '.cxx', '.cc', '.c', '.inl', '.ipp', '.tpp'}
     
     def __init__(self, project_name: str, project_path: Path, 
                  include_private: bool = False, verbose: bool = False):
@@ -550,7 +547,6 @@ class DocumentationExtractor:
                 self.project_doc.by_namespace[ns].append(element)
                 
                 # Index par nom (pour liens)
-                # Utiliser nom complet avec namespace
                 full_name = f"{ns}::{sig.name}" if ns != "__global__" else sig.name
                 self.project_doc.by_name[full_name] = element
                 
@@ -566,13 +562,10 @@ class DocumentationExtractor:
                 # Résoudre les liens @see
                 resolved_see = []
                 for see_ref in element.see_also:
-                    # Chercher l'élément référencé
                     if see_ref in self.project_doc.by_name:
                         resolved_see.append(see_ref)
                     else:
-                        # Peut-être juste un nom sans namespace
                         resolved_see.append(see_ref)
-                
                 element.see_also = resolved_see
     
     def _analyze_dependencies(self):
@@ -582,22 +575,17 @@ class DocumentationExtractor:
         file_by_name = {}
         for file_doc in self.project_doc.files:
             file_by_name[file_doc.file_name] = file_doc
-            # Aussi par path relatif
             file_by_name[file_doc.relative_path] = file_doc
         
         # Pour chaque fichier, résoudre ses includes
         for file_doc in self.project_doc.files:
             deps = set()
-            
             for include in file_doc.includes:
-                # Chercher le fichier correspondant
                 include_name = Path(include).name
-                
                 if include_name in file_by_name:
                     deps.add(file_by_name[include_name].relative_path)
                 elif include in file_by_name:
                     deps.add(include)
-            
             self.project_doc.file_dependencies[file_doc.relative_path] = deps
             
             # Remplir included_by (inverse)
@@ -632,7 +620,6 @@ class DocumentationExtractor:
         )
         stats['total_parameters'] = total_params
         
-        # Moyenne de paramètres par fonction
         functions_with_params = [
             e for f in self.project_doc.files 
             for e in f.elements 
@@ -643,7 +630,6 @@ class DocumentationExtractor:
         else:
             stats['avg_params_per_function'] = 0
         
-        # Éléments avec documentation complète
         well_documented = sum(
             1 for f in self.project_doc.files 
             for e in f.elements 
@@ -657,651 +643,6 @@ class DocumentationExtractor:
             stats['documentation_coverage'] = 0
         
         self.project_doc.stats = stats
-
-
-# ============================================================================
-# UTILITAIRES
-# ============================================================================
-
-def create_element_id(element: DocComment) -> str:
-    """Crée un ID unique pour un élément (pour les ancres HTML/MD)"""
-    sig = element.signature
-    
-    # Format: namespace-classname-elementname
-    parts = []
-    
-    if sig.namespace:
-        parts.append(sig.namespace.replace('::', '-').lower())
-    
-    if sig.parent_class:
-        parts.append(sig.parent_class.replace('::', '-').lower())
-    
-    parts.append(sig.name.lower())
-    
-    return '-'.join(parts)
-
-
-def create_file_link(from_file: str, to_file: str, base_dir: str = "files") -> str:
-    """Crée un lien relatif entre deux fichiers de documentation"""
-    
-    # Convertir les chemins en chemins MD
-    from_md = Path(from_file).with_suffix('.md').name.replace('.', '_')
-    to_md = Path(to_file).with_suffix('.md').name.replace('.', '_')
-    
-    # Si même fichier, lien interne
-    if from_md == to_md:
-        return f"#{to_md}"
-    
-    # Sinon, lien relatif
-    return f"./{base_dir}/{to_md}"
-
-
-def sanitize_filename(name: str) -> str:
-    """Nettoie un nom pour l'utiliser comme nom de fichier"""
-    # Remplacer caractères spéciaux
-    name = name.replace('::', '_')
-    name = name.replace('/', '_')
-    name = name.replace('\\', '_')
-    name = name.replace(' ', '_')
-    name = re.sub(r'[<>:"|?*]', '', name)
-    return name
-
-
-class MarkdownGenerator:
-    """Générateur de documentation Markdown avec design moderne"""
-    
-    def __init__(self, project_doc: ProjectDocumentation):
-        self.project_doc = project_doc
-        self.output_dir = Path(".")
-        
-        # Mapping type -> emoji
-        self.type_icons = {
-            ElementType.CLASS: "🏛️",
-            ElementType.STRUCT: "🏗️",
-            ElementType.ENUM: "🔢",
-            ElementType.UNION: "🤝",
-            ElementType.FUNCTION: "⚙️",
-            ElementType.METHOD: "🔧",
-            ElementType.VARIABLE: "📦",
-            ElementType.MACRO: "🔣",
-            ElementType.TYPEDEF: "📝",
-            ElementType.NAMESPACE: "🗂️",
-        }
-    
-    def generate(self, output_dir: Path):
-        """Génère toute la documentation"""
-        self.output_dir = output_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        print(f"📝 Generating Markdown documentation in: {output_dir}")
-        
-        # Page d'accueil
-        self._generate_index()
-        
-        # Par fichier
-        self._generate_by_files()
-        
-        # Par namespace
-        self._generate_by_namespace()
-        
-        # Par type
-        self._generate_by_type()
-        
-        # Recherche alphabétique
-        self._generate_search()
-        
-        # API complète
-        self._generate_api()
-        
-        # Statistiques
-        self._generate_stats()
-        
-        print(f"✅ Markdown generation complete!")
-    
-    def _generate_index(self):
-        """Page d'accueil"""
-        stats = self.project_doc.stats
-        
-        md = f"""# {self.project_doc.project_name} - Documentation API
-
-> 🚀 Généré le {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-![Elements](https://img.shields.io/badge/Elements-{stats.get('total_elements', 0)}-blue)
-![Files](https://img.shields.io/badge/Files-{stats.get('total_files', 0)}-green)
-![Coverage](https://img.shields.io/badge/Coverage-{stats.get('documentation_coverage', 0):.0f}%25-orange)
-
-## 📊 Statistiques Rapides
-
-| Catégorie | Nombre |
-|-----------|--------|
-| 📁 Fichiers | {stats.get('total_files', 0)} |
-| 🧩 Éléments | {stats.get('total_elements', 0)} |
-| 🏛️ Classes | {stats.get('classes', 0)} |
-| 🏗️ Structures | {stats.get('structs', 0)} |
-| 🔢 Enums | {stats.get('enums', 0)} |
-| ⚙️ Fonctions | {stats.get('functions', 0)} |
-| 🔧 Méthodes | {stats.get('methods', 0)} |
-
-## 🔍 Navigation
-
-- [📁 Par Fichier](./files/index.md) - Documentation organisée par fichier source
-- [🗂️ Par Namespace](./namespaces/index.md) - Navigation par espace de noms
-- [🎯 Par Type](./types/index.md) - Éléments groupés par type
-- [🔍 Recherche](./search.md) - Index alphabétique complet
-- [🔧 API Complète](./api.md) - Vue d'ensemble de l'API
-- [📊 Statistiques](./stats.md) - Métriques détaillées
-
-## 📚 À Propos
-
-Cette documentation a été générée automatiquement depuis les commentaires Doxygen du code source.
-
-**Couverture:** {stats.get('well_documented', 0)} éléments sur {stats.get('total_elements', 0)} ont une documentation complète ({stats.get('documentation_coverage', 0):.1f}%)
-
----
-
-*Documentation générée avec ❤️ par Jenga Build System*
-"""
-        
-        (self.output_dir / "index.md").write_text(md, encoding='utf-8')
-        print(f"  ✓ index.md")
-    
-    def _generate_by_files(self):
-        """Documentation par fichier"""
-        files_dir = self.output_dir / "files"
-        files_dir.mkdir(exist_ok=True)
-        
-        # Index
-        md = f"""# 📁 Documentation par Fichier
-
-> {len(self.project_doc.files)} fichiers documentés
-
-[🏠 Accueil](../index.md)
-
-## Liste des Fichiers
-
-"""
-        for file_doc in sorted(self.project_doc.files, key=lambda f: f.file_name):
-            md_name = sanitize_filename(file_doc.file_name) + ".md"
-            md += f"- 📄 [{file_doc.file_name}](./{md_name}) ({len(file_doc.elements)} éléments)\n"
-            
-            # Générer la page du fichier
-            self._generate_file_page(file_doc, files_dir)
-        
-        (files_dir / "index.md").write_text(md, encoding='utf-8')
-        print(f"  ✓ files/ ({len(self.project_doc.files)} files)")
-    
-    def _generate_file_page(self, file_doc: FileDocumentation, files_dir: Path):
-        """Page individuelle d'un fichier"""
-        
-        md_name = sanitize_filename(file_doc.file_name) + ".md"
-        
-        md = f"""# 📄 {file_doc.file_name}
-
-[🏠 Accueil](../index.md) | [📁 Fichiers](./index.md)
-
-## Informations
-
-"""
-        
-        if file_doc.file_description:
-            md += f"**Description:** {file_doc.file_description}\n\n"
-        
-        if file_doc.file_author:
-            md += f"**Auteur:** {file_doc.file_author}\n\n"
-        
-        md += f"**Chemin:** `{file_doc.relative_path}`\n\n"
-        
-        # Includes
-        if file_doc.includes:
-            md += "### 📦 Fichiers Inclus\n\n"
-            for inc in file_doc.includes:
-                # Créer lien si c'est un fichier du projet
-                inc_name = Path(inc).name
-                linked = False
-                for f in self.project_doc.files:
-                    if f.file_name == inc_name:
-                        inc_md = sanitize_filename(inc_name) + ".md"
-                        md += f"- [`{inc}`](./{inc_md})\n"
-                        linked = True
-                        break
-                
-                if not linked:
-                    md += f"- `{inc}`\n"
-            md += "\n"
-        
-        # Included by
-        if file_doc.included_by:
-            md += "### 🔗 Inclus Par\n\n"
-            for inc_by in file_doc.included_by:
-                inc_name = Path(inc_by).name
-                inc_md = sanitize_filename(inc_name) + ".md"
-                md += f"- [`{inc_name}`](./{inc_md})\n"
-            md += "\n"
-        
-        # Namespaces
-        if file_doc.namespaces:
-            md += "### 🗂️ Namespaces\n\n"
-            for ns in file_doc.namespaces:
-                ns_md = ns.replace('::', '_') + ".md"
-                md += f"- [`{ns}`](../namespaces/{ns_md})\n"
-            md += "\n"
-        
-        # Éléments
-        md += f"## 🎯 Éléments ({len(file_doc.elements)})\n\n"
-        
-        # Grouper par type
-        by_type = {}
-        for elem in file_doc.elements:
-            t = elem.signature.element_type
-            if t not in by_type:
-                by_type[t] = []
-            by_type[t].append(elem)
-        
-        for elem_type in sorted(by_type.keys(), key=lambda t: t.value):
-            elements = by_type[elem_type]
-            icon = self.type_icons.get(elem_type, "📌")
-            
-            md += f"### {icon} {elem_type.value.capitalize()}s ({len(elements)})\n\n"
-            
-            for elem in sorted(elements, key=lambda e: e.signature.name):
-                md += self._format_element(elem, file_doc.file_name)
-                md += "\n---\n\n"
-        
-        (files_dir / md_name).write_text(md, encoding='utf-8')
-    
-    def _format_element(self, elem: DocComment, current_file: str = "") -> str:
-        """Formate un élément documenté"""
-        
-        sig = elem.signature
-        icon = self.type_icons.get(sig.element_type, "📌")
-        elem_id = create_element_id(elem)
-        
-        md = f'<a name="{elem_id}"></a>\n\n'
-        md += f"#### {icon} `{sig.name}`\n\n"
-        
-        # Badges
-        badges = []
-        if sig.is_static:
-            badges.append("`static`")
-        if sig.is_const:
-            badges.append("`const`")
-        if sig.is_virtual:
-            badges.append("`virtual`")
-        if sig.is_constexpr:
-            badges.append("`constexpr`")
-        if sig.is_noexcept:
-            badges.append("`noexcept`")
-        if sig.access != "public":
-            badges.append(f"`{sig.access}`")
-        
-        if badges:
-            md += " ".join(badges) + "\n\n"
-        
-        # Signature complète
-        md += f"```cpp\n{sig.full_signature}\n```\n\n"
-        
-        # Brief
-        if elem.brief:
-            md += f"**{elem.brief}**\n\n"
-        
-        # Description
-        if elem.description:
-            md += f"{elem.description}\n\n"
-        
-        # Template parameters
-        if sig.template_params:
-            md += "**Paramètres Template:**\n\n"
-            for tp in sig.template_params:
-                md += f"- `{tp}`\n"
-            md += "\n"
-        
-        # Parameters
-        if sig.parameters:
-            md += "**Paramètres:**\n\n"
-            md += "| Nom | Type | Description |\n"
-            md += "|-----|------|-------------|\n"
-            for param in sig.parameters:
-                desc = elem.param_docs.get(param.name, "")
-                direction = f"[{param.direction}] " if param.direction else ""
-                md += f"| `{param.name}` | `{param.type}` | {direction}{desc} |\n"
-            md += "\n"
-        
-        # Return
-        if elem.returns:
-            md += f"**Retour:** {elem.returns}\n\n"
-        
-        # Examples
-        if elem.examples:
-            md += "**Exemples:**\n\n"
-            for i, ex in enumerate(elem.examples, 1):
-                md += f"```cpp\n{ex}\n```\n\n"
-        
-        # Notes
-        for note in elem.notes:
-            md += f"> 📝 **Note:** {note}\n\n"
-        
-        # Warnings
-        for warn in elem.warnings:
-            md += f"> ⚠️ **Attention:** {warn}\n\n"
-        
-        # See also avec liens
-        if elem.see_also:
-            md += "**Voir Aussi:**\n\n"
-            for see in elem.see_also:
-                # Chercher l'élément
-                if see in self.project_doc.by_name:
-                    target = self.project_doc.by_name[see]
-                    target_file = target.file_path
-                    target_id = create_element_id(target)
-                    
-                    # Créer lien relatif
-                    if Path(target_file).name == current_file:
-                        md += f"- [`{see}`](#{target_id})\n"
-                    else:
-                        target_md = sanitize_filename(Path(target_file).name) + ".md"
-                        md += f"- [`{see}`](./{target_md}#{target_id})\n"
-                else:
-                    md += f"- `{see}`\n"
-            md += "\n"
-        
-        # Métadonnées
-        meta = []
-        if elem.since:
-            meta.append(f"Depuis: {elem.since}")
-        if elem.complexity:
-            meta.append(f"Complexité: {elem.complexity}")
-        if elem.thread_safety:
-            meta.append(f"Thread-safety: {elem.thread_safety}")
-        
-        if meta:
-            md += "*" + " | ".join(meta) + "*\n\n"
-        
-        # Deprecated
-        if elem.deprecated:
-            md += f"> 🚫 **DÉPRÉCIÉ:** {elem.deprecated}\n\n"
-        
-        # Source
-        md += f"*Défini dans: `{elem.file_path}:{elem.line_number}`*\n\n"
-        
-        return md
-    
-    def _generate_by_namespace(self):
-        """Documentation par namespace"""
-        ns_dir = self.output_dir / "namespaces"
-        ns_dir.mkdir(exist_ok=True)
-        
-        md = f"""# 🗂️ Documentation par Namespace
-
-> {len(self.project_doc.by_namespace)} namespaces
-
-[🏠 Accueil](../index.md)
-
-## Liste
-
-"""
-        for ns in sorted(self.project_doc.by_namespace.keys()):
-            elements = self.project_doc.by_namespace[ns]
-            ns_display = "Global" if ns == "__global__" else ns
-            ns_md = sanitize_filename(ns) + ".md"
-            
-            md += f"- 🗂️ [`{ns_display}`](./{ns_md}) ({len(elements)} éléments)\n"
-            
-            # Générer page du namespace
-            self._generate_namespace_page(ns, elements, ns_dir)
-        
-        (ns_dir / "index.md").write_text(md, encoding='utf-8')
-        print(f"  ✓ namespaces/ ({len(self.project_doc.by_namespace)} namespaces)")
-    
-    def _generate_namespace_page(self, ns: str, elements: List[DocComment], ns_dir: Path):
-        """Page d'un namespace"""
-        
-        ns_display = "Global" if ns == "__global__" else ns
-        ns_md = sanitize_filename(ns) + ".md"
-        
-        md = f"""# 🗂️ Namespace `{ns_display}`
-
-> {len(elements)} éléments
-
-[🏠 Accueil](../index.md) | [🗂️ Namespaces](./index.md)
-
-## Éléments
-
-"""
-        
-        # Grouper par type
-        by_type = {}
-        for elem in elements:
-            t = elem.signature.element_type
-            if t not in by_type:
-                by_type[t] = []
-            by_type[t].append(elem)
-        
-        for elem_type in sorted(by_type.keys(), key=lambda t: t.value):
-            elems = by_type[elem_type]
-            icon = self.type_icons.get(elem_type, "📌")
-            
-            md += f"### {icon} {elem_type.value.capitalize()}s ({len(elems)})\n\n"
-            
-            for elem in sorted(elems, key=lambda e: e.signature.name):
-                # Brief + lien vers fichier
-                file_name = Path(elem.file_path).name
-                file_md = sanitize_filename(file_name) + ".md"
-                elem_id = create_element_id(elem)
-                
-                md += f"- **[`{elem.signature.name}`](../files/{file_md}#{elem_id})**"
-                if elem.brief:
-                    md += f" — {elem.brief}"
-                md += "\n"
-            
-            md += "\n"
-        
-        (ns_dir / ns_md).write_text(md, encoding='utf-8')
-    
-    def _generate_by_type(self):
-        """Documentation par type"""
-        types_dir = self.output_dir / "types"
-        types_dir.mkdir(exist_ok=True)
-        
-        md = """# 🎯 Documentation par Type
-
-[🏠 Accueil](../index.md)
-
-## Types
-
-"""
-        
-        type_lists = [
-            (ElementType.CLASS, self.project_doc.classes),
-            (ElementType.STRUCT, self.project_doc.structs),
-            (ElementType.ENUM, self.project_doc.enums),
-            (ElementType.UNION, self.project_doc.unions),
-            (ElementType.FUNCTION, self.project_doc.functions),
-            (ElementType.METHOD, self.project_doc.methods),
-            (ElementType.VARIABLE, self.project_doc.variables),
-            (ElementType.MACRO, self.project_doc.macros),
-            (ElementType.TYPEDEF, self.project_doc.typedefs),
-        ]
-        
-        for elem_type, elements in type_lists:
-            if not elements:
-                continue
-            
-            icon = self.type_icons.get(elem_type, "📌")
-            type_md = elem_type.value + "s.md"
-            
-            md += f"- {icon} [{elem_type.value.capitalize()}s](./{type_md}) ({len(elements)} éléments)\n"
-            
-            # Générer page du type
-            self._generate_type_page(elem_type, elements, types_dir)
-        
-        (types_dir / "index.md").write_text(md, encoding='utf-8')
-        print(f"  ✓ types/ (9 types)")
-    
-    def _generate_type_page(self, elem_type: ElementType, elements: List[DocComment], types_dir: Path):
-        """Page d'un type"""
-        
-        icon = self.type_icons.get(elem_type, "📌")
-        type_md = elem_type.value + "s.md"
-        
-        md = f"""# {icon} {elem_type.value.capitalize()}s
-
-> {len(elements)} éléments
-
-[🏠 Accueil](../index.md) | [🎯 Types](./index.md)
-
-## Liste
-
-"""
-        
-        for elem in sorted(elements, key=lambda e: e.signature.name):
-            file_name = Path(elem.file_path).name
-            file_md = sanitize_filename(file_name) + ".md"
-            elem_id = create_element_id(elem)
-            
-            md += f"- **[`{elem.signature.name}`](../files/{file_md}#{elem_id})**"
-            
-            # Namespace
-            ns = elem.signature.namespace or "__global__"
-            if ns != "__global__":
-                md += f" (`{ns}`)"
-            
-            # Brief
-            if elem.brief:
-                md += f" — {elem.brief}"
-            
-            md += "\n"
-        
-        (types_dir / type_md).write_text(md, encoding='utf-8')
-    
-    def _generate_search(self):
-        """Index alphabétique"""
-        
-        all_elements = []
-        for file_doc in self.project_doc.files:
-            all_elements.extend(file_doc.elements)
-        
-        md = f"""# 🔍 Recherche Alphabétique
-
-> {len(all_elements)} éléments
-
-[🏠 Accueil](./index.md)
-
-## Index
-
-"""
-        
-        # Grouper par première lettre
-        by_letter = {}
-        for elem in all_elements:
-            letter = elem.signature.name[0].upper()
-            if letter not in by_letter:
-                by_letter[letter] = []
-            by_letter[letter].append(elem)
-        
-        # Navigation
-        for letter in sorted(by_letter.keys()):
-            md += f"[{letter}](#{letter.lower()}) "
-        md += "\n\n---\n\n"
-        
-        # Listes
-        for letter in sorted(by_letter.keys()):
-            md += f'<a name="{letter.lower()}"></a>\n\n'
-            md += f"## {letter}\n\n"
-            
-            for elem in sorted(by_letter[letter], key=lambda e: e.signature.name.lower()):
-                file_name = Path(elem.file_path).name
-                file_md = sanitize_filename(file_name) + ".md"
-                elem_id = create_element_id(elem)
-                icon = self.type_icons.get(elem.signature.element_type, "📌")
-                
-                md += f"- {icon} **[`{elem.signature.name}`](./files/{file_md}#{elem_id})**"
-                
-                if elem.brief:
-                    md += f" — {elem.brief}"
-                
-                md += "\n"
-            
-            md += "\n"
-        
-        (self.output_dir / "search.md").write_text(md, encoding='utf-8')
-        print(f"  ✓ search.md")
-    
-    def _generate_api(self):
-        """API complète"""
-        md = f"""# 🔧 API Complète
-
-[🏠 Accueil](./index.md)
-
-## Vue d'Ensemble
-
-Documentation complète de l'API du projet {self.project_doc.project_name}.
-
-"""
-        
-        # Lien vers chaque type
-        md += "## Par Type\n\n"
-        
-        type_lists = [
-            (ElementType.CLASS, self.project_doc.classes),
-            (ElementType.STRUCT, self.project_doc.structs),
-            (ElementType.ENUM, self.project_doc.enums),
-            (ElementType.FUNCTION, self.project_doc.functions),
-            (ElementType.METHOD, self.project_doc.methods),
-        ]
-        
-        for elem_type, elements in type_lists:
-            if not elements:
-                continue
-            
-            icon = self.type_icons.get(elem_type, "📌")
-            type_md = elem_type.value + "s.md"
-            
-            md += f"- {icon} [{elem_type.value.capitalize()}s](./types/{type_md}) ({len(elements)})\n"
-        
-        (self.output_dir / "api.md").write_text(md, encoding='utf-8')
-        print(f"  ✓ api.md")
-    
-    def _generate_stats(self):
-        """Statistiques détaillées"""
-        stats = self.project_doc.stats
-        
-        md = f"""# 📊 Statistiques Détaillées
-
-[🏠 Accueil](./index.md)
-
-## Vue d'Ensemble
-
-| Métrique | Valeur |
-|----------|--------|
-| Fichiers | {stats.get('total_files', 0)} |
-| Éléments | {stats.get('total_elements', 0)} |
-| Namespaces | {stats.get('namespaces', 0)} |
-| Couverture | {stats.get('documentation_coverage', 0):.1f}% |
-
-## Par Type
-
-| Type | Nombre |
-|------|--------|
-| 🏛️ Classes | {stats.get('classes', 0)} |
-| 🏗️ Structures | {stats.get('structs', 0)} |
-| 🔢 Enums | {stats.get('enums', 0)} |
-| 🤝 Unions | {stats.get('unions', 0)} |
-| ⚙️ Fonctions | {stats.get('functions', 0)} |
-| 🔧 Méthodes | {stats.get('methods', 0)} |
-| 📦 Variables | {stats.get('variables', 0)} |
-| 🔣 Macros | {stats.get('macros', 0)} |
-| 📝 Typedefs | {stats.get('typedefs', 0)} |
-
-## Qualité
-
-- **Éléments bien documentés:** {stats.get('well_documented', 0)} / {stats.get('total_elements', 0)}
-- **Couverture:** {stats.get('documentation_coverage', 0):.1f}%
-- **Paramètres moyens par fonction:** {stats.get('avg_params_per_function', 0):.1f}
-
-"""
-        
-        (self.output_dir / "stats.md").write_text(md, encoding='utf-8')
-        print(f"  ✓ stats.md")
 
 
 # ============================================================================
@@ -1385,27 +726,23 @@ class CppSignatureParser:
         return None
     
     def _parse_class_signature(self, code: str, kind: str) -> Optional[ElementSignature]:
-        """Parse signature de class/struct"""
         match = self.patterns['class'].search(code)
         if not match:
             return None
         
-        class_type = match.group(1)  # class ou struct
+        class_type = match.group(1)
         name = match.group(2)
         
-        # Détecter template
         template_params = []
         template_match = re.search(r'template\s*<([^>]+)>', code)
         if template_match:
             template_params = [p.strip() for p in template_match.group(1).split(',')]
         
-        # Extraire héritage
         inheritance = ""
         inherit_match = re.search(r':\s*((?:(?:public|private|protected)\s+\w+(?:,\s*)?)+)', code)
         if inherit_match:
             inheritance = inherit_match.group(1)
         
-        # Construire signature complète
         sig = f"template<{', '.join(template_params)}> " if template_params else ""
         sig += f"{class_type} {name}"
         if inheritance:
@@ -1419,26 +756,18 @@ class CppSignatureParser:
         )
     
     def _parse_enum_signature(self, code: str) -> Optional[ElementSignature]:
-        """Parse signature d'enum"""
         match = self.patterns['enum'].search(code)
         if not match:
             return None
-        
         name = match.group(1)
-        
-        # Détecter enum class
         is_scoped = 'enum class' in code
-        
-        # Détecter underlying type
         underlying_type = ""
         type_match = re.search(r'enum\s+(?:class\s+)?\w+\s*:\s*(\w+)', code)
         if type_match:
             underlying_type = type_match.group(1)
-        
         sig = f"enum {'class ' if is_scoped else ''}{name}"
         if underlying_type:
             sig += f" : {underlying_type}"
-        
         return ElementSignature(
             element_type=ElementType.ENUM,
             name=name,
@@ -1446,13 +775,10 @@ class CppSignatureParser:
         )
     
     def _parse_union_signature(self, code: str) -> Optional[ElementSignature]:
-        """Parse signature d'union"""
         match = self.patterns['union'].search(code)
         if not match:
             return None
-        
         name = match.group(1)
-        
         return ElementSignature(
             element_type=ElementType.UNION,
             name=name,
@@ -1460,7 +786,6 @@ class CppSignatureParser:
         )
     
     def _parse_function_signature(self, code: str) -> Optional[ElementSignature]:
-        """Parse signature de fonction/méthode"""
         match = self.patterns['function'].search(code)
         if not match:
             return None
@@ -1471,10 +796,8 @@ class CppSignatureParser:
         params_str = match.group(4) or ""
         trailing_str = match.group(5) or ""
         
-        # Parser les paramètres
         parameters = self._parse_parameters(params_str)
         
-        # Détecter les modifiers
         is_static = 'static' in modifiers_str
         is_virtual = 'virtual' in modifiers_str
         is_inline = 'inline' in modifiers_str
@@ -1486,17 +809,14 @@ class CppSignatureParser:
         is_final = 'final' in trailing_str
         is_pure_virtual = '= 0' in code
         
-        # Détecter template
         template_params = []
         template_match = re.search(r'template\s*<([^>]+)>', code)
         if template_match:
             template_params = [p.strip() for p in template_match.group(1).split(',')]
         
-        # Construire signature complète
         sig = ""
         if template_params:
             sig += f"template<{', '.join(template_params)}> "
-        
         if is_static:
             sig += "static "
         if is_virtual:
@@ -1507,11 +827,9 @@ class CppSignatureParser:
             sig += "explicit "
         if is_constexpr:
             sig += "constexpr "
-        
         sig += f"{return_type} {func_name}("
         sig += ", ".join([f"{p.type} {p.name}" for p in parameters])
         sig += ")"
-        
         if is_const:
             sig += " const"
         if is_noexcept:
@@ -1523,8 +841,6 @@ class CppSignatureParser:
         if is_pure_virtual:
             sig += " = 0"
         
-        # Déterminer si c'est une fonction ou méthode
-        # (nécessite contexte de la classe parente - sera déterminé plus tard)
         element_type = ElementType.FUNCTION
         
         return ElementSignature(
@@ -1547,58 +863,39 @@ class CppSignatureParser:
         )
     
     def _parse_parameters(self, params_str: str) -> List[Parameter]:
-        """Parse la liste de paramètres d'une fonction"""
         if not params_str.strip():
             return []
-        
         parameters = []
-        
-        # Diviser par virgules (en respectant les templates)
         param_parts = self._smart_split(params_str, ',')
-        
         for part in param_parts:
             part = part.strip()
             if not part or part == 'void':
                 continue
-            
-            # Parser type et nom
-            # Format: [const] type [*&] name [= default]
-            
-            # Extraire valeur par défaut
             default_value = ""
             if '=' in part:
                 part, default_value = part.split('=', 1)
                 part = part.strip()
                 default_value = default_value.strip()
-            
-            # Extraire nom (dernier mot)
             tokens = part.split()
             if len(tokens) >= 2:
                 param_name = tokens[-1]
-                # Enlever * et & du nom si présents
                 param_name = param_name.lstrip('*&')
-                
                 param_type = ' '.join(tokens[:-1])
             else:
-                # Pas de nom (déclaration forward)
                 param_name = ""
                 param_type = part
-            
             parameters.append(Parameter(
                 name=param_name,
                 type=param_type,
                 default_value=default_value
             ))
-        
         return parameters
     
     def _smart_split(self, text: str, delimiter: str) -> List[str]:
-        """Split intelligent qui respecte les <> et ()"""
         parts = []
         current = []
         depth_angle = 0
         depth_paren = 0
-        
         for char in text:
             if char == '<':
                 depth_angle += 1
@@ -1612,29 +909,22 @@ class CppSignatureParser:
                 parts.append(''.join(current))
                 current = []
                 continue
-            
             current.append(char)
-        
         if current:
             parts.append(''.join(current))
-        
         return parts
     
     def _parse_variable_signature(self, code: str) -> Optional[ElementSignature]:
-        """Parse signature de variable"""
         match = self.patterns['variable'].search(code)
         if not match:
             return None
-        
         modifiers = match.group(1) or ""
         var_type = match.group(2)
         var_name = match.group(3)
-        
         is_static = 'static' in modifiers
         is_const = 'const' in modifiers
         is_constexpr = 'constexpr' in modifiers
         is_inline = 'inline' in modifiers
-        
         sig = ""
         if is_static:
             sig += "static "
@@ -1644,9 +934,7 @@ class CppSignatureParser:
             sig += "constexpr "
         if is_inline:
             sig += "inline "
-        
         sig += f"{var_type} {var_name}"
-        
         return ElementSignature(
             element_type=ElementType.VARIABLE,
             name=var_name,
@@ -1659,18 +947,14 @@ class CppSignatureParser:
         )
     
     def _parse_macro_signature(self, code: str) -> Optional[ElementSignature]:
-        """Parse signature de macro"""
         match = self.patterns['macro'].search(code)
         if not match:
             return None
-        
         macro_name = match.group(1)
         macro_value = match.group(2) or ""
-        
         sig = f"#define {macro_name}"
         if macro_value:
             sig += f" {macro_value}"
-        
         return ElementSignature(
             element_type=ElementType.MACRO,
             name=macro_name,
@@ -1678,20 +962,17 @@ class CppSignatureParser:
         )
     
     def _parse_typedef_signature(self, code: str) -> Optional[ElementSignature]:
-        """Parse signature de typedef/using"""
         match = self.patterns['typedef'].search(code)
         if not match:
             return None
-        
-        if match.group(1):  # typedef
+        if match.group(1):
             original_type = match.group(1)
             alias_name = match.group(2)
             sig = f"typedef {original_type} {alias_name}"
-        else:  # using
+        else:
             alias_name = match.group(3)
             original_type = match.group(4)
             sig = f"using {alias_name} = {original_type}"
-        
         return ElementSignature(
             element_type=ElementType.TYPEDEF,
             name=alias_name,
@@ -1761,8 +1042,6 @@ class DoxygenParser:
             param_name = match.group(2)
             param_desc = self._clean_text(match.group(3))
             doc.param_docs[param_name] = param_desc
-            
-            # Mettre à jour le paramètre dans la signature si trouvé
             for param in signature.parameters:
                 if param.name == param_name:
                     param.description = param_desc
@@ -1821,34 +1100,509 @@ class DoxygenParser:
                 continue
             if not in_tag and clean and clean != doc.brief:
                 desc_lines.append(clean)
-        
         if desc_lines:
             doc.description = ' '.join(desc_lines)
         
         return doc
     
     def _clean_text(self, text: str) -> str:
-        """Nettoie le texte extrait"""
-        # Enlever * au début
         text = re.sub(r'^\s*\*+\s*', '', text, flags=re.MULTILINE)
-        # Enlever / au début
         text = re.sub(r'^\s*/+\s*', '', text, flags=re.MULTILINE)
-        # Espaces multiples
         text = re.sub(r'\s+', ' ', text)
         return text.strip()
 
 
 # ============================================================================
-# COMMANDE PRINCIPALE
+# UTILITAIRES
 # ============================================================================
 
-def execute(args):
-    """Point d'entrée principal de la commande docs"""
+def create_element_id(element: DocComment) -> str:
+    sig = element.signature
+    parts = []
+    if sig.namespace:
+        parts.append(sig.namespace.replace('::', '-').lower())
+    if sig.parent_class:
+        parts.append(sig.parent_class.replace('::', '-').lower())
+    parts.append(sig.name.lower())
+    return '-'.join(parts)
+
+
+def sanitize_filename(name: str) -> str:
+    name = name.replace('::', '_')
+    name = name.replace('/', '_')
+    name = name.replace('\\', '_')
+    name = name.replace(' ', '_')
+    name = re.sub(r'[<>:"|?*]', '', name)
+    return name
+
+
+# ============================================================================
+# GÉNÉRATEUR MARKDOWN
+# ============================================================================
+
+class MarkdownGenerator:
+    """Générateur de documentation Markdown avec design moderne"""
     
-    parser = argparse.ArgumentParser(
-        description='Génération de documentation pour les projets Jenga',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+    def __init__(self, project_doc: ProjectDocumentation):
+        self.project_doc = project_doc
+        self.output_dir = Path(".")
+        self.type_icons = {
+            ElementType.CLASS: "🏛️",
+            ElementType.STRUCT: "🏗️",
+            ElementType.ENUM: "🔢",
+            ElementType.UNION: "🤝",
+            ElementType.FUNCTION: "⚙️",
+            ElementType.METHOD: "🔧",
+            ElementType.VARIABLE: "📦",
+            ElementType.MACRO: "🔣",
+            ElementType.TYPEDEF: "📝",
+            ElementType.NAMESPACE: "🗂️",
+        }
+    
+    def generate(self, output_dir: Path):
+        self.output_dir = output_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"📝 Generating Markdown documentation in: {output_dir}")
+        self._generate_index()
+        self._generate_by_files()
+        self._generate_by_namespace()
+        self._generate_by_type()
+        self._generate_search()
+        self._generate_api()
+        self._generate_stats()
+        print(f"✅ Markdown generation complete!")
+    
+    def _generate_index(self):
+        stats = self.project_doc.stats
+        md = f"""# {self.project_doc.project_name} - Documentation API
+
+> 🚀 Généré le {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+![Elements](https://img.shields.io/badge/Elements-{stats.get('total_elements', 0)}-blue)
+![Files](https://img.shields.io/badge/Files-{stats.get('total_files', 0)}-green)
+![Coverage](https://img.shields.io/badge/Coverage-{stats.get('documentation_coverage', 0):.0f}%25-orange)
+
+## 📊 Statistiques Rapides
+
+| Catégorie | Nombre |
+|-----------|--------|
+| 📁 Fichiers | {stats.get('total_files', 0)} |
+| 🧩 Éléments | {stats.get('total_elements', 0)} |
+| 🏛️ Classes | {stats.get('classes', 0)} |
+| 🏗️ Structures | {stats.get('structs', 0)} |
+| 🔢 Enums | {stats.get('enums', 0)} |
+| ⚙️ Fonctions | {stats.get('functions', 0)} |
+| 🔧 Méthodes | {stats.get('methods', 0)} |
+
+## 🔍 Navigation
+
+- [📁 Par Fichier](./files/index.md) - Documentation organisée par fichier source
+- [🗂️ Par Namespace](./namespaces/index.md) - Navigation par espace de noms
+- [🎯 Par Type](./types/index.md) - Éléments groupés par type
+- [🔍 Recherche](./search.md) - Index alphabétique complet
+- [🔧 API Complète](./api.md) - Vue d'ensemble de l'API
+- [📊 Statistiques](./stats.md) - Métriques détaillées
+
+## 📚 À Propos
+
+Cette documentation a été générée automatiquement depuis les commentaires Doxygen du code source.
+
+**Couverture:** {stats.get('well_documented', 0)} éléments sur {stats.get('total_elements', 0)} ont une documentation complète ({stats.get('documentation_coverage', 0):.1f}%)
+
+---
+
+*Documentation générée avec ❤️ par Jenga Build System*
+"""
+        (self.output_dir / "index.md").write_text(md, encoding='utf-8')
+        print(f"  ✓ index.md")
+    
+    def _generate_by_files(self):
+        files_dir = self.output_dir / "files"
+        files_dir.mkdir(exist_ok=True)
+        md = f"""# 📁 Documentation par Fichier
+
+> {len(self.project_doc.files)} fichiers documentés
+
+[🏠 Accueil](../index.md)
+
+## Liste des Fichiers
+
+"""
+        for file_doc in sorted(self.project_doc.files, key=lambda f: f.file_name):
+            md_name = sanitize_filename(file_doc.file_name) + ".md"
+            md += f"- 📄 [{file_doc.file_name}](./{md_name}) ({len(file_doc.elements)} éléments)\n"
+            self._generate_file_page(file_doc, files_dir)
+        (files_dir / "index.md").write_text(md, encoding='utf-8')
+        print(f"  ✓ files/ ({len(self.project_doc.files)} files)")
+    
+    def _generate_file_page(self, file_doc: FileDocumentation, files_dir: Path):
+        md_name = sanitize_filename(file_doc.file_name) + ".md"
+        md = f"""# 📄 {file_doc.file_name}
+
+[🏠 Accueil](../index.md) | [📁 Fichiers](./index.md)
+
+## Informations
+
+"""
+        if file_doc.file_description:
+            md += f"**Description:** {file_doc.file_description}\n\n"
+        if file_doc.file_author:
+            md += f"**Auteur:** {file_doc.file_author}\n\n"
+        md += f"**Chemin:** `{file_doc.relative_path}`\n\n"
+        if file_doc.includes:
+            md += "### 📦 Fichiers Inclus\n\n"
+            for inc in file_doc.includes:
+                inc_name = Path(inc).name
+                linked = False
+                for f in self.project_doc.files:
+                    if f.file_name == inc_name:
+                        inc_md = sanitize_filename(inc_name) + ".md"
+                        md += f"- [`{inc}`](./{inc_md})\n"
+                        linked = True
+                        break
+                if not linked:
+                    md += f"- `{inc}`\n"
+            md += "\n"
+        if file_doc.included_by:
+            md += "### 🔗 Inclus Par\n\n"
+            for inc_by in file_doc.included_by:
+                inc_name = Path(inc_by).name
+                inc_md = sanitize_filename(inc_name) + ".md"
+                md += f"- [`{inc_name}`](./{inc_md})\n"
+            md += "\n"
+        if file_doc.namespaces:
+            md += "### 🗂️ Namespaces\n\n"
+            for ns in file_doc.namespaces:
+                ns_md = ns.replace('::', '_') + ".md"
+                md += f"- [`{ns}`](../namespaces/{ns_md})\n"
+            md += "\n"
+        md += f"## 🎯 Éléments ({len(file_doc.elements)})\n\n"
+        by_type = {}
+        for elem in file_doc.elements:
+            t = elem.signature.element_type
+            if t not in by_type:
+                by_type[t] = []
+            by_type[t].append(elem)
+        for elem_type in sorted(by_type.keys(), key=lambda t: t.value):
+            elements = by_type[elem_type]
+            icon = self.type_icons.get(elem_type, "📌")
+            md += f"### {icon} {elem_type.value.capitalize()}s ({len(elements)})\n\n"
+            for elem in sorted(elements, key=lambda e: e.signature.name):
+                md += self._format_element(elem, file_doc.file_name)
+                md += "\n---\n\n"
+        (files_dir / md_name).write_text(md, encoding='utf-8')
+    
+    def _format_element(self, elem: DocComment, current_file: str = "") -> str:
+        sig = elem.signature
+        icon = self.type_icons.get(sig.element_type, "📌")
+        elem_id = create_element_id(elem)
+        md = f'<a name="{elem_id}"></a>\n\n'
+        md += f"#### {icon} `{sig.name}`\n\n"
+        badges = []
+        if sig.is_static:
+            badges.append("`static`")
+        if sig.is_const:
+            badges.append("`const`")
+        if sig.is_virtual:
+            badges.append("`virtual`")
+        if sig.is_constexpr:
+            badges.append("`constexpr`")
+        if sig.is_noexcept:
+            badges.append("`noexcept`")
+        if sig.access != "public":
+            badges.append(f"`{sig.access}`")
+        if badges:
+            md += " ".join(badges) + "\n\n"
+        md += f"```cpp\n{sig.full_signature}\n```\n\n"
+        if elem.brief:
+            md += f"**{elem.brief}**\n\n"
+        if elem.description:
+            md += f"{elem.description}\n\n"
+        if sig.template_params:
+            md += "**Paramètres Template:**\n\n"
+            for tp in sig.template_params:
+                md += f"- `{tp}`\n"
+            md += "\n"
+        if sig.parameters:
+            md += "**Paramètres:**\n\n"
+            md += "| Nom | Type | Description |\n"
+            md += "|-----|------|-------------|\n"
+            for param in sig.parameters:
+                desc = elem.param_docs.get(param.name, "")
+                direction = f"[{param.direction}] " if param.direction else ""
+                md += f"| `{param.name}` | `{param.type}` | {direction}{desc} |\n"
+            md += "\n"
+        if elem.returns:
+            md += f"**Retour:** {elem.returns}\n\n"
+        if elem.examples:
+            md += "**Exemples:**\n\n"
+            for i, ex in enumerate(elem.examples, 1):
+                md += f"```cpp\n{ex}\n```\n\n"
+        for note in elem.notes:
+            md += f"> 📝 **Note:** {note}\n\n"
+        for warn in elem.warnings:
+            md += f"> ⚠️ **Attention:** {warn}\n\n"
+        if elem.see_also:
+            md += "**Voir Aussi:**\n\n"
+            for see in elem.see_also:
+                if see in self.project_doc.by_name:
+                    target = self.project_doc.by_name[see]
+                    target_file = target.file_path
+                    target_id = create_element_id(target)
+                    if Path(target_file).name == current_file:
+                        md += f"- [`{see}`](#{target_id})\n"
+                    else:
+                        target_md = sanitize_filename(Path(target_file).name) + ".md"
+                        md += f"- [`{see}`](./{target_md}#{target_id})\n"
+                else:
+                    md += f"- `{see}`\n"
+            md += "\n"
+        meta = []
+        if elem.since:
+            meta.append(f"Depuis: {elem.since}")
+        if elem.complexity:
+            meta.append(f"Complexité: {elem.complexity}")
+        if elem.thread_safety:
+            meta.append(f"Thread-safety: {elem.thread_safety}")
+        if meta:
+            md += "*" + " | ".join(meta) + "*\n\n"
+        if elem.deprecated:
+            md += f"> 🚫 **DÉPRÉCIÉ:** {elem.deprecated}\n\n"
+        md += f"*Défini dans: `{elem.file_path}:{elem.line_number}`*\n\n"
+        return md
+    
+    def _generate_by_namespace(self):
+        ns_dir = self.output_dir / "namespaces"
+        ns_dir.mkdir(exist_ok=True)
+        md = f"""# 🗂️ Documentation par Namespace
+
+> {len(self.project_doc.by_namespace)} namespaces
+
+[🏠 Accueil](../index.md)
+
+## Liste
+
+"""
+        for ns in sorted(self.project_doc.by_namespace.keys()):
+            elements = self.project_doc.by_namespace[ns]
+            ns_display = "Global" if ns == "__global__" else ns
+            ns_md = sanitize_filename(ns) + ".md"
+            md += f"- 🗂️ [`{ns_display}`](./{ns_md}) ({len(elements)} éléments)\n"
+            self._generate_namespace_page(ns, elements, ns_dir)
+        (ns_dir / "index.md").write_text(md, encoding='utf-8')
+        print(f"  ✓ namespaces/ ({len(self.project_doc.by_namespace)} namespaces)")
+    
+    def _generate_namespace_page(self, ns: str, elements: List[DocComment], ns_dir: Path):
+        ns_display = "Global" if ns == "__global__" else ns
+        ns_md = sanitize_filename(ns) + ".md"
+        md = f"""# 🗂️ Namespace `{ns_display}`
+
+> {len(elements)} éléments
+
+[🏠 Accueil](../index.md) | [🗂️ Namespaces](./index.md)
+
+## Éléments
+
+"""
+        by_type = {}
+        for elem in elements:
+            t = elem.signature.element_type
+            if t not in by_type:
+                by_type[t] = []
+            by_type[t].append(elem)
+        for elem_type in sorted(by_type.keys(), key=lambda t: t.value):
+            elems = by_type[elem_type]
+            icon = self.type_icons.get(elem_type, "📌")
+            md += f"### {icon} {elem_type.value.capitalize()}s ({len(elems)})\n\n"
+            for elem in sorted(elems, key=lambda e: e.signature.name):
+                file_name = Path(elem.file_path).name
+                file_md = sanitize_filename(file_name) + ".md"
+                elem_id = create_element_id(elem)
+                md += f"- **[`{elem.signature.name}`](../files/{file_md}#{elem_id})**"
+                if elem.brief:
+                    md += f" — {elem.brief}"
+                md += "\n"
+            md += "\n"
+        (ns_dir / ns_md).write_text(md, encoding='utf-8')
+    
+    def _generate_by_type(self):
+        types_dir = self.output_dir / "types"
+        types_dir.mkdir(exist_ok=True)
+        md = """# 🎯 Documentation par Type
+
+[🏠 Accueil](../index.md)
+
+## Types
+
+"""
+        type_lists = [
+            (ElementType.CLASS, self.project_doc.classes),
+            (ElementType.STRUCT, self.project_doc.structs),
+            (ElementType.ENUM, self.project_doc.enums),
+            (ElementType.UNION, self.project_doc.unions),
+            (ElementType.FUNCTION, self.project_doc.functions),
+            (ElementType.METHOD, self.project_doc.methods),
+            (ElementType.VARIABLE, self.project_doc.variables),
+            (ElementType.MACRO, self.project_doc.macros),
+            (ElementType.TYPEDEF, self.project_doc.typedefs),
+        ]
+        for elem_type, elements in type_lists:
+            if not elements:
+                continue
+            icon = self.type_icons.get(elem_type, "📌")
+            type_md = elem_type.value + "s.md"
+            md += f"- {icon} [{elem_type.value.capitalize()}s](./{type_md}) ({len(elements)} éléments)\n"
+            self._generate_type_page(elem_type, elements, types_dir)
+        (types_dir / "index.md").write_text(md, encoding='utf-8')
+        print(f"  ✓ types/ (9 types)")
+    
+    def _generate_type_page(self, elem_type: ElementType, elements: List[DocComment], types_dir: Path):
+        icon = self.type_icons.get(elem_type, "📌")
+        type_md = elem_type.value + "s.md"
+        md = f"""# {icon} {elem_type.value.capitalize()}s
+
+> {len(elements)} éléments
+
+[🏠 Accueil](../index.md) | [🎯 Types](./index.md)
+
+## Liste
+
+"""
+        for elem in sorted(elements, key=lambda e: e.signature.name):
+            file_name = Path(elem.file_path).name
+            file_md = sanitize_filename(file_name) + ".md"
+            elem_id = create_element_id(elem)
+            md += f"- **[`{elem.signature.name}`](../files/{file_md}#{elem_id})**"
+            ns = elem.signature.namespace or "__global__"
+            if ns != "__global__":
+                md += f" (`{ns}`)"
+            if elem.brief:
+                md += f" — {elem.brief}"
+            md += "\n"
+        (types_dir / type_md).write_text(md, encoding='utf-8')
+    
+    def _generate_search(self):
+        all_elements = []
+        for file_doc in self.project_doc.files:
+            all_elements.extend(file_doc.elements)
+        md = f"""# 🔍 Recherche Alphabétique
+
+> {len(all_elements)} éléments
+
+[🏠 Accueil](./index.md)
+
+## Index
+
+"""
+        by_letter = {}
+        for elem in all_elements:
+            letter = elem.signature.name[0].upper()
+            if letter not in by_letter:
+                by_letter[letter] = []
+            by_letter[letter].append(elem)
+        for letter in sorted(by_letter.keys()):
+            md += f"[{letter}](#{letter.lower()}) "
+        md += "\n\n---\n\n"
+        for letter in sorted(by_letter.keys()):
+            md += f'<a name="{letter.lower()}"></a>\n\n'
+            md += f"## {letter}\n\n"
+            for elem in sorted(by_letter[letter], key=lambda e: e.signature.name.lower()):
+                file_name = Path(elem.file_path).name
+                file_md = sanitize_filename(file_name) + ".md"
+                elem_id = create_element_id(elem)
+                icon = self.type_icons.get(elem.signature.element_type, "📌")
+                md += f"- {icon} **[`{elem.signature.name}`](./files/{file_md}#{elem_id})**"
+                if elem.brief:
+                    md += f" — {elem.brief}"
+                md += "\n"
+            md += "\n"
+        (self.output_dir / "search.md").write_text(md, encoding='utf-8')
+        print(f"  ✓ search.md")
+    
+    def _generate_api(self):
+        md = f"""# 🔧 API Complète
+
+[🏠 Accueil](./index.md)
+
+## Vue d'Ensemble
+
+Documentation complète de l'API du projet {self.project_doc.project_name}.
+
+"""
+        md += "## Par Type\n\n"
+        type_lists = [
+            (ElementType.CLASS, self.project_doc.classes),
+            (ElementType.STRUCT, self.project_doc.structs),
+            (ElementType.ENUM, self.project_doc.enums),
+            (ElementType.FUNCTION, self.project_doc.functions),
+            (ElementType.METHOD, self.project_doc.methods),
+        ]
+        for elem_type, elements in type_lists:
+            if not elements:
+                continue
+            icon = self.type_icons.get(elem_type, "📌")
+            type_md = elem_type.value + "s.md"
+            md += f"- {icon} [{elem_type.value.capitalize()}s](./types/{type_md}) ({len(elements)})\n"
+        (self.output_dir / "api.md").write_text(md, encoding='utf-8')
+        print(f"  ✓ api.md")
+    
+    def _generate_stats(self):
+        stats = self.project_doc.stats
+        md = f"""# 📊 Statistiques Détaillées
+
+[🏠 Accueil](./index.md)
+
+## Vue d'Ensemble
+
+| Métrique | Valeur |
+|----------|--------|
+| Fichiers | {stats.get('total_files', 0)} |
+| Éléments | {stats.get('total_elements', 0)} |
+| Namespaces | {stats.get('namespaces', 0)} |
+| Couverture | {stats.get('documentation_coverage', 0):.1f}% |
+
+## Par Type
+
+| Type | Nombre |
+|------|--------|
+| 🏛️ Classes | {stats.get('classes', 0)} |
+| 🏗️ Structures | {stats.get('structs', 0)} |
+| 🔢 Enums | {stats.get('enums', 0)} |
+| 🤝 Unions | {stats.get('unions', 0)} |
+| ⚙️ Fonctions | {stats.get('functions', 0)} |
+| 🔧 Méthodes | {stats.get('methods', 0)} |
+| 📦 Variables | {stats.get('variables', 0)} |
+| 🔣 Macros | {stats.get('macros', 0)} |
+| 📝 Typedefs | {stats.get('typedefs', 0)} |
+
+## Qualité
+
+- **Éléments bien documentés:** {stats.get('well_documented', 0)} / {stats.get('total_elements', 0)}
+- **Couverture:** {stats.get('documentation_coverage', 0):.1f}%
+- **Paramètres moyens par fonction:** {stats.get('avg_params_per_function', 0):.1f}
+
+"""
+        (self.output_dir / "stats.md").write_text(md, encoding='utf-8')
+        print(f"  ✓ stats.md")
+
+# ============================================================================
+# COMMANDE PRINCIPALE – CLASSE DOCSCOMMAND
+# ============================================================================
+
+class DocsCommand:
+    """
+    jenga docs extract|stats|list|clean [options]
+    Génère la documentation des projets.
+    """
+
+    @staticmethod
+    def Execute(args: List[str]) -> int:
+        """Point d'entrée principal de la commande docs."""
+        parser = argparse.ArgumentParser(
+            prog="jenga docs",
+            description='Génération de documentation pour les projets Jenga',
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog="""
 Exemples:
   jenga docs extract                          # Tous les projets
   jenga docs extract --project NKCore         # Projet spécifique
@@ -1864,299 +1618,229 @@ Formats supportés:
   pdf       - Documentation PDF professionnelle
   all       - Tous les formats
 """
-    )
-    
-    # Sous-commandes
-    subparsers = parser.add_subparsers(
-        dest='subcommand',
-        help='Opération de documentation'
-    )
-    
-    # --- Extract ---
-    extract_parser = subparsers.add_parser(
-        'extract',
-        help='Extraire la documentation depuis les sources'
-    )
-    
-    extract_parser.add_argument(
-        '--project',
-        help='Projet spécifique (défaut: tous)'
-    )
-    
-    extract_parser.add_argument(
-        '--output',
-        default='docs',
-        help='Répertoire de sortie (défaut: docs/)'
-    )
-    
-    extract_parser.add_argument(
-        '--format',
-        choices=SUPPORTED_FORMATS,
-        default='markdown',
-        help='Format de sortie (défaut: markdown)'
-    )
-    
-    extract_parser.add_argument(
-        '--include-private',
-        action='store_true',
-        help='Inclure les membres privés/protégés'
-    )
-    
-    extract_parser.add_argument(
-        '--exclude-projects',
-        nargs='+',
-        help='Projets à exclure'
-    )
-    
-    extract_parser.add_argument(
-        '--exclude-dirs',
-        nargs='+',
-        help='Répertoires à exclure (ex: tests, vendor)'
-    )
-    
-    extract_parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Affichage détaillé'
-    )
-    
-    # --- Stats ---
-    stats_parser = subparsers.add_parser(
-        'stats',
-        help='Afficher les statistiques de documentation'
-    )
-    
-    stats_parser.add_argument(
-        '--project',
-        help='Projet spécifique'
-    )
-    
-    stats_parser.add_argument(
-        '--json',
-        action='store_true',
-        help='Format JSON'
-    )
-    
-    # --- List ---
-    list_parser = subparsers.add_parser(
-        'list',
-        help='Lister les projets documentables'
-    )
-    
-    # --- Clean ---
-    clean_parser = subparsers.add_parser(
-        'clean',
-        help='Nettoyer la documentation générée'
-    )
-    
-    clean_parser.add_argument(
-        '--project',
-        help='Projet spécifique'
-    )
-    
-    clean_parser.add_argument(
-        '--output',
-        default='docs',
-        help='Répertoire de sortie (défaut: docs/)'
-    )
-    
-    # Parse
-    if not args:
-        parser.print_help()
-        return 0
-    
-    try:
-        parsed = parser.parse_args(args)
-    except SystemExit:
-        return 1
-    
-    # Router
-    if parsed.subcommand == 'extract':
-        return cmd_extract(parsed)
-    elif parsed.subcommand == 'stats':
-        return cmd_stats(parsed)
-    elif parsed.subcommand == 'list':
-        return cmd_list(parsed)
-    elif parsed.subcommand == 'clean':
-        return cmd_clean(parsed)
-    elif not parsed.subcommand:
-        parser.print_help()
-        return 0
-    
-    return 1
-
-
-def cmd_extract(args):
-    """Commande extract"""
-    workspace = load_workspace()
-    if not workspace:
-        Display.error("Aucun workspace trouvé")
-        return 1
-    
-    Display.section(f"📚 Documentation - {workspace.name}")
-    
-    # Déterminer projets
-    if args.project:
-        if args.project not in workspace.projects:
-            Display.error(f"Projet introuvable: {args.project}")
-            return 1
-        projects = [args.project]
-    else:
-        projects = list(workspace.projects.keys())
-    
-    if args.exclude_projects:
-        projects = [p for p in projects if p not in args.exclude_projects]
-    
-    Display.info(f"📦 {len(projects)} projet(s)")
-    print()
-    
-    stats = {'success': 0, 'failed': 0, 'skipped': 0}
-    
-    for project_name in projects:
-        project = workspace.projects[project_name]
-        project_dir = Path(project.location)
-        if not project_dir.is_absolute():
-            project_dir = workspace.location / project_dir
-        
-        try:
-            project_dir.relative_to(workspace.location)
-        except ValueError:
-            Display.warning(f"⚠️  Externe: {project_name}")
-            stats['skipped'] += 1
-            continue
-        
-        result = extract_project(project_name, project, workspace.location, args)
-        if result:
-            stats['success'] += 1
-        else:
-            stats['failed'] += 1
-        print()
-    
-    print_summary(stats, args.output)
-    return 0 if stats['failed'] == 0 else 1
-
-
-def extract_project(name, project, workspace_dir, args):
-    """Extrait un projet"""
-    Display.section(f"📦 {name}")
-    
-    # S'assurer que workspace_dir est un Path
-    workspace_dir = Path(workspace_dir)
-    
-    sources = get_source_directories(project, workspace_dir)
-    if not sources:
-        Display.warning("  Pas de sources")
-        return None
-    
-    try:
-        extractor = DocumentationExtractor(
-            project_name=name,
-            project_path=workspace_dir / Path(project.location),
-            include_private=args.include_private,
-            verbose=args.verbose
         )
         
-        doc = extractor.extract(sources)
+        subparsers = parser.add_subparsers(dest='subcommand', help='Opération de documentation')
         
-        if doc.stats.get('total_elements', 0) == 0:
-            Display.warning("  Aucun élément")
+        # --- Extract ---
+        extract_parser = subparsers.add_parser('extract', help='Extraire la documentation depuis les sources')
+        extract_parser.add_argument('--project', help='Projet spécifique (défaut: tous)')
+        extract_parser.add_argument('--output', default='docs', help='Répertoire de sortie (défaut: docs/)')
+        extract_parser.add_argument('--format', choices=['markdown', 'html', 'pdf', 'all'], default='markdown', help='Format de sortie (défaut: markdown)')
+        extract_parser.add_argument('--include-private', action='store_true', help='Inclure les membres privés/protégés')
+        extract_parser.add_argument('--exclude-projects', nargs='+', help='Projets à exclure')
+        extract_parser.add_argument('--exclude-dirs', nargs='+', help='Répertoires à exclure (ex: tests, vendor)')
+        extract_parser.add_argument('--verbose', action='store_true', help='Affichage détaillé')
+        
+        # --- Stats ---
+        stats_parser = subparsers.add_parser('stats', help='Afficher les statistiques de documentation')
+        stats_parser.add_argument('--project', help='Projet spécifique')
+        stats_parser.add_argument('--json', action='store_true', help='Format JSON')
+        
+        # --- List ---
+        list_parser = subparsers.add_parser('list', help='Lister les projets documentables')
+        
+        # --- Clean ---
+        clean_parser = subparsers.add_parser('clean', help='Nettoyer la documentation générée')
+        clean_parser.add_argument('--project', help='Projet spécifique')
+        clean_parser.add_argument('--output', default='docs', help='Répertoire de sortie (défaut: docs/)')
+        parser.add_argument("--jenga-file", help="Path to the workspace .jenga file (default: auto-detected)")
+        parsed = parser.parse_args(args)
+
+        if not args:
+            parser.print_help()
+            return 0
+        
+        try:
+            parsed = parser.parse_args(args)
+        except SystemExit:
+            return 1
+        
+        if parsed.subcommand == 'extract':
+            return DocsCommand._cmd_extract(parsed)
+        elif parsed.subcommand == 'stats':
+            return DocsCommand._cmd_stats(parsed)
+        elif parsed.subcommand == 'list':
+            return DocsCommand._cmd_list(parsed)
+        elif parsed.subcommand == 'clean':
+            return DocsCommand._cmd_clean(parsed)
+        elif not parsed.subcommand:
+            parser.print_help()
+            return 0
+        
+        return 1
+
+    # -----------------------------------------------------------------------
+    # Implémentation des sous-commandes (statiques internes)
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _load_workspace(parsed):
+        """Charge le workspace courant."""
+        # Déterminer le répertoire de travail (workspace root)
+        workspace_root = Path.cwd()
+        if parsed.jenga_file:
+            entry_file = Path(parsed.jenga_file).resolve()
+            if not entry_file.exists():
+                Colored.PrintError(f"Jenga file not found: {entry_file}")
+                return 1
+        else:
+            entry_file = FileSystem.FindWorkspaceEntry(workspace_root)
+            if not entry_file:
+                Colored.PrintError("No .jenga workspace file found.")
+                return 1
+        workspace_root = entry_file.parent
+        loader = Loader()
+        return loader.LoadWorkspace(str(entry_file))
+
+    @staticmethod
+    def _cmd_extract(args):
+        workspace = DocsCommand._load_workspace(args)
+        if not workspace:
+            Display.Error("Aucun workspace trouvé")
+            return 1
+        
+        Display.Section(f"📚 Documentation - {workspace.name}")
+        
+        if args.project:
+            if args.project not in workspace.projects:
+                Display.Error(f"Projet introuvable: {args.project}")
+                return 1
+            projects = [args.project]
+        else:
+            projects = list(workspace.projects.keys())
+        
+        if args.exclude_projects:
+            projects = [p for p in projects if p not in args.exclude_projects]
+        
+        Display.Info(f"📦 {len(projects)} projet(s)")
+        print()
+        
+        stats = {'success': 0, 'failed': 0, 'skipped': 0}
+        
+        for project_name in projects:
+            project = workspace.projects[project_name]
+            project_dir = Path(project.location)
+            if not project_dir.is_absolute():
+                project_dir = workspace.location / project_dir
+            
+            try:
+                project_dir.relative_to(workspace.location)
+            except ValueError:
+                Display.Warning(f"⚠️  Externe: {project_name}")
+                stats['skipped'] += 1
+                continue
+            
+            result = DocsCommand._extract_project(project_name, project, workspace.location, args)
+            if result:
+                stats['success'] += 1
+            else:
+                stats['failed'] += 1
+            print()
+        
+        DocsCommand._print_summary(stats, args.output)
+        return 0 if stats['failed'] == 0 else 1
+
+    @staticmethod
+    def _extract_project(name, project, workspace_dir, args):
+        Display.Section(f"📦 {name}")
+        workspace_dir = Path(workspace_dir)
+        
+        def get_source_directories(proj, wks_dir):
+            dirs = []
+            project_dir = Path(proj.location)
+            if not project_dir.is_absolute():
+                project_dir = wks_dir / project_dir
+            for sub in ['src', 'include']:
+                d = project_dir / sub
+                if d.exists():
+                    dirs.append(d)
+            if not dirs and project_dir.exists():
+                dirs.append(project_dir)
+            return dirs
+        
+        sources = get_source_directories(project, workspace_dir)
+        if not sources:
+            Display.Warning("  Pas de sources")
             return None
         
-        output = workspace_dir / args.output / name
-        
-        if args.format in ['markdown', 'all']:
-            gen = MarkdownGenerator(doc)
-            gen.generate(output / 'markdown')
-        
-        Display.success(f"  ✓ {doc.stats['total_files']} fichiers")
-        Display.success(f"  ✓ {doc.stats['total_elements']} éléments")
-        
-        return {'files': doc.stats['total_files'], 'elements': doc.stats['total_elements']}
-    
-    except Exception as e:
-        Display.error(f"  ✗ {e}")
-        return None
+        try:
+            extractor = DocumentationExtractor(
+                project_name=name,
+                project_path=workspace_dir / Path(project.location),
+                include_private=args.include_private,
+                verbose=args.verbose
+            )
+            
+            doc = extractor.extract(sources)
+            
+            if doc.stats.get('total_elements', 0) == 0:
+                Display.warning("  Aucun élément")
+                return None
+            
+            output = workspace_dir / args.output / name
+            
+            if args.format in ['markdown', 'all']:
+                gen = MarkdownGenerator(doc)
+                gen.generate(output / 'markdown')
+            
+            # TODO: HTML, PDF generators
+            
+            Display.Success(f"  ✓ {doc.stats['total_files']} fichiers")
+            Display.Success(f"  ✓ {doc.stats['total_elements']} éléments")
+            
+            return {'files': doc.stats['total_files'], 'elements': doc.stats['total_elements']}
+        except Exception as e:
+            Display.Error(f"  ✗ {e}")
+            return None
 
+    @staticmethod
+    def _print_summary(stats, output):
+        Display.Section("📊 RÉSUMÉ")
+        Display.Success(f"✓ Succès: {stats['success']}")
+        if stats['failed']:
+            Display.Error(f"✗ Échecs: {stats['failed']}")
+        if stats['skipped']:
+            Display.Warning(f"⊘ Ignorés: {stats['skipped']}")
+        print()
+        Display.Info(f"📂 {output}/")
 
-def get_source_directories(project, workspace_dir):
-    """Trouve les répertoires sources"""
-    dirs = []
-    
-    # S'assurer que workspace_dir est un Path
-    workspace_dir = Path(workspace_dir)
-    
-    project_dir = Path(project.location)
-    if not project_dir.is_absolute():
-        project_dir = workspace_dir / project_dir
-    
-    # Double vérification que project_dir est un Path
-    project_dir = Path(project_dir)
-    
-    for name in ['src', 'include']:
-        d = project_dir / name
-        if d.exists():
-            dirs.append(d)
-    
-    if not dirs and project_dir.exists():
-        dirs.append(project_dir)
-    
-    return dirs
-
-
-def print_summary(stats, output):
-    """Résumé"""
-    Display.section("📊 RÉSUMÉ")
-    Display.success(f"✓ Succès: {stats['success']}")
-    if stats['failed']:
-        Display.error(f"✗ Échecs: {stats['failed']}")
-    if stats['skipped']:
-        Display.warning(f"⊘ Ignorés: {stats['skipped']}")
-    print()
-    Display.info(f"📂 {output}/")
-
-
-def cmd_stats(args):
-    """Stats"""
-    workspace = load_workspace()
-    if not workspace:
-        return 1
-    
-    Display.section("📊 Statistiques")
-    Display.info(f"Projets: {len(workspace.projects)}")
-    return 0
-
-
-def cmd_list(args):
-    """Liste"""
-    workspace = load_workspace()
-    if not workspace:
-        return 1
-    
-    Display.section("📚 Projets")
-    for name in workspace.projects:
-        Display.info(f"📦 {name}")
-    return 0
-
-
-def cmd_clean(args):
-    """Clean"""
-    workspace = load_workspace()
-    if not workspace:
-        return 1
-    
-    output = workspace.location / args.output
-    if args.project:
-        output = output / args.project
-    
-    if not output.exists():
-        Display.warning("Déjà propre")
+    @staticmethod
+    def _cmd_stats(args):
+        workspace = DocsCommand._load_workspace(args)
+        if not workspace:
+            return 1
+        Display.Section("📊 Statistiques")
+        Display.Info(f"Projets: {len(workspace.projects)}")
+        # TODO: plus de stats
         return 0
-    
-    import shutil
-    shutil.rmtree(output)
-    Display.success("✓ Nettoyé")
-    return 0
+
+    @staticmethod
+    def _cmd_list(args):
+        workspace = DocsCommand._load_workspace(args)
+        if not workspace:
+            return 1
+        Display.Section("📚 Projets")
+        for name in workspace.projects:
+            Display.Info(f"📦 {name}")
+        return 0
+
+    @staticmethod
+    def _cmd_clean(args):
+        workspace = DocsCommand._load_workspace(args)
+        if not workspace:
+            return 1
+        output = workspace.location / args.output
+        if args.project:
+            output = output / args.project
+        if output.exists():
+            shutil.rmtree(output)
+            Display.Success("✓ Nettoyé")
+        else:
+            Display.Warning("Déjà propre")
+        return 0
 
 
 if __name__ == '__main__':
-    sys.exit(execute(sys.argv[1:]))
+    docscommand = DocsCommand()
+    sys.exit(docscommand.Execute(sys.argv[1:]))

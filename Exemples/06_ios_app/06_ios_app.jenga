@@ -1,0 +1,15 @@
+from Jenga import *
+
+with workspace("IOSDemo"):
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.IOS])
+    targetarchs([TargetArch.ARM64, TargetArch.X86_64])
+
+    with project("IOSApp"):
+        windowedapp()
+        language("Objective-C++")
+        files(["src/**.mm"])
+        iosbundleid("com.Jenga.iosdemo")
+        iosversion("1.0")
+        iosminsdk("14.0")
+        iosbuildnumber(1)

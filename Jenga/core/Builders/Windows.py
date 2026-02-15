@@ -1,0 +1,493 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Windows Builder – Compilation pour Microsoft Windows.
+Supporte MSVC, Clang (via clang-cl ou clang++), et MinGW (gcc/g++).
+Gère les fichiers .exe, .dll, .lib, .pdb, .res (ressources).
+Support complet des modules C++20 : .cppm, .ixx, .mpp, .c++m.
+"""
+
+import os
+import sys
+import subprocess
+from pathlib import Path
+from typing import List, Optional, Dict, Any
+
+from Jenga.Core.Api import Project, ProjectKind, CompilerFamily, TargetEnv, TargetOS
+from ...Utils import Process, FileSystem, Colored
+from ..Builder import Builder
+from ..Toolchains import ToolchainManager
+
+
+class WindowsBuilder(Builder):
+    """
+    Builder pour Windows (PE/COFF).
+    """
+
+    def __init__(self, workspace, config, platform, targetOs, targetArch, targetEnv=None, verbose=False):
+        super().__init__(workspace, config, platform, targetOs, targetArch, targetEnv, verbose)
+        self.is_msvc = self.toolchain.compilerFamily == CompilerFamily.MSVC
+        self.is_clang = self.toolchain.compilerFamily == CompilerFamily.CLANG
+        self.is_mingw = (self.toolchain.compilerFamily == CompilerFamily.GCC and self.toolchain.targetOs == TargetOS.WINDOWS) or \
+                        (self.toolchain.compilerFamily == CompilerFamily.CLANG and self.toolchain.targetEnv == TargetEnv.MINGW)
+        self.is_clang_cl = self.is_clang and "clang-cl" in str(self.toolchain.ccPath).lower()
+        self._validate_compiler_paths()
+
+    def _validate_compiler_paths(self):
+        if self.is_msvc or self.is_clang_cl:
+            if self.toolchain.ccPath is None:
+                raise RuntimeError(f"MSVC/clang-cl compiler path not set for toolchain '{self.toolchain.name}'")
+        elif self.is_mingw or self.is_clang:
+            if self.toolchain.ccPath is None:
+                raise RuntimeError(f"GCC/Clang compiler path not set for toolchain '{self.toolchain.name}'")
+
+    @staticmethod
+    def _EnumValue(v):
+        return v.value if hasattr(v, "value") else v
+
+    def PreparePCH(self, project: Project, objDir: Path) -> bool:
+        project._jengaPchFile = ""
+        project._jengaPchHeaderResolved = ""
+        project._jengaPchHeaderToken = ""
+        project._jengaPchSourceResolved = ""
+        if not project.pchHeader:
+            return True
+
+        header_path = Path(self.ResolveProjectPath(project, project.pchHeader))
+        if not header_path.exists():
+            return False
+        header_token = header_path.name
+        pch_file = objDir / f"{project.name}.pch"
+        project._jengaPchHeaderResolved = str(header_path)
+        project._jengaPchHeaderToken = header_token
+        project._jengaPchFile = str(pch_file)
+
+        source_path = None
+        if project.pchSource:
+            source_path = Path(self.ResolveProjectPath(project, project.pchSource))
+            project._jengaPchSourceResolved = str(source_path)
+        else:
+            source_path = objDir / "__jenga_pch.cpp"
+            source_path.write_text(f'#include "{header_token}"\n', encoding="utf-8")
+            project._jengaPchSourceResolved = str(source_path)
+
+        if self.is_msvc or self.is_clang_cl:
+            args = [self.toolchain.ccPath, "/c", f"/Fo{objDir / '__jenga_pch.obj'}", "/nologo"]
+            for inc in project.includeDirs:
+                args.append(f"/I{self.ResolveProjectPath(project, inc)}")
+            args.append(f"/I{header_path.parent}")
+            for define in self.toolchain.defines:
+                args.append(f"/D{define}")
+            for define in project.defines:
+                args.append(f"/D{define}")
+            if project.language.value in ("C++", "Objective-C++") and project.cppdialect:
+                args.append(f"/std:{project.cppdialect.lower()}")
+            elif project.cdialect:
+                args.append(f"/std:{project.cdialect.lower()}")
+            args.append(f"/Yc{header_token}")
+            args.append(f"/Fp{pch_file}")
+            args.append(str(source_path))
+            result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+            return result.returnCode == 0
+
+        # clang++ / mingw path
+        compiler = self.toolchain.cxxPath or self.toolchain.ccPath
+        args = [compiler, "-x", "c++-header", str(header_path), "-o", str(pch_file)]
+        for inc in project.includeDirs:
+            args.append(f"-I{self.ResolveProjectPath(project, inc)}")
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0
+
+    # -----------------------------------------------------------------------
+    # Implémentation des méthodes abstraites
+    # -----------------------------------------------------------------------
+
+    def GetObjectExtension(self) -> str:
+        return ".obj"
+
+    def GetOutputExtension(self, project: Project) -> str:
+        if project.kind == ProjectKind.SHARED_LIB:
+            return ".dll"
+        elif project.kind == ProjectKind.STATIC_LIB:
+            return ".lib"
+        elif project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE):
+            return ".exe"
+        else:
+            return ".exe"
+
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+        src = Path(sourceFile)
+        obj = Path(objectFile)
+        FileSystem.MakeDirectory(obj.parent)
+        if self.is_msvc:
+            return self._CompileMSVC(project, src, obj)
+        elif self.is_clang:
+            return self._CompileClang(project, src, obj)
+        elif self.is_mingw:
+            return self._CompileMinGW(project, src, obj)
+        else:
+            Colored.PrintError(f"Unsupported compiler family for Windows: {self.toolchain.compilerFamily}")
+            return False
+
+    def GetModuleFlags(self, project: Project, sourceFile: str) -> List[str]:
+        flags = []
+        if not self.IsModuleFile(sourceFile):
+            return flags
+        if self.is_msvc or self.is_clang_cl:
+            flags.append("/interface")
+            flags.append("/std:c++latest")
+            obj_dir = self.GetObjectDir(project)
+            ifc_name = Path(sourceFile).with_suffix('.ifc').name
+            ifc_path = obj_dir / ifc_name
+            flags.append(f"/module:output{str(ifc_path)}")
+            if '_part.' in sourceFile or sourceFile.endswith('_part.ixx'):
+                flags.append("/internalPartition")
+        elif self.is_clang and not self.is_clang_cl:
+            flags.extend(["-fmodules", "-fbuiltin-module-map", "-std=c++20"])
+            obj_dir = self.GetObjectDir(project)
+            pcm_name = Path(sourceFile).with_suffix('.pcm').name
+            pcm_path = obj_dir / pcm_name
+            flags.append(f"-fmodule-output={str(pcm_path)}")
+        elif self.is_mingw:
+            flags.extend(["-fmodules-ts", "-std=c++20"])
+            obj_dir = self.GetObjectDir(project)
+            gcm_dir = obj_dir / "gcm"
+            flags.append(f"-fmodule-mapper={str(gcm_dir / 'module.mapper')}")
+        return flags
+
+    def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
+        out = Path(outputFile)
+        FileSystem.MakeDirectory(out.parent)
+        if self.is_msvc:
+            return self._LinkMSVC(project, objectFiles, out)
+        elif self.is_clang:
+            return self._LinkClang(project, objectFiles, out)
+        elif self.is_mingw:
+            return self._LinkMinGW(project, objectFiles, out)
+        else:
+            Colored.PrintError(f"Unsupported compiler family for Windows: {self.toolchain.compilerFamily}")
+            return False
+
+    # -----------------------------------------------------------------------
+    # Compilation MSVC
+    # -----------------------------------------------------------------------
+
+    def _CompileMSVC(self, project: Project, src: Path, obj: Path) -> bool:
+        args = [self.toolchain.ccPath, "/c", f"/Fo{obj}", "/nologo"]
+        for inc in project.includeDirs:
+            args.append(f"/I{self.ResolveProjectPath(project, inc)}")
+        for define in self.toolchain.defines:
+            args.append(f"/D{define}")
+        for define in project.defines:
+            args.append(f"/D{define}")
+        opt = self._EnumValue(project.optimize)
+        warn = self._EnumValue(project.warnings)
+        if project.symbols:
+            args.append("/Zi")
+        if opt == "Speed":
+            args.append("/O2")
+        elif opt == "Size":
+            args.append("/O1")
+        elif opt == "Full":
+            args.append("/Ox")
+        else:
+            args.append("/Od")
+        if warn == "All":
+            args.append("/W3")
+        elif warn == "Extra":
+            args.append("/W4")
+        elif warn == "Pedantic":
+            args.append("/W4")
+        elif warn == "Everything":
+            args.append("/Wall")
+        elif warn == "Error":
+            args.append("/WX")
+        if project.language.value in ("C++", "Objective-C++"):
+            if project.cppdialect:
+                args.append(f"/std:{project.cppdialect.lower()}")
+        else:
+            if project.cdialect:
+                args.append(f"/std:{project.cdialect.lower()}")
+        if self.IsModuleFile(str(src)):
+            args.extend(self.GetModuleFlags(project, str(src)))
+        pch_file = getattr(project, "_jengaPchFile", "")
+        pch_token = getattr(project, "_jengaPchHeaderToken", "")
+        pch_src = getattr(project, "_jengaPchSourceResolved", "")
+        if pch_file and pch_token and str(src.resolve()) != str(Path(pch_src).resolve()):
+            args.append(f"/Yu{pch_token}")
+            args.append(f"/Fp{pch_file}")
+        args.extend(self.toolchain.cxxflags if project.language.value in ("C++", "Objective-C++") else self.toolchain.cflags)
+        if project.language.value in ("C++", "Objective-C++"):
+            args.extend(project.cxxflags)
+        else:
+            args.extend(project.cflags)
+        args.append(str(src))
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0
+
+    def _LinkMSVC(self, project: Project, objectFiles: List[str], output: Path) -> bool:
+        if project.kind == ProjectKind.STATIC_LIB:
+            return self._CreateStaticLibMSVC(project, objectFiles, output)
+        args = [self.toolchain.ldPath, f"/OUT:{output}", "/nologo"]
+        if project.kind == ProjectKind.SHARED_LIB:
+            args.append("/DLL")
+        for libdir in project.libDirs:
+            args.append(f"/LIBPATH:{self.ResolveProjectPath(project, libdir)}")
+        for lib in project.links:
+            if not lib.endswith(".lib"):
+                lib += ".lib"
+            args.append(lib)
+        # Flags utilisateur supplémentaires
+        args.extend(self.toolchain.ldflags)
+        args.extend(project.ldflags)
+        args.extend(objectFiles)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0
+
+    def _CreateStaticLibMSVC(self, project: Project, objectFiles: List[str], output: Path) -> bool:
+        lib_path = Path(self.toolchain.toolchainDir).parent / "lib.exe"
+        if not lib_path.exists():
+            lib_path = self.toolchain.arPath
+        args = [str(lib_path), f"/OUT:{output}", "/nologo"]
+        args.extend(objectFiles)
+        # Les flags d'archiveur peuvent être ajoutés ici si nécessaire
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0
+
+    # -----------------------------------------------------------------------
+    # Compilation Clang/LLVM (clang-cl ou clang++)
+    # -----------------------------------------------------------------------
+
+    def _CompileClang(self, project: Project, src: Path, obj: Path) -> bool:
+        if self.is_clang_cl:
+            args = [self.toolchain.ccPath, "/c", f"/Fo{obj}"]
+            opt = self._EnumValue(project.optimize)
+            if project.symbols:
+                args.append("/Zi")
+            if opt == "Speed":
+                args.append("/O2")
+            elif opt == "Size":
+                args.append("/O1")
+            else:
+                args.append("/Od")
+            for inc in project.includeDirs:
+                args.append(f"/I{self.ResolveProjectPath(project, inc)}")
+            for define in self.toolchain.defines:
+                args.append(f"/D{define}")
+            for define in project.defines:
+                args.append(f"/D{define}")
+            if self.IsModuleFile(str(src)):
+                args.extend(self.GetModuleFlags(project, str(src)))
+            pch_file = getattr(project, "_jengaPchFile", "")
+            pch_token = getattr(project, "_jengaPchHeaderToken", "")
+            pch_src = getattr(project, "_jengaPchSourceResolved", "")
+            if pch_file and pch_token and str(src.resolve()) != str(Path(pch_src).resolve()):
+                args.append(f"/Yu{pch_token}")
+                args.append(f"/Fp{pch_file}")
+            if project.language.value in ("C++", "Objective-C++"):
+                if project.cppdialect:
+                    args.append(f"/std:{project.cppdialect.lower()}")
+            else:
+                if project.cdialect:
+                    args.append(f"/std:{project.cdialect.lower()}")
+            args.extend(self.toolchain.cxxflags if project.language.value in ("C++", "Objective-C++") else self.toolchain.cflags)
+            if project.language.value in ("C++", "Objective-C++"):
+                args.extend(project.cxxflags)
+            else:
+                args.extend(project.cflags)
+            args.append(str(src))
+        else:
+            args = [self.toolchain.ccPath, "-c", "-o", str(obj)]
+            args.extend(self._GetClangCommonFlags(project))
+            pch_file = getattr(project, "_jengaPchFile", "")
+            if pch_file:
+                args.extend(["-include-pch", pch_file])
+            if self.IsModuleFile(str(src)):
+                args.extend(self.GetModuleFlags(project, str(src)))
+            if project.language.value in ("C++", "Objective-C++"):
+                args.extend(project.cxxflags)
+            else:
+                args.extend(project.cflags)
+            args.append(str(src))
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0
+
+    def _LinkClang(self, project: Project, objectFiles: List[str], output: Path) -> bool:
+        if self.is_clang_cl:
+            if project.kind == ProjectKind.STATIC_LIB:
+                return self._CreateStaticLibClang(project, objectFiles, output)
+
+            # clang-cl is a compiler driver, not link.exe. Use /Fe for output and
+            # pass linker-specific options after /link.
+            driver = self.toolchain.cxxPath or self.toolchain.ccPath
+            args = [driver]
+            if project.kind == ProjectKind.SHARED_LIB:
+                args.append("/LD")
+            args.extend(objectFiles)
+            args.append(f"/Fe{output}")
+
+            link_args = []
+            for libdir in project.libDirs:
+                link_args.append(f"/LIBPATH:{self.ResolveProjectPath(project, libdir)}")
+            for lib in project.links:
+                if not lib.endswith(".lib"):
+                    lib += ".lib"
+                link_args.append(lib)
+            link_args.extend(self.toolchain.ldflags)
+            link_args.extend(project.ldflags)
+            if link_args:
+                args.append("/link")
+                args.extend(link_args)
+        elif self.toolchain.ldPath and "lld-link" in str(self.toolchain.ldPath).lower():
+            if project.kind == ProjectKind.STATIC_LIB:
+                return self._CreateStaticLibClang(project, objectFiles, output)
+            ld = self.toolchain.ldPath if self.toolchain.ldPath else self.toolchain.cxxPath
+            args = [ld, f"/OUT:{output}"]
+            if project.kind == ProjectKind.SHARED_LIB:
+                args.append("/DLL")
+            for libdir in project.libDirs:
+                args.append(f"/LIBPATH:{self.ResolveProjectPath(project, libdir)}")
+            for lib in project.links:
+                if not lib.endswith(".lib"):
+                    lib += ".lib"
+                args.append(lib)
+            args.extend(self.toolchain.ldflags)
+            args.extend(project.ldflags)
+            args.extend(objectFiles)
+        else:
+            if project.kind == ProjectKind.STATIC_LIB:
+                return self._CreateStaticLibClang(project, objectFiles, output)
+            ld = self.toolchain.cxxPath
+            args = [ld, "-o", str(output)]
+            if project.kind == ProjectKind.SHARED_LIB:
+                args.append("-shared")
+            # Object files first for GNU-like linkers.
+            args.extend(objectFiles)
+            for libdir in project.libDirs:
+                args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
+            for lib in project.links:
+                # If lib is a full path (e.g., Build/Lib/Debug/Foo/Foo.lib), pass it directly
+                # Otherwise, treat it as a library name and use -l prefix
+                if Path(lib).is_absolute() or ('/' in lib or '\\' in lib):
+                    args.append(lib)
+                else:
+                    args.append(f"-l{lib}")
+            args.extend(self.toolchain.ldflags)
+            args.extend(project.ldflags)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0
+
+    # -----------------------------------------------------------------------
+    # Compilation MinGW (GCC)
+    # -----------------------------------------------------------------------
+
+    def _CompileMinGW(self, project: Project, src: Path, obj: Path) -> bool:
+        args = [self.toolchain.ccPath, "-c", "-o", str(obj)]
+        args.extend(self._GetGCCCommonFlags(project))
+        pch_header = getattr(project, "_jengaPchHeaderResolved", "")
+        if pch_header:
+            args.extend(["-include", pch_header])
+        if self.IsModuleFile(str(src)):
+            args.extend(self.GetModuleFlags(project, str(src)))
+        if project.language.value in ("C++", "Objective-C++"):
+            args.extend(project.cxxflags)
+        else:
+            args.extend(project.cflags)
+        args.append(str(src))
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0
+
+    def _LinkMinGW(self, project: Project, objectFiles: List[str], output: Path) -> bool:
+        if project.kind == ProjectKind.STATIC_LIB:
+            return self._CreateStaticLibGCC(project, objectFiles, output)
+        args = [self.toolchain.cxxPath, "-o", str(output)]
+        if project.kind == ProjectKind.SHARED_LIB:
+            args.append("-shared")
+        # Object files first for GNU-like linkers.
+        args.extend(objectFiles)
+        for libdir in project.libDirs:
+            args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
+        for lib in project.links:
+            # If lib is a full path, pass it directly; otherwise use -l prefix
+            if Path(lib).is_absolute() or ('/' in lib or '\\' in lib):
+                args.append(lib)
+            else:
+                args.append(f"-l{lib}")
+        args.extend(project.ldflags)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0
+
+    # -----------------------------------------------------------------------
+    # Utilitaires communs
+    # -----------------------------------------------------------------------
+
+    def _GetGCCCommonFlags(self, project: Project) -> List[str]:
+        flags = []
+        for inc in project.includeDirs:
+            flags.append(f"-I{self.ResolveProjectPath(project, inc)}")
+        for define in self.toolchain.defines:
+            flags.append(f"-D{define}")
+        for define in project.defines:
+            flags.append(f"-D{define}")
+        opt = self._EnumValue(project.optimize)
+        warn = self._EnumValue(project.warnings)
+        if project.symbols:
+            flags.append("-g")
+        if opt == "Off":
+            flags.append("-O0")
+        elif opt == "Size":
+            flags.append("-Os")
+        elif opt == "Speed":
+            flags.append("-O2")
+        elif opt == "Full":
+            flags.append("-O3")
+        if warn == "All":
+            flags.append("-Wall")
+        elif warn == "Extra":
+            flags.append("-Wextra")
+        elif warn == "Pedantic":
+            flags.append("-pedantic")
+        elif warn == "Error":
+            flags.append("-Werror")
+        if project.language.value in ("C++", "Objective-C++"):
+            if project.cppdialect:
+                flags.append(f"-std={project.cppdialect.lower()}")
+            flags.extend(self.toolchain.cxxflags)
+        else:
+            if project.cdialect:
+                flags.append(f"-std={project.cdialect.lower()}")
+            flags.extend(self.toolchain.cflags)
+
+        # Ajouter les flags d'import de modules C++20
+        flags.extend(self._GetModuleImportFlags(project))
+
+        return flags
+
+    def _GetClangCommonFlags(self, project: Project) -> List[str]:
+        return self._GetGCCCommonFlags(project)
+
+    def _CreateStaticLibGCC(self, project: Project, objectFiles: List[str], output: Path) -> bool:
+        ar = self.toolchain.arPath or "ar"
+        args = [ar, "rcs", str(output)]
+        args.extend(self.toolchain.arflags)
+        args.extend(objectFiles)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0
+
+    def _CreateStaticLibClang(self, project: Project, objectFiles: List[str], output: Path) -> bool:
+        ar = self.toolchain.arPath or "llvm-ar"
+        args = [ar, "rcs", str(output)]
+        args.extend(self.toolchain.arflags)
+        args.extend(objectFiles)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
+        return result.returnCode == 0

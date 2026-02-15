@@ -1,227 +1,142 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Jenga Build System - Sign Command
-Signs applications (Android APK, iOS IPA, macOS apps, Windows executables)
+Sign command – Signe un APK Android ou IPA iOS.
+Délègue aux builders spécifiques.
 """
 
-import sys
-import subprocess
+import argparse
+import sys, os
 from pathlib import Path
+from typing import List, Optional, Tuple
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from ..Utils import Colored, FileSystem
+from ..Core.Loader import Loader
+from ..Core.Cache import Cache
+from ..Core.Platform import Platform
+from ..Core import Api
 
-from core.loader import load_workspace
-from utils.display import Display, Colors
 
+class SignCommand:
+    """jenga sign --apk FILE [--keystore KS] [--alias ALIAS] [--storepass PASS] [--keypass PASS]"""
 
-def execute(options: dict) -> bool:
-    """Execute sign command"""
-    
-    # Load workspace
-    workspace = load_workspace()
-    if not workspace:
-        return False
-    
-    platform = options.get('platform', 'Android')
-    project_name = options.get('project')
-    apk_path = options.get('apk')
-    keystore = options.get('keystore')
-    
-    Display.section(f"Signing {platform} Application")
-    
-    # Get project
-    if project_name:
-        if project_name not in workspace.projects:
-            Display.error(f"Project '{project_name}' not found")
-            return False
-        project = workspace.projects[project_name]
-    else:
-        # Use start project
-        if workspace.startproject and workspace.startproject in workspace.projects:
-            project = workspace.projects[workspace.startproject]
+    @staticmethod
+    def Execute(args: List[str]) -> int:
+        parser = argparse.ArgumentParser(
+            prog="jenga sign",
+            description="Sign an Android APK or iOS IPA."
+        )
+        parser.add_argument("--apk", help="Android APK file to sign")
+        parser.add_argument("--ipa", help="iOS IPA file to sign")
+        parser.add_argument("--keystore", help="Keystore file (Android)")
+        parser.add_argument("--alias", help="Key alias")
+        parser.add_argument("--storepass", help="Keystore password")
+        parser.add_argument("--keypass", help="Key password")
+        parser.add_argument("--project", help="Project name (to get signing config)")
+        parser.add_argument("--no-daemon", action="store_true", help="Do not use daemon")
+        parser.add_argument("--jenga-file", help="Path to the workspace .jenga file (default: auto-detected)")
+        parsed = parser.parse_args(args)
+
+        if not parsed.apk and not parsed.ipa:
+            Colored.PrintError("Specify either --apk or --ipa.")
+            return 1
+
+        if parsed.apk:
+            return SignCommand._SignAndroid(parsed)
         else:
-            Display.error("No project specified. Use --project <name>")
-            return False
-    
-    if platform == 'Android':
-        return _sign_android(workspace, project, apk_path, keystore, options)
-    elif platform == 'iOS':
-        return _sign_ios(workspace, project, options)
-    elif platform == 'Windows':
-        return _sign_windows(workspace, project, options)
-    elif platform == 'MacOS':
-        return _sign_macos(workspace, project, options)
-    else:
-        Display.error(f"Signing not supported for platform: {platform}")
-        return False
+            return SignCommand._SignIOS(parsed)
 
+    @staticmethod
+    def _SignAndroid(args) -> int:
+        """Signe un APK avec apksigner."""
+        # Si un projet est spécifié, charger ses paramètres depuis le workspace
+        keystore = args.keystore
+        alias = args.alias
+        storepass = args.storepass
+        keypass = args.keypass
 
-def _sign_android(workspace, project, apk_path, keystore_path, options):
-    """Sign Android APK"""
-    
-    Display.step("Signing Android APK...")
-    
-    # Get APK path
-    if not apk_path:
-        config = options.get('config', 'Release')
-        package_dir = Path(workspace.location) / "Build" / "Packages"
-        apk_path = package_dir / f"{project.name}-{config}.apk"
-    else:
-        apk_path = Path(apk_path)
-    
-    if not apk_path.exists():
-        Display.error(f"APK not found: {apk_path}")
-        Display.info("Build and package the APK first with: jenga package")
-        return False
-    
-    Display.info(f"APK: {apk_path}")
-    
-    # Get keystore
-    if keystore_path:
-        keystore = keystore_path
-    elif project.androidkeystore:
-        keystore = project.androidkeystore
-    else:
-        Display.error("No keystore specified")
-        Display.info("Options:")
-        Display.info("  1. Use --keystore /path/to/keystore.jks")
-        Display.info("  2. Set in .jenga: androidkeystore(\"/path/to/keystore.jks\")")
-        Display.info("  3. Generate with: jenga keygen")
-        return False
-    
-    keystore = Path(keystore)
-    if not keystore.exists():
-        Display.error(f"Keystore not found: {keystore}")
-        Display.info("Generate a keystore with: jenga keygen")
-        return False
-    
-    Display.info(f"Keystore: {keystore}")
-    
-    # Get signing parameters
-    keystore_pass = options.get('storepass') or project.androidkeystorepass or "android"
-    key_alias = options.get('alias') or project.androidkeyalias or "key0"
-    
-    # Find apksigner
-    if not workspace.androidsdkpath:
-        Display.error("Android SDK path not set")
-        Display.info("Set it with: androidsdkpath(\"/path/to/android-sdk\")")
-        return False
-    
-    sdk_path = Path(workspace.androidsdkpath)
-    build_tools_dir = sdk_path / "build-tools"
-    
-    if not build_tools_dir.exists():
-        Display.error("Build-tools not found in Android SDK")
-        return False
-    
-    # Get latest build tools
-    build_tools_versions = sorted([d.name for d in build_tools_dir.iterdir() if d.is_dir()])
-    if not build_tools_versions:
-        Display.error("No build-tools version found")
-        return False
-    
-    build_tools_version = build_tools_versions[-1]
-    apksigner = build_tools_dir / build_tools_version / "apksigner"
-    
-    if not apksigner.exists():
-        # Try apksigner.bat on Windows
-        apksigner = build_tools_dir / build_tools_version / "apksigner.bat"
-        if not apksigner.exists():
-            Display.error("apksigner not found in build-tools")
-            return False
-    
-    Display.info(f"Using apksigner from: {build_tools_version}")
-    
-    # Output signed APK
-    signed_apk = apk_path.parent / f"{apk_path.stem}-signed.apk"
-    
-    # Sign APK
-    Display.info("Signing APK...")
-    
-    try:
+        if args.project:
+            # Déterminer le répertoire de travail (workspace root)
+            workspace_root = Path.cwd()
+            if args.jenga_file:
+                entry_file = Path(args.jenga_file).resolve()
+                if not entry_file.exists():
+                    Colored.PrintError(f"Jenga file not found: {entry_file}")
+                    return 1
+            else:
+                entry_file = FileSystem.FindWorkspaceEntry(workspace_root)
+                if not entry_file:
+                    Colored.PrintError("No .jenga workspace file found.")
+                    return 1
+            workspace_root = entry_file.parent
+            
+            if entry_file:
+                loader = Loader()
+                cache = Cache(entry_file.parent, workspaceName=entry_file.stem)
+                workspace = cache.LoadWorkspace(entry_file, loader)
+                if workspace and args.project in workspace.projects:
+                    proj = workspace.projects[args.project]
+                    keystore = keystore or proj.androidKeystore
+                    alias = alias or proj.androidKeyAlias
+                    storepass = storepass or proj.androidKeystorePass
+                    # keypass = keypass or proj.androidKeyPass? (pas dans l'API actuelle)
+
+        if not keystore or not Path(keystore).exists():
+            Colored.PrintError("Keystore not found. Provide --keystore or configure in project.")
+            return 1
+
+        # Chercher apksigner dans le SDK Android
+        apksigner = SignCommand._FindApksigner()
+        if not apksigner:
+            Colored.PrintError("apksigner not found. Install Android SDK build-tools.")
+            return 1
+
         cmd = [
-            str(apksigner), "sign",
-            "--ks", str(keystore),
-            "--ks-pass", f"pass:{keystore_pass}",
-            "--ks-key-alias", key_alias,
-            "--out", str(signed_apk),
-            str(apk_path)
+            apksigner, "sign",
+            "--ks", keystore,
+            "--ks-pass", f"pass:{storepass or ''}",
+            "--ks-key-alias", alias or "mykey",
+            "--out", str(Path(args.apk).with_suffix(".signed.apk")),
+            args.apk
         ]
-        
+        if keypass:
+            cmd.extend(["--key-pass", f"pass:{keypass}"])
+
+        Colored.PrintInfo(f"Signing {args.apk}...")
+        import subprocess
         result = subprocess.run(cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            Display.error(f"Failed to sign APK:")
-            print(result.stderr)
-            return False
-        
-        Display.success(f"\n✓ APK signed successfully!")
-        Display.info(f"  Signed APK: {signed_apk}")
-        Display.info(f"  Size: {signed_apk.stat().st_size / (1024*1024):.2f} MB")
-        
-        # Verify signature
-        Display.info("\nVerifying signature...")
-        
-        verify_cmd = [str(apksigner), "verify", str(signed_apk)]
-        verify_result = subprocess.run(verify_cmd, capture_output=True, text=True)
-        
-        if verify_result.returncode == 0:
-            Display.success("✓ APK signature verified")
+        if result.returncode == 0:
+            Colored.PrintSuccess(f"Signed APK created.")
+            return 0
         else:
-            Display.warning("⚠ Could not verify signature")
-        
-        return True
-        
-    except Exception as e:
-        Display.error(f"Error signing APK: {e}")
-        return False
+            Colored.PrintError(f"Signing failed: {result.stderr}")
+            return 1
 
+    @staticmethod
+    def _SignIOS(args) -> int:
+        """Signe un IPA avec codesign (nécessite macOS)."""
+        if Platform.GetHostOS() != Api.TargetOS.MACOS:
+            Colored.PrintError("iOS signing requires macOS.")
+            return 1
+        # Déléguer à xcodebuild / codesign
+        Colored.PrintInfo("iOS signing not yet implemented.")
+        return 1
 
-def _sign_ios(workspace, project, options):
-    """Sign iOS IPA"""
-    
-    Display.step("Signing iOS IPA...")
-    Display.warning("iOS signing requires valid provisioning profiles and certificates")
-    
-    # TODO: Implement iOS code signing
-    # codesign --force --sign "iPhone Developer: ..." --entitlements ... MyApp.app
-    
-    Display.info("This feature is under development")
-    Display.info("For now, use Xcode for iOS code signing")
-    
-    return False
-
-
-def _sign_windows(workspace, project, options):
-    """Sign Windows executable with Authenticode"""
-    
-    Display.step("Signing Windows executable...")
-    Display.warning("Windows code signing requires a valid certificate")
-    
-    # TODO: Implement Windows Authenticode signing
-    # signtool sign /f certificate.pfx /p password /tr http://timestamp.digicert.com /td sha256 /fd sha256 MyApp.exe
-    
-    Display.info("This feature is under development")
-    Display.info("Use signtool.exe from Windows SDK for code signing")
-    
-    return False
-
-
-def _sign_macos(workspace, project, options):
-    """Sign macOS application"""
-    
-    Display.step("Signing macOS application...")
-    Display.warning("macOS signing requires a valid Developer ID certificate")
-    
-    # TODO: Implement macOS code signing
-    # codesign --force --deep --sign "Developer ID Application: ..." MyApp.app
-    
-    Display.info("This feature is under development")
-    Display.info("Use codesign from Xcode Command Line Tools")
-    
-    return False
-
-
-if __name__ == "__main__":
-    execute({})
+    @staticmethod
+    def _FindApksigner() -> str:
+        """Localise apksigner dans le SDK Android."""
+        # Chercher dans les variables d'environnement
+        sdk = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
+        if sdk:
+            sdk_path = Path(sdk)
+            bt_dir = sdk_path / "build-tools"
+            if bt_dir.exists():
+                versions = sorted([d for d in bt_dir.iterdir() if d.is_dir()], reverse=True)
+                for ver in versions:
+                    apk = ver / "apksigner"
+                    if sys.platform == "win32":
+                        apk = apk.with_suffix(".exe")
+                    if apk.exists():
+                        return str(apk)
+        # Fallback: which
+        return FileSystem.FindExecutable("apksigner") or ""

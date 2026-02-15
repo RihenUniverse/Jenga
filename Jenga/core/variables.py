@@ -1,347 +1,429 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nken Build System - Variables Module
-Handles variable expansion for %{variable} syntax
+Variables – Moteur d'expansion des variables pour le DSL Jenga.
+
+Supporte :
+  - %{wks.nom} ou %{workspace.nom} : propriétés du workspace courant
+  - %{prj.nom} ou %{project.nom}   : propriétés du projet courant
+  - %{cfg.nom}                     : propriétés de la configuration de build
+  - %{unitest.nom}                : propriétés de la configuration Unitest
+  - %{test.nom}                   : propriétés du projet de test courant
+  - %{nomProjet.nom}              : propriétés d'un projet quelconque du workspace
+  - %{env.NOM}                    : variables d'environnement
+  - %{Jenga.Root}                : racine d'installation de Jenga
+  - %{Jenga.Version}             : version de Jenga
+
+Les chemins sont automatiquement résolus par rapport au répertoire de base approprié.
+L'expansion peut être appliquée récursivement sur des objets entiers.
+
+Toutes les méthodes publiques sont en PascalCase, les méthodes privées en _PascalCase.
+Les attributs de classe (constantes) sont en UPPER_SNAKE_CASE.
 """
 
+import os
 import re
-from typing import Dict, Any, Optional
 from pathlib import Path
+from typing import Dict, Any, Optional, Union, List, Callable
+from functools import lru_cache
+
+from ..Utils import FileSystem  # déjà implémenté
+
+# ✅ Import absolu cohérent avec l'API utilisateur
+from Jenga.Core import Api
 
 
 class VariableExpander:
-    """Handles variable expansion in configuration strings"""
-    
-    # Regex pattern for %{variable} or %{project.property}
-    VAR_PATTERN = re.compile(r'%\{([^}]+)\}')
-    
-    def __init__(self, workspace=None, project=None, config: str = "Debug", platform: str = "Windows"):
-        self.workspace = workspace
-        self.project = project
-        self.config = config
-        self.platform = platform
-        self.custom_vars: Dict[str, str] = {}
-        
-    def add_variable(self, name: str, value: str):
-        """Add a custom variable"""
-        self.custom_vars[name] = value
-    
-    def expand(self, text: str) -> str:
-        """Expand all variables in text"""
-        if not text or not isinstance(text, str):
-            return text
-        
-        def replace_var(match):
-            var_expr = match.group(1)
-            value = self._resolve_variable(var_expr)
-            return str(value) if value is not None else match.group(0)
-        
-        # Keep expanding until no more variables found (handles nested variables)
-        prev_text = ""
-        while prev_text != text:
-            prev_text = text
-            text = self.VAR_PATTERN.sub(replace_var, text)
-        
-        return text
-    
-    def expand_list(self, items: list) -> list:
-        """Expand variables in a list of strings"""
-        return [self.expand(item) for item in items]
-    
-    def _resolve_variable(self, var_expr: str) -> Optional[str]:
-        """Resolve a variable expression"""
-        
-        # Handle project.property syntax
-        if '.' in var_expr:
-            parts = var_expr.split('.', 1)
-            obj_name = parts[0]
-            prop_name = parts[1]
-            
-            # Workspace properties
-            if obj_name == "wks" or obj_name == "workspace":
-                return self._get_workspace_property(prop_name)
-            
-            # Current project properties
-            elif obj_name == "prj" or obj_name == "project":
-                return self._get_project_property(self.project, prop_name)
-            
-            # Configuration properties
-            elif obj_name == "cfg" or obj_name == "config":
-                return self._get_config_property(prop_name)
-            
-            # Other project properties (project_name.property)
-            elif self.workspace and obj_name in self.workspace.projects:
-                target_project = self.workspace.projects[obj_name]
-                
-                # Check if current project depends on this project
-                if self.project and obj_name not in self.project.dependson:
-                    # Allow access anyway but warn (for debugging)
-                    pass
-                
-                return self._get_project_property(target_project, prop_name)
-        
-        # Simple variables
-        else:
-            # Built-in variables
-            builtin = self._get_builtin_variable(var_expr)
-            if builtin is not None:
-                return builtin
-            
-            # Custom variables
-            if var_expr in self.custom_vars:
-                return self.custom_vars[var_expr]
-        
-        return None
-    
-    def _get_builtin_variable(self, name: str) -> Optional[str]:
-        """Get built-in variable value"""
-        
-        builtin_vars = {
-            "config": self.config,
-            "configuration": self.config,
-            "platform": self.platform,
-            "system": self.platform,
+    """
+    Expansion des variables contextuelles. Instance unique par workspace/commande.
+    """
+
+    # Pattern pour capturer %{...}
+    _VAR_PATTERN = re.compile(r"%\{([^}]+)\}")
+
+    # -----------------------------------------------------------------------
+    # Initialisation / configuration
+    # -----------------------------------------------------------------------
+
+    def __init__(self,
+                 workspace: Optional[Any] = None,
+                 project: Optional[Any] = None,
+                 config: Optional[Dict[str, str]] = None,
+                 unitestConfig: Optional[Any] = None,
+                 testProject: Optional[Any] = None,
+                 baseDir: Optional[Path] = None,
+                 jengaRoot: Optional[Path] = None):
+        """
+        Crée un expandeur avec un contexte donné.
+        Les paramètres peuvent être modifiés plus tard via les setters.
+        """
+        self._workspace = workspace
+        self._project = project
+        self._config = config or {}
+        self._unitestConfig = unitestConfig
+        self._testProject = testProject
+        self._baseDir = baseDir or Path.cwd()
+        self._jengaRoot = jengaRoot or self._DetectJengaRoot()
+        self._toolchain = None   # Toolchain courante
+
+        # Cache interne pour les accès répétés
+        self._projectCache: Dict[str, Any] = {}
+
+    # -----------------------------------------------------------------------
+    # Private helpers – _PascalCase
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _DetectJengaRoot() -> Path:
+        """Détecte le répertoire racine de l'installation Jenga."""
+        # Si on est dans le package installé, __file__ est dans Jenga/Core/
+        return Path(__file__).parent.parent.parent.resolve()
+
+    def _GetWorkspaceVariable(self, var: str) -> Optional[str]:
+        """Récupère une propriété du workspace."""
+        if self._workspace is None:
+            return None
+        key = var.lower()
+
+        mapping: Dict[str, Union[str, Callable]] = {
+            'name': 'name',
+            'location': 'location',
+            'configurations': lambda w: ','.join(getattr(w, 'configurations', [])),
+            'platforms': lambda w: ','.join(getattr(w, 'platforms', [])),
+            'startproject': 'startProject',
+            'defaulttoolchain': 'defaultToolchain',
         }
-        
-        return builtin_vars.get(name.lower())
-    
-    def _get_workspace_property(self, prop_name: str) -> Optional[str]:
-        """Get workspace property"""
-        if not self.workspace:
-            return None
-        
-        prop_lower = prop_name.lower()
-        
-        if prop_lower == "name":
-            return self.workspace.name
-        elif prop_lower == "location":
-            return self.workspace.location or "."
-        elif prop_lower == "buildcfg":
-            return self.config
-        
-        # Try to get attribute directly
-        return getattr(self.workspace, prop_name, None)
-    
-    def _get_project_property(self, proj, prop_name: str) -> Optional[str]:
-        """Get project property"""
-        if not proj:
-            return None
-        
-        prop_lower = prop_name.lower()
-        
-        if prop_lower == "name":
-            return proj.name
-        elif prop_lower == "location":
-            return proj.location or "."
-        elif prop_lower == "targetdir":
-            return proj.targetdir
-        elif prop_lower == "objdir":
-            return proj.objdir
-        elif prop_lower == "targetname":
-            return proj.targetname or proj.name
-        elif prop_lower == "kind":
-            return proj.kind.value
-        elif prop_lower == "language":
-            return proj.language.value
-        
-        # Try to get attribute directly
-        return getattr(proj, prop_name, None)
-    
-    def _get_config_property(self, prop_name: str) -> Optional[str]:
-        """Get configuration property"""
-        prop_lower = prop_name.lower()
-        
-        if prop_lower == "buildcfg":
-            return self.config
-        elif prop_lower == "platform":
-            return self.platform
-        elif prop_lower == "system":
-            return self.platform
-        elif prop_lower == "architecture":
-            return "x64"  # Default, can be made configurable
-        
+        if key in mapping:
+            attr = mapping[key]
+            if callable(attr):
+                return attr(self._workspace)
+            val = getattr(self._workspace, attr, '')
+            return str(val) if val is not None else ''
         return None
 
+    def _GetProjectVariable(self, project: Any, var: str) -> Optional[str]:
+        """Récupère une propriété d'un projet donné."""
+        if project is None:
+            return None
+        key = var.lower()
 
-def expand_path_patterns(pattern: str, base_dir: str = ".") -> list:
-    """
-    Expand path patterns with wildcards:
-    - *.cpp: all .cpp files in directory
-    - **.cpp: all .cpp files recursively
-    - !file.cpp: exclude file
-    """
-    from pathlib import Path
-    
-    results = []
-    exclude = False
-    
-    # Check for exclusion prefix
-    if pattern.startswith("!"):
-        exclude = True
-        pattern = pattern[1:].strip()
-    
-    # Convert to Path
-    pattern_path = Path(pattern)
-    
-    # Determine base path
-    if pattern_path.is_absolute():
-        base_path = Path("/")
-        working_pattern = pattern
-    else:
-        base_path = Path(base_dir)
-        working_pattern = pattern
-    
-    # Handle ** recursive patterns
-    if "**" in working_pattern:
-        # Split on **
-        parts = working_pattern.split("**", 1)
-        prefix = parts[0].rstrip("/\\")
-        suffix = parts[1].lstrip("/\\") if len(parts) > 1 else ""
-        
-        # Determine search directory
-        if prefix:
-            if Path(prefix).is_absolute():
-                search_dir = Path(prefix)
-            else:
-                prefix = prefix.lstrip("/\\")
-                search_dir = base_path / prefix
+        mapping: Dict[str, Union[str, Callable]] = {
+            'name': 'name',
+            'location': 'location',
+            'targetdir': 'targetDir',
+            'objdir': 'objDir',
+            'targetname': 'targetName',
+            'kind': lambda p: p.kind.value if p.kind else '',
+            'language': lambda p: p.language.value if p.language else '',
+            'cppdialect': 'cppdialect',
+            'cdialect': 'cdialect',
+            'toolchain': 'toolchain',
+            'istest': 'isTest',
+        }
+        if key in mapping:
+            attr = mapping[key]
+            if callable(attr):
+                return attr(project)
+            val = getattr(project, attr, '')
+            return str(val) if val is not None else ''
+        return None
+
+    def _GetUnitestVariable(self, var: str) -> Optional[str]:
+        """Récupère une propriété de la configuration Unitest."""
+        if self._unitestConfig is None:
+            return None
+        key = var.lower()
+
+        mapping = {
+            'mode': 'mode',
+            'includedir': 'includeDir',
+            'include': 'includeDir',
+            'libdir': 'libDir',
+            'lib': 'libName',
+            'libname': 'libName',
+            'targetdir': 'targetDir',
+            'targetname': 'targetName',
+            'objdir': 'objDir',
+        }
+        if key in mapping:
+            val = getattr(self._unitestConfig, mapping[key], '')
+            return str(val) if val is not None else ''
+        return None
+
+    def _GetTestVariable(self, var: str) -> Optional[str]:
+        """Récupère une propriété du projet de test courant."""
+        if self._testProject is None:
+            return None
+        return self._GetProjectVariable(self._testProject, var)
+
+    def _GetNamedProjectVariable(self, projectName: str, var: str) -> Optional[str]:
+        """Récupère une propriété d'un projet nommé dans le workspace."""
+        if self._workspace is None:
+            return None
+        # Cache du projet pour éviter les accès répétés
+        if projectName not in self._projectCache:
+            proj = self._workspace.projects.get(projectName)
+            self._projectCache[projectName] = proj
         else:
-            search_dir = base_path
-        
-        # Prepare glob pattern for suffix
-        if suffix:
-            # If suffix starts with . (like .cpp), add * before it
-            if suffix.startswith(".") or (suffix and "*" not in suffix):
-                glob_pattern = "*" + suffix if suffix.startswith(".") else suffix
-            else:
-                glob_pattern = suffix
-        else:
-            glob_pattern = "*"
-        
-        # Search recursively
-        if search_dir.exists() and search_dir.is_dir():
-            for file_path in search_dir.rglob(glob_pattern):
-                if file_path.is_file():
-                    results.append((str(file_path), exclude))
-    
-    # Handle * non-recursive patterns
-    elif "*" in working_pattern:
-        if Path(working_pattern).is_absolute():
-            parent = Path(working_pattern).parent
-            pattern_name = Path(working_pattern).name
-            if parent.exists():
-                for file_path in parent.glob(pattern_name):
-                    if file_path.is_file():
-                        results.append((str(file_path), exclude))
-        else:
-            parts = working_pattern.rsplit("/", 1)
-            if len(parts) == 2:
-                search_dir = base_path / parts[0]
-                file_pattern = parts[1]
-            else:
-                search_dir = base_path
-                file_pattern = working_pattern
-            
-            if search_dir.exists():
-                for file_path in search_dir.glob(file_pattern):
-                    if file_path.is_file():
-                        results.append((str(file_path), exclude))
-    
-    # Handle exact file paths
-    else:
-        if Path(working_pattern).is_absolute():
-            file_path = Path(working_pattern)
-        else:
-            file_path = base_path / remove_first_dir(working_pattern, True)
+            proj = self._projectCache[projectName]
+        if proj is None:
+            return None
+        return self._GetProjectVariable(proj, var)
 
-        if file_path.exists() and file_path.is_file():
-            results.append((str(file_path), exclude))
-    
-    return results
+    # -----------------------------------------------------------------------
+    # Setters publics
+    # -----------------------------------------------------------------------
+    def SetToolchain(self, toolchain: Any) -> None:
+        """Définit la toolchain courante (pour l'expansion de %{toolchain.*})."""
+        self._toolchain = toolchain
 
+    # -----------------------------------------------------------------------
+    # Nouvelle méthode privée
+    # -----------------------------------------------------------------------
+    def _GetToolchainVariable(self, var: str) -> Optional[str]:
+        """Récupère une propriété de la toolchain courante."""
+        if self._toolchain is None:
+            return None
+        key = var.lower()
 
-def remove_first_dir(path: str, keep_empty: bool = False) -> str:
-    """
-    Retire le premier répertoire d'un chemin
-    
-    Args:
-        path: Le chemin à transformer
-        keep_empty: Si True, retourne "" si le chemin devient vide
-    
-    Exemples:
-        "src/main.cpp" → "main.cpp"
-        "include/utils/header.h" → "utils/header.h"
-        "main.cpp" → "" (ou "main.cpp" si keep_empty=True)
-        "C:\\src\\app.cpp" → "src\\app.cpp"
-        "/usr/bin/app" → "usr/bin/app"
-        "./src/app.cpp" → "src/app.cpp"
-        "../src/app.cpp" → "src/app.cpp"
-    """
-    # Gérer les chemins vides
-    if not path:
-        return "" if keep_empty else path
-    
-    # Gérer les chemins commençant par ./ ou ../
-    if path.startswith("./"):
-        path = path[2:]
-    elif path.startswith("../"):
-        path = path[3:]  # On enlève le .. aussi
-    
-    # Utiliser pathlib pour une gestion propre
-    p = Path(path)
-    
-    # Obtenir toutes les parties du chemin
-    parts = list(p.parts)
-    
-    # Si on a une partie vide (pour les chemins Unix absolus comme "/usr/bin")
-    if parts and parts[0] == "":
-        parts = parts[1:]  # Retirer la partie vide
-    
-    # Si on a une lettre de lecteur (Windows: "C:")
-    if len(parts) > 0 and re.match(r'^[A-Za-z]:$', parts[0]):
-        parts = parts[1:]  # Retirer la lettre de lecteur
-    
-    # Maintenant retirer le premier répertoire valide
-    if len(parts) > 1:
-        result = Path(*parts[1:])
-        return str(result)
-    elif len(parts) == 1:
-        # Un seul élément : c'est soit un fichier soit un répertoire terminal
-        if keep_empty:
-            return str(p)
-        else:
-            return ""  # Plus rien après retrait
-    else:
-        return ""
+        mapping = {
+            'name': 'name',
+            'compilerfamily': lambda tc: tc.compilerFamily.value if tc.compilerFamily else '',
+            'targetos': lambda tc: tc.targetOs.value if tc.targetOs else '',
+            'targetarch': lambda tc: tc.targetArch.value if tc.targetArch else '',
+            'targetenv': lambda tc: tc.targetEnv.value if tc.targetEnv else '',
+            'targettriple': 'targetTriple',
+            'sysroot': 'sysroot',
+            'toolchaindir': 'toolchainDir',
+            'cc': 'ccPath',
+            'cxx': 'cxxPath',
+            'ar': 'arPath',
+            'ld': 'ldPath',
+            'strip': 'stripPath',
+            'ranlib': 'ranlibPath',
+            'asm': 'asmPath',
+        }
+        if key in mapping:
+            attr = mapping[key]
+            if callable(attr):
+                return attr(self._toolchain)
+            val = getattr(self._toolchain, attr, '')
+            return str(val) if val is not None else ''
+        return None
 
+    def _GetJengaVariable(self, var: str) -> Optional[str]:
+        """Variables internes du système Jenga."""
+        key = var.lower()
+        package_root = Path(__file__).resolve().parents[1]  # .../Jenga
+        unitest_root = package_root / "Unitest"
+        if not unitest_root.exists():
+            candidate = self._jengaRoot / "Jenga" / "Unitest"
+            unitest_root = candidate if candidate.exists() else (self._jengaRoot / "Unitest")
 
-def resolve_file_list(patterns: list, base_dir: str = ".", expander: VariableExpander = None) -> list:
-    """
-    Resolve a list of file patterns into actual file paths
-    Handles:
-    - Variable expansion
-    - Wildcard expansion (*, **)
-    - Exclusions (!)
-    """
-    included_files = set()
-    excluded_files = set()
-    
-    for pattern in patterns:
-        # Expand variables first
-        if expander:
-            pattern = expander.expand(pattern)
-        
-        # Expand wildcards
-        expanded = expand_path_patterns(pattern, base_dir)
-        
-        for file_path, is_exclude in expanded:
-            if is_exclude:
-                excluded_files.add(file_path)
-            else:
-                included_files.add(file_path)
-    
-    # Remove excluded files
-    final_files = included_files - excluded_files
-    
-    return sorted(list(final_files))
+        mapping = {
+            'root': str(self._jengaRoot),
+            'version': '2.0.0',  # À définir globalement
+            'unitest.source': str(unitest_root),
+            'unitest.include': str(unitest_root / 'src'),
+            'unitest.lib': str(unitest_root / 'libs' / 'Unitest.lib'),
+            'unitest.objdir': str(self._jengaRoot / 'Build' / 'Obj' / 'Unitest'),
+            'unitest.targetdir': str(self._jengaRoot / 'Build' / 'Lib'),
+            'unitest.automaintemplate': str(unitest_root / 'Entry' / 'Entry.cpp'),
+        }
+        return mapping.get(key)
+
+    def _GetImplicitVariable(self, var: str) -> Optional[str]:
+        """
+        Résolution d'une variable non namespacée (%{name}, %{targetdir}, ...).
+        Priorité: cfg -> project -> workspace -> env.
+        """
+        if self._config and var in self._config:
+            return str(self._config[var])
+        for key in (var, var.lower(), var.upper()):
+            if self._config and key in self._config:
+                return str(self._config[key])
+        val = self._GetProjectVariable(self._project, var)
+        if val is not None:
+            return val
+        val = self._GetWorkspaceVariable(var)
+        if val is not None:
+            return val
+        if var in os.environ:
+            return os.environ[var]
+        if var.upper() in os.environ:
+            return os.environ[var.upper()]
+        return None
+
+    def _ExpandString(self, text: str) -> str:
+        """Remplace les variables dans une chaîne unique."""
+        if not text or '%{' not in text:
+            return text
+
+        def replacer(match):
+            full_var = match.group(1)
+            parts = full_var.split('.')
+            if len(parts) < 2:
+                implicit = self._GetImplicitVariable(full_var)
+                return implicit if implicit is not None else match.group(0)
+
+            namespace_raw = parts[0]
+            namespace = namespace_raw.lower()
+            variable = '.'.join(parts[1:])
+
+            # 1. Configuration courante
+            if namespace == 'cfg' and self._config is not None:
+                return self._config.get(variable, match.group(0))
+
+            # 2. Workspace
+            if namespace in ('wks', 'workspace'):
+                val = self._GetWorkspaceVariable(variable)
+                if val is not None:
+                    return val
+
+            # 3. Projet courant
+            if namespace in ('prj', 'project'):
+                val = self._GetProjectVariable(self._project, variable)
+                if val is not None:
+                    return val
+
+            # 4. Unitest
+            if namespace == 'unitest':
+                val = self._GetUnitestVariable(variable)
+                if val is not None:
+                    return val
+
+            # 5. Test
+            if namespace == 'test':
+                val = self._GetTestVariable(variable)
+                if val is not None:
+                    return val
+
+            # 6. Projet nommé
+            val = self._GetNamedProjectVariable(namespace_raw, variable)
+            if val is None:
+                val = self._GetNamedProjectVariable(namespace_raw.lower(), variable)
+            if val is not None:
+                return val
+
+            # 7. Environnement
+            if namespace == 'env' and variable in os.environ:
+                return os.environ[variable]
+
+            # 8. Jenga interne
+            if namespace == 'jenga':
+                val = self._GetJengaVariable(variable)
+                if val is not None:
+                    return val
+
+            # 9. Toolchain courante  ←  ✅ MAINTENANT À L'INTÉRIEUR
+            if namespace == 'toolchain':
+                val = self._GetToolchainVariable(variable)
+                if val is not None:
+                    return val
+
+            # 10. Sinon, on laisse le placeholder intact
+            return match.group(0)
+
+        return self._VAR_PATTERN.sub(replacer, text)
+
+    def _ResolvePath(self, value: str, relativeTo: Optional[Path] = None) -> str:
+        """
+        Résout un chemin : le rend absolu s'il est relatif et ne contient pas de variable.
+        Si le chemin contient encore des variables, on le laisse tel quel.
+        """
+        if not value or '%{' in value:
+            return value
+        p = Path(value)
+        if p.is_absolute():
+            return value
+        base = relativeTo or self._baseDir
+        return str((base / p).resolve())
+
+    # -----------------------------------------------------------------------
+    # Public API – PascalCase
+    # -----------------------------------------------------------------------
+
+    def SetWorkspace(self, workspace: Any) -> None:
+        self._workspace = workspace
+        self._projectCache.clear()  # Les projets peuvent avoir changé
+
+    def SetProject(self, project: Any) -> None:
+        self._project = project
+
+    def SetConfig(self, config: Dict[str, str]) -> None:
+        self._config = config
+
+    def SetUnitestConfig(self, unitestConfig: Any) -> None:
+        self._unitestConfig = unitestConfig
+
+    def SetTestProject(self, testProject: Any) -> None:
+        self._testProject = testProject
+
+    def SetBaseDir(self, baseDir: Path) -> None:
+        self._baseDir = baseDir
+
+    def Expand(self, text: str, recursive: bool = False) -> str:
+        """
+        Étend les variables dans une chaîne.
+        Si recursive = True, applique l'expansion jusqu'à ce qu'il n'y ait plus de changements.
+        """
+        if not recursive:
+            return self._ExpandString(text)
+
+        # Expansion itérative jusqu'à stabilisation
+        prev = text
+        while True:
+            cur = self._ExpandString(prev)
+            if cur == prev:
+                break
+            prev = cur
+        return cur
+
+    def ExpandAll(self, obj: Any, recursive: bool = True) -> Any:
+        """
+        Parcourt récursivement un objet (dataclass, dict, list, str) et étend toutes les chaînes.
+        Retourne une copie modifiée ou modifie sur place selon le type.
+        Pour les objets complexes, on suppose qu'ils sont mutables.
+        """
+        import sys
+        from types import SimpleNamespace
+
+        if isinstance(obj, str):
+            return self.Expand(obj, recursive=recursive)
+
+        if isinstance(obj, list):
+            new_list = []
+            for item in obj:
+                new_list.append(self.ExpandAll(item, recursive))
+            return new_list
+
+        if isinstance(obj, tuple):
+            return tuple(self.ExpandAll(item, recursive) for item in obj)
+
+        if isinstance(obj, dict):
+            new_dict = {}
+            for k, v in obj.items():
+                new_dict[k] = self.ExpandAll(v, recursive)
+            return new_dict
+
+        # Pour les dataclasses ou objets avec __dict__
+        if hasattr(obj, '__dict__'):
+            for attr, val in obj.__dict__.items():
+                if not attr.startswith('_') and isinstance(val, (str, list, dict)):
+                    expanded = self.ExpandAll(val, recursive)
+                    setattr(obj, attr, expanded)
+            return obj
+
+        # Autres types (int, float, bool, None) : inchangé
+        return obj
+
+    def ResolvePath(self, path: str, relativeTo: Optional[Path] = None) -> str:
+        """
+        Applique d'abord l'expansion, puis résout le chemin absolu si possible.
+        """
+        expanded = self.Expand(path)
+        return self._ResolvePath(expanded, relativeTo)
+
+    def ResolvePathList(self, paths: List[str], relativeTo: Optional[Path] = None) -> List[str]:
+        """Applique ResolvePath à une liste de chemins."""
+        return [self.ResolvePath(p, relativeTo) for p in paths]

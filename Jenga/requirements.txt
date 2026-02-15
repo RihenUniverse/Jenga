@@ -1,0 +1,20 @@
+# Jenga – Core dependencies
+# Minimum Python version: 3.8
+# 
+# Install with: pip install -r requirements.txt
+
+# File system watching (optional but recommended for 'watch' command)
+watchdog>=2.1.0
+
+# Windows colored output support
+colorama>=0.4.4; sys_platform == 'win32'
+
+# HTTP requests (for package managers, deployment)
+requests>=2.28.0
+
+# (Optional) Rich console output
+# rich>=12.0.0
+
+# (Optional) Markdown generation for docs
+# markdown>=3.4.0
+# pygments>=2.12.0

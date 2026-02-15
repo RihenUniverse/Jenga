@@ -1,0 +1,12 @@
+from Jenga import *
+
+with workspace("ModulesCpp20"):
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.WINDOWS])
+    targetarchs([TargetArch.X86_64])
+
+    with project("MathApp"):
+        consoleapp()
+        language("C++")
+        cppdialect("C++20")
+        files(["src/math.cppm", "src/main.cpp"])

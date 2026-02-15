@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from Jenga import *
+
+with workspace("StaticLibraryExample"):
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.WINDOWS, TargetOS.LINUX, TargetOS.MACOS])
+    targetarchs([TargetArch.X86_64])
+
+    with project("MathLib"):
+        staticlib()
+        language("C++")
+        location("mathlib")
+        files(["src/**.cpp"])
+        includedirs(["include"])
+
+    with project("App"):
+        consoleapp()
+        language("C++")
+        location("app")
+        files(["main.cpp"])
+        includedirs(["%{wks.location}/mathlib/include"])
+        links(["MathLib"])
+        dependson(["MathLib"])

@@ -1,561 +1,137 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Jenga Build System - Enhanced Run Command
-Supports running executables with debuggers (GDB, GGDB, LLDB)
-and running unit tests
+Run command – Exécute l'exécutable d'un projet (après build si nécessaire).
 """
 
+import argparse
 import sys
-import subprocess
-import shlex
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import List, Optional, Tuple
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from core.loader import load_workspace
-from core.variables import VariableExpander
-from core.api import ProjectKind
-from utils.display import Display
-
-
-# ============================================================================
-# DEBUGGER CONFIGURATIONS
-# ============================================================================
-
-DEBUGGERS = {
-    'gdb': {
-        'name': 'GNU Debugger (GDB)',
-        'command': 'gdb',
-        'args': ['--args'],
-        'platforms': ['Linux', 'MacOS', 'Windows'],
-    },
-    'ggdb': {
-        'name': 'GDB (with extended info)',
-        'command': 'gdb',
-        'args': ['--args'],
-        'platforms': ['Linux', 'MacOS', 'Windows'],
-        'note': 'Executable must be compiled with -ggdb flag',
-    },
-    'lldb': {
-        'name': 'LLVM Debugger (LLDB)',
-        'command': 'lldb',
-        'args': ['--'],
-        'platforms': ['MacOS', 'Linux'],
-    },
-    'valgrind': {
-        'name': 'Valgrind Memory Debugger',
-        'command': 'valgrind',
-        'args': ['--leak-check=full', '--show-leak-kinds=all', '--track-origins=yes'],
-        'platforms': ['Linux', 'MacOS'],
-    },
-}
+from ..Core.Loader import Loader
+from ..Core.Cache import Cache
+from ..Core.Builder import Builder
+from ..Core import Api
+from ..Utils import Colored, Process, FileSystem
+from .Build import BuildCommand
 
 
-# ============================================================================
-# UNIT TEST SUPPORT
-# ============================================================================
+class RunCommand:
+    """jenga run [PROJECT] [--config NAME] [--platform NAME] [--args ...]"""
 
-def find_test_project(workspace, project_name: Optional[str] = None) -> Optional[Dict]:
-    """Find test project for a given project"""
-    
-    if project_name:
-        # Look for specific project's tests
-        test_project_name = f"{project_name}_Tests"
-        if test_project_name in workspace.projects:
-            project = workspace.projects[test_project_name]
-            if hasattr(project, 'is_test') and project.is_test:
-                return {
-                    'name': test_project_name,
-                    'project': project,
-                    'parent': project.parent_project
-                }
-    else:
-        # Find default project's tests
-        default_project = workspace.startproject
-        if default_project:
-            test_project_name = f"{default_project}_Tests"
-            if test_project_name in workspace.projects:
-                project = workspace.projects[test_project_name]
-                if hasattr(project, 'is_test') and project.is_test:
-                    return {
-                        'name': test_project_name,
-                        'project': project,
-                        'parent': project.parent_project
-                    }
-    
-    # Search all test projects
-    test_projects = []
-    for name, proj in workspace.projects.items():
-        if hasattr(proj, 'is_test') and proj.is_test:
-            test_projects.append({
-                'name': name,
-                'project': proj,
-                'parent': proj.parent_project
-            })
-    
-    if test_projects:
-        if project_name:
-            # Try to find test project by parent name
-            for test_proj in test_projects:
-                if test_proj['parent'] == project_name:
-                    return test_proj
+    @staticmethod
+    def Execute(args: List[str]) -> int:
+        parser = argparse.ArgumentParser(prog="jenga run", description="Run a project executable.")
+        parser.add_argument("project", nargs="?", default=None, help="Project name to run (default: startProject or first executable)")
+        parser.add_argument("--config", default="Debug", help="Build configuration")
+        parser.add_argument("--platform", default=None, help="Target platform")
+        parser.add_argument("--args", nargs=argparse.REMAINDER, default=[], help="Arguments to pass to the executable")
+        parser.add_argument("--no-build", action="store_true", help="Skip build step (assume already built)")
+        parser.add_argument("--no-daemon", action="store_true", help="Do not use daemon")
+        parser.add_argument("--jenga-file", help="Path to the workspace .jenga file (default: auto-detected)")
+        parsed = parser.parse_args(args)
+
+        # Déterminer le répertoire de travail (workspace root)
+        workspace_root = Path.cwd()
+        if parsed.jenga_file:
+            entry_file = Path(parsed.jenga_file).resolve()
+            if not entry_file.exists():
+                Colored.PrintError(f"Jenga file not found: {entry_file}")
+                return 1
         else:
-            # Return first test project
-            return test_projects[0]
-    
-    return None
+            entry_file = FileSystem.FindWorkspaceEntry(workspace_root)
+            if not entry_file:
+                Colored.PrintError("No .jenga workspace file found.")
+                return 1
+        workspace_root = entry_file.parent
 
+        # Utiliser le daemon si disponible
+        if not parsed.no_daemon:
+            from ..Core.Daemon import DaemonClient, DaemonStatus
+            client = DaemonClient(workspace_root)
+            if client.IsAvailable():
+                try:
+                    response = client.SendCommand('run', {
+                        'project': parsed.project,
+                        'config': parsed.config,
+                        'platform': parsed.platform,
+                        'args': parsed.args,
+                        'no_build': parsed.no_build
+                    })
+                    if response.get('status') == 'ok':
+                        return response.get('return_code', 0)
+                    else:
+                        Colored.PrintError(f"Daemon run failed: {response.get('message')}")
+                        return 1
+                except Exception as e:
+                    Colored.PrintWarning(f"Daemon error: {e}, falling back.")
 
-def get_all_test_projects(workspace) -> List[Dict]:
-    """Get all test projects in workspace"""
-    test_projects = []
-    for name, proj in workspace.projects.items():
-        if hasattr(proj, 'is_test') and proj.is_test:
-            test_projects.append({
-                'name': name,
-                'project': proj,
-                'parent': proj.parent_project
-            })
-    return test_projects
-
-
-def run_test_project(workspace, test_info: Dict, config: str, platform: str, 
-                    debugger: str, test_args: List[str]) -> int:
-    """Run a test project"""
-    
-    test_project = test_info['project']
-    expander = VariableExpander(workspace, test_project, config, platform)
-    
-    # Get executable path
-    target_dir = Path(expander.expand(test_project.targetdir))
-    target_name = expander.expand(test_project.targetname) if test_project.targetname else test_info['name']
-    
-    if platform == "Windows":
-        executable = target_dir / f"{target_name}.exe"
-    else:
-        executable = target_dir / target_name
-    
-    if not executable.exists():
-        Display.error(f"Test executable not found: {executable}")
-        Display.info("Build tests first with: jenga build")
-        return 1
-    
-    # Add test-specific arguments from project configuration
-    if hasattr(test_project, 'testoptions'):
-        test_args = list(test_project.testoptions) + test_args
-    
-    Display.section(f"Running Tests: {test_info['name']}")
-    Display.info(f"Parent Project: {test_info['parent']}")
-    Display.info(f"Executable: {executable}")
-    
-    # Run with debugger or directly
-    workspace_dir = Path(workspace.location) if workspace.location else Path.cwd()
-    
-    if debugger == 'none':
-        return run_direct(executable, test_args, workspace_dir)
-    else:
-        return run_with_debugger(executable, debugger, test_args, workspace_dir)
-
-
-def run_all_tests(workspace, config: str, platform: str, 
-                 debugger: str, test_args: List[str]) -> bool:
-    """Run all test projects"""
-    
-    test_projects = get_all_test_projects(workspace)
-    
-    if not test_projects:
-        Display.error("No test projects found in workspace")
-        Display.info("Create tests using 'test' context in .jenga file")
-        return False
-    
-    Display.info(f"Found {len(test_projects)} test project(s)")
-    
-    results = []
-    for test_info in test_projects:
-        result = run_test_project(workspace, test_info, config, platform, 
-                                debugger, test_args)
-        results.append((test_info['name'], result))
-        
-        # Add separator between test runs
-        if test_info != test_projects[-1]:
-            print("\n" + "=" * 70 + "\n")
-    
-    # Summary
-    Display.section("Test Summary")
-    passed = 0
-    failed = 0
-    
-    for name, result in results:
-        if result == 0:
-            Display.success(f"✓ {name}: PASSED")
-            passed += 1
-        else:
-            Display.error(f"✗ {name}: FAILED (code: {result})")
-            failed += 1
-    
-    Display.info(f"\nTotal: {len(results)} test project(s)")
-    Display.info(f"Passed: {passed}, Failed: {failed}")
-    
-    return failed == 0
-
-
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
-def find_executable(workspace, config: str, platform: str, project_name: Optional[str] = None):
-    """Find executable to run"""
-    
-    # Determine project
-    if not project_name:
-        project_name = workspace.startproject
-    
-    if not project_name:
-        # Find first executable project
-        for name, proj in workspace.projects.items():
-            if proj.kind in [ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE]:
-                project_name = name
-                break
-    
-    if not project_name:
-        Display.error("No executable project found")
-        return None, None
-    
-    if project_name not in workspace.projects:
-        Display.error(f"Project not found: {project_name}")
-        return None, None
-    
-    project = workspace.projects[project_name]
-    
-    # Check if executable
-    if project.kind not in [ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE]:
-        Display.error(f"Project '{project_name}' is not executable (kind: {project.kind})")
-        return None, None
-    
-    # Get executable path
-    expander = VariableExpander(workspace, project, config, platform)
-    
-    # Get target directory and name
-    target_dir = Path(expander.expand(project.targetdir))
-    target_name = expander.expand(project.targetname) if project.targetname else project.name
-    
-    # Determine extension
-    if platform == "Windows":
-        executable = target_dir / f"{target_name}.exe"
-    else:
-        executable = target_dir / target_name
-    
-    if not executable.exists():
-        Display.error(f"Executable not found: {executable}")
-        Display.info("Build first with: jenga build")
-        return None, None
-    
-    return executable, project
-
-
-def check_debugger_available(debugger: str) -> bool:
-    """Check if debugger is available on system"""
-    debugger_info = DEBUGGERS.get(debugger)
-    if not debugger_info:
-        return False
-    
-    command = debugger_info['command']
-    
-    try:
-        result = subprocess.run(
-            [command, '--version'],
-            capture_output=True,
-            timeout=2
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-
-
-def run_with_debugger(executable: Path, debugger: str, args: List[str], workspace_dir: Path) -> int:
-    """Run executable with specified debugger"""
-    
-    debugger_info = DEBUGGERS[debugger]
-    
-    # Check availability
-    if not check_debugger_available(debugger):
-        Display.error(f"{debugger_info['name']} not found on system")
-        Display.info(f"Install {debugger} or use --debug=none")
-        
-        # Provide installation instructions
-        if debugger in ['gdb', 'ggdb']:
-            Display.info("\nInstall GDB:")
-            Display.info("  Linux: sudo apt-get install gdb")
-            Display.info("  MacOS: brew install gdb")
-            Display.info("  Windows: Install MinGW-w64 or Cygwin")
-        elif debugger == 'lldb':
-            Display.info("\nInstall LLDB:")
-            Display.info("  MacOS: Included with Xcode Command Line Tools")
-            Display.info("  Linux: sudo apt-get install lldb")
-        
-        return 1
-    
-    # Build command
-    cmd = [debugger_info['command']] + debugger_info['args'] + [str(executable)] + args
-    
-    Display.info(f"Starting {debugger_info['name']}...")
-    Display.info(f"Command: {' '.join(cmd)}")
-    
-    if 'note' in debugger_info:
-        Display.warning(f"Note: {debugger_info['note']}")
-    
-    print("=" * 70)
-    
-    try:
-        result = subprocess.run(cmd, cwd=workspace_dir)
-        print("=" * 70)
-        
-        if result.returncode == 0:
-            Display.success("Debugger session completed")
-        else:
-            Display.warning(f"Debugger exited with code {result.returncode}")
-        
-        return result.returncode
-        
-    except KeyboardInterrupt:
-        Display.warning("\nDebugger interrupted")
-        return 130
-    except Exception as e:
-        Display.error(f"Error running debugger: {e}")
-        return 1
-
-
-def run_direct(executable: Path, args: List[str], workspace_dir: Path) -> int:
-    """Run executable directly without debugger"""
-    
-    Display.info(f"Running: {executable}")
-    print("=" * 70)
-    
-    try:
-        result = subprocess.run(
-            [str(executable)] + args,
-            cwd=workspace_dir
-        )
-        
-        print("=" * 70)
-        
-        if result.returncode == 0:
-            Display.success("Program completed successfully")
-        else:
-            Display.warning(f"Program exited with code {result.returncode}")
-        
-        return result.returncode
-        
-    except FileNotFoundError:
-        Display.error(f"Could not execute: {executable}")
-        return 127
-    except KeyboardInterrupt:
-        Display.warning("\nProgram interrupted")
-        return 130
-    except Exception as e:
-        Display.error(f"Error running program: {e}")
-        return 1
-
-
-# ============================================================================
-# MAIN EXECUTION
-# ============================================================================
-
-def execute(options: dict) -> bool:
-    """Execute run command"""
-    
-    # Load workspace
-    workspace = load_workspace()
-    if not workspace:
-        return False
-    
-    # Extract options
-    config = options.get("config", "Debug")
-    platform = options.get("platform", "Windows")
-    project_name = options.get("project")
-    debugger = options.get("debug", "none")
-    run_tests = options.get("test")
-    program_args = options.get("args", [])
-    
-    # Auto-detect platform if not specified
-    if platform == "Windows":
-        import platform as sys_platform
-        if sys_platform.system() == "Linux":
-            platform = "Linux"
-        elif sys_platform.system() == "Darwin":
-            platform = "MacOS"
-    
-    # Validate debugger
-    if debugger not in ['none'] and debugger not in DEBUGGERS:
-        Display.error(f"Unknown debugger: {debugger}")
-        Display.info(f"Available: {', '.join(['none'] + list(DEBUGGERS.keys()))}")
-        return False
-    
-    if run_tests:
-        if run_tests == 'all':
-            test_projects = get_all_test_projects(workspace)
-            executed_any = True
-            for test_info in test_projects:
-                executed_any = run_test_project(workspace, test_info, config, platform, debugger, program_args) and executed_any
-            return executed_any
-        test_info = find_test_project(workspace, run_tests)
-        if not test_info:
-            Display.error(f"No test project found for '{run_tests or workspace.startproject or 'default'}'")
-            
-            # Show available test projects
-            test_projects = get_all_test_projects(workspace)
-            if test_projects:
-                Display.info("\nAvailable test projects:")
-                for tp in test_projects:
-                    Display.info(f"  • {tp['name']} (parent: {tp['parent']})")
-                Display.info("\nRun all tests with: jenga run --alltest")
+        # Mode direct
+        loader = Loader(verbose=False)
+        cache = Cache(workspace_root)
+        workspace = cache.LoadWorkspace(entry_file, loader)
+        if workspace is None:
+            workspace = loader.LoadWorkspace(str(entry_file))
+            if workspace:
+                cache.SaveWorkspace(workspace, entry_file, loader)
             else:
-                Display.info("\nNo test projects found. Create tests using 'test' context.")
-            
-            return False
-        
-        return run_test_project(workspace, test_info, config, platform, debugger, program_args) == 0
-    
-    # Normal executable run
-    executable, project = find_executable(workspace, config, platform, project_name)
-    if not executable:
-        return False
-    
-    # Display info
-    Display.info(f"Project: {project.name}")
-    Display.info(f"Configuration: {config}")
-    Display.info(f"Platform: {platform}")
-    Display.info(f"Executable: {executable}")
-    
-    if debugger != 'none':
-        Display.info(f"Debugger: {DEBUGGERS[debugger]['name']}")
-    
-    if program_args:
-        Display.info(f"Arguments: {' '.join(program_args)}")
-    
-    print()
-    
-    # Run
-    workspace_dir = Path(workspace.location) if workspace.location else Path.cwd()
-    
-    if debugger == 'none':
-        returncode = run_direct(executable, program_args, workspace_dir)
-    else:
-        returncode = run_with_debugger(executable, debugger, program_args, workspace_dir)
-    
-    return returncode == 0
+                Colored.PrintError("Failed to load workspace.")
+                return 1
 
+        # Déterminer le projet à exécuter
+        project_name = parsed.project
+        if not project_name:
+            project_name = workspace.startProject
+        if not project_name:
+            # Chercher le premier projet de type exécutable
+            for name, proj in workspace.projects.items():
+                if proj.kind in (Api.ProjectKind.CONSOLE_APP, Api.ProjectKind.WINDOWED_APP, Api.ProjectKind.TEST_SUITE):
+                    project_name = name
+                    break
+        if not project_name:
+            Colored.PrintError("No executable project found.")
+            return 1
 
-# ============================================================================
-# COMMAND LINE INTERFACE
-# ============================================================================
+        if project_name not in workspace.projects:
+            Colored.PrintError(f"Project '{project_name}' not found.")
+            return 1
 
-def main():
-    """Main entry point for command line"""
-    import argparse
-    
-    parser = argparse.ArgumentParser(
-        description="Run executable projects and unit tests",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Run default project
-  jenga run
-  
-  # Run with GDB debugger
-  jenga run --debug=gdb
-  
-  # Run with GGDB (extended debug info)
-  jenga run --debug=ggdb
-  
-  # Run specific project
-  jenga run --project MyApp
-  
-  # Run with arguments
-  jenga run --verbose --config=test.json
-  
-  # Run Release build
-  jenga run --config Release
-  
-  # Run with Valgrind memory check
-  jenga run --debug=valgrind
-  
-  # Run unit tests for default project
-  jenga run --test
-  
-  # Run unit tests for specific project
-  jenga run --test MyApp
-  
-  # Run all unit tests in workspace
-  jenga run --alltest
-  
-  # Run tests with custom arguments
-  jenga run --test --verbose --filter=Math*
-  
-Debuggers:
-  none      - Run directly (default)
-  gdb       - GNU Debugger
-  ggdb      - GDB with extended debug info
-  lldb      - LLVM Debugger (macOS/Linux)
-  valgrind  - Memory debugger (Linux/macOS)
-"""
-    )
-    
-    parser.add_argument(
-        '--config',
-        default='Debug',
-        help='Build configuration (default: Debug)'
-    )
-    
-    parser.add_argument(
-        '--platform',
-        default='Windows',
-        help='Target platform (default: Windows)'
-    )
-    
-    parser.add_argument(
-        '--project',
-        help='Project name to run (default: startup project)'
-    )
-    
-    parser.add_argument(
-        '--debug',
-        default='none',
-        choices=['none', 'gdb', 'ggdb', 'lldb', 'valgrind'],
-        help='Debugger to use (default: none)'
-    )
-    
-    parser.add_argument(
-        '--test',
-        help='Run unit tests for the project'
-    )
-    
-    parser.add_argument(
-        'args',
-        nargs='*',
-        help='Arguments to pass to the executable or test runner'
-    )
-    
-    # Validate mutual exclusivity
-    parsed = parser.parse_args()
-    
-    if parsed.test and parsed.alltest:
-        parser.error("--test and --alltest are mutually exclusive")
-    
-    options = {
-        'config': parsed.config,
-        'platform': parsed.platform,
-        'project': parsed.project,
-        'debug': parsed.debug,
-        'test': parsed.test,
-        'args': parsed.args,
-    }
-    
-    success = execute(options)
-    sys.exit(0 if success else 1)
+        project = workspace.projects[project_name]
 
+        # Build si nécessaire
+        if not parsed.no_build:
+            Colored.PrintInfo(f"Building {project_name}...")
+            build_args = ["--config", parsed.config]
+            if parsed.platform:
+                build_args += ["--platform", parsed.platform]
+            if parsed.jenga_file:
+                build_args += ["--jenga-file", str(entry_file)]
+            build_args += ["--target", project_name]
+            ret = BuildCommand.Execute(build_args)
+            if ret != 0:
+                return ret
 
-if __name__ == "__main__":
-    main()
+        # Déterminer le chemin de l'exécutable
+        # Il faut un builder pour connaître l'extension et le chemin exact
+        try:
+            builder = BuildCommand.CreateBuilder(
+                workspace,
+                config=parsed.config,
+                platform=parsed.platform or (workspace.targetOses[0].value if workspace.targetOses else "Windows"),
+                target=project_name,
+                verbose=False
+            )
+        except Exception as e:
+            Colored.PrintError(f"Cannot create builder: {e}")
+            return 1
+
+        exe_path = builder.GetTargetPath(project)
+        if not exe_path.exists():
+            Colored.PrintError(f"Executable not found: {exe_path}")
+            return 1
+
+        # Exécuter
+        Colored.PrintInfo(f"Running {exe_path}...")
+        cmd = [str(exe_path)] + parsed.args
+        return Process.Run(cmd)

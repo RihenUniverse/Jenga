@@ -1,852 +1,351 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Nken Build System - Configuration Loader
-Loads and executes .jenga files
+Loader – Chargement des workspaces et projets Jenga.
+
+Responsabilités :
+  - Exécuter un fichier .jenga racine et construire l'objet Workspace.
+  - Gérer les inclusions (include, batchinclude) via l'API déjà existante.
+  - Post-traiter le workspace : expansion des variables, normalisation des chemins.
+  - Permettre le rechargement individuel d'un fichier externe pour mise à jour incrémentale.
+  - Charger un projet standalone (hors workspace).
+
+Utilise l'API définie dans Jenga.Api et le moteur d'expansion Variables.
 """
 
+import os
 import sys
 from pathlib import Path
+from typing import Optional, Dict, List, Any, Tuple, Callable
+import traceback
 import importlib.util
-import re
 
-import os
-import json
-import time
-import hashlib
-from typing import Optional, Dict, Any, List
-from dataclasses import asdict
-import pickle
-
-# Fix imports to work from any context
-try:
-    from .api import get_current_workspace, reset_state, _current_project, _current_workspace
-    from .variables import VariableExpander, resolve_file_list
-except ImportError:
-    from core.api import get_current_workspace, reset_state
-    try:
-        from core.api import _current_project, _current_workspace
-    except ImportError:
-        _current_project = None
-        _current_workspace = None
-    try:
-        from core.variables import VariableExpander, resolve_file_list
-    except ImportError:
-        # Fallback minimal implementation
-        class VariableExpander:
-            def __init__(self, workspace, project, config, platform):
-                self.workspace = workspace
-                self.project = project
-                self.config = config
-                self.platform = platform
-            
-            def expand(self, text: str) -> str:
-                return text.replace("%{wks.location}", self.workspace.location or ".")
-
-try:
-    from ..utils.display import Display
-except ImportError:
-    from utils.display import Display
+# Import de l'API Jenga (définit workspace, project, etc.)
+from Jenga.Core import Api
+from .Variables import VariableExpander
+from .GlobalToolchains import ApplyGlobalRegistryToWorkspace
+from ..Utils import Colored, FileSystem
 
 
-class JengaCache:
-    """Gestionnaire de cache pour les configurations .jenga"""
-    
-    def __init__(self, jenga_file: Path):
+class Loader:
+    """
+    Chargeur de workspaces et projets.
+    Instance unique par commande, mais peut être réutilisée.
+    """
+
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
+        self._expandCache: Dict[str, VariableExpander] = {}  # expandeur par workspace
+        self._currentWorkspace: Optional[Any] = None
+        self._currentProject: Optional[Any] = None
+
+    def _ValidateWorkspace(self, workspace: Any) -> bool:
         """
-        Initialise le système de cache
-        
-        Args:
-            jenga_file: Chemin vers le fichier .jenga principal
+        Vérifie que le workspace est valide : doit avoir au moins un projet non interne.
+        Retourne True si valide, False sinon.
         """
-        self.jenga_file = jenga_file.resolve()
-        self.cache_dir = self.jenga_file.parent / ".jenga_cache"
-        self.cache_file = self.cache_dir / f"{self.jenga_file.stem}.cache.json"
-        self.files_cache_file = self.cache_dir / f"{self.jenga_file.stem}.files.json"
-        
-        # Créer le répertoire de cache si nécessaire
-        self.cache_dir.mkdir(exist_ok=True)
-        
-        # Version du cache (invalide le cache si format change)
-        self.cache_version = "2.0"
-        
-        # Cache des patterns de fichiers
-        self.files_cache: Dict[str, Dict[str, Any]] = {}
-        self._load_files_cache()
-    
-    def _load_files_cache(self):
-        """Charger le cache des fichiers"""
-        if self.files_cache_file.exists():
-            try:
-                with open(self.files_cache_file, 'r', encoding='utf-8') as f:
-                    self.files_cache = json.load(f)
-            except:
-                self.files_cache = {}
-    
-    def _save_files_cache(self):
-        """Sauvegarder le cache des fichiers"""
-        try:
-            with open(self.files_cache_file, 'w', encoding='utf-8') as f:
-                json.dump(self.files_cache, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"⚠️ Warning: Failed to save files cache: {e}")
-    
-    def get_file_hash(self, file_path: str) -> str:
-        """Calculer un hash rapide pour un fichier (mtime + taille)"""
-        try:
-            path = Path(file_path)
-            if not path.exists():
-                return ""
-            
-            # Utiliser mtime et taille pour un hash rapide
-            stat = path.stat()
-            mtime = stat.st_mtime
-            size = stat.st_size
-            
-            hasher = hashlib.md5()
-            hasher.update(f"{mtime}:{size}:{file_path}".encode())
-            return hasher.hexdigest()
-        except:
-            return ""
-    
-    def _resolve_patterns_with_cache(self, patterns: List[str], base_dir: str, 
-                                   expander: VariableExpander, cache_key: str) -> List[str]:
-        """
-        Résoudre les patterns avec cache intelligent
-        
-        Args:
-            patterns: Liste des patterns à résoudre
-            base_dir: Répertoire de base pour la résolution
-            expander: Expander pour les variables
-            cache_key: Clé unique pour ce projet/contexte
-        
-        Returns:
-            Liste des fichiers résolus
-        """
-        from pathlib import Path
-        
-        resolved_files = []
-        
-        for pattern in patterns:
-            # Expander les variables dans le pattern
-            expanded_pattern = expander.expand(pattern)
-            
-            # Créer une clé de cache pour ce pattern
-            pattern_hash = hashlib.md5(f"{cache_key}:{expanded_pattern}".encode()).hexdigest()[:16]
-            cache_entry_key = f"{pattern_hash}"
-            
-            # Vérifier si le pattern est dans le cache et encore valide
-            if cache_entry_key in self.files_cache:
-                cache_entry = self.files_cache[cache_entry_key]
-                
-                # Vérifier si le pattern a changé
-                if cache_entry.get("pattern") == expanded_pattern:
-                    # Vérifier si les fichiers existent toujours
-                    cached_files = cache_entry.get("files", [])
-                    all_files_exist = True
-                    
-                    for file_path in cached_files:
-                        if not Path(file_path).exists():
-                            all_files_exist = False
-                            break
-                    
-                    if all_files_exist:
-                        resolved_files.extend(cached_files)
-                        continue
-            
-            # Si pas dans le cache ou invalide, résoudre normalement
-            # Utiliser glob pour la résolution des patterns
-            import glob
-            
-            # Convertir le pattern en chemin absolu
-            if Path(expanded_pattern).is_absolute():
-                search_pattern = expanded_pattern
-            else:
-                search_pattern = str(Path(base_dir) / expanded_pattern)
-            
-            # Résoudre avec glob
-            try:
-                matched_files = glob.glob(search_pattern, recursive=True)
-                
-                # Filtrer seulement les fichiers (pas les répertoires)
-                matched_files = [f for f in matched_files if Path(f).is_file()]
-                
-                # Ajouter au cache
-                self.files_cache[cache_entry_key] = {
-                    "pattern": expanded_pattern,
-                    "base_dir": base_dir,
-                    "files": matched_files,
-                    "timestamp": time.time()
-                }
-                
-                resolved_files.extend(matched_files)
-                
-            except Exception as e:
-                print(f"⚠️ Warning: Failed to resolve pattern {pattern}: {e}")
-                # Fallback: utiliser le pattern tel quel
-                if Path(expanded_pattern).exists():
-                    resolved_files.append(expanded_pattern)
-        
-        # Sauvegarder le cache après chaque résolution
-        self._save_files_cache()
-        
-        return list(set(resolved_files))  # Supprimer les doublons
-    
-    def needs_rebuild(self, workspace_hash: str = None) -> bool:
-        """
-        Vérifier si le cache doit être reconstruit
-        
-        Args:
-            workspace_hash: Hash du workspace actuel (optionnel)
-        
-        Returns:
-            True si le cache doit être reconstruit
-        """
-        # Pas de cache fichier → rebuild nécessaire
-        if not self.cache_file.exists():
-            return True
-        
-        # .jenga modifié plus récemment que le cache → rebuild
-        jenga_mtime = self.jenga_file.stat().st_mtime
-        cache_mtime = self.cache_file.stat().st_mtime
-        
-        if jenga_mtime > cache_mtime:
-            return True
-        
-        try:
-            # Charger le cache pour vérifier la version
-            with open(self.cache_file, 'r', encoding='utf-8') as f:
-                cache_data = json.load(f)
-            
-            # Vérifier la version du cache
-            if cache_data.get("version") != self.cache_version:
-                return True
-            
-            # Vérifier le hash du workspace (si fourni)
-            if workspace_hash and cache_data.get("workspace_hash") != workspace_hash:
-                return True
-            
+        if workspace is None:
             return False
-            
-        except:
-            return True
-    
-    def save_workspace(self, workspace, additional_info: Dict[str, Any] = None):
-        """
-        Sauvegarder un workspace dans le cache
-        
-        Args:
-            workspace: Workspace à sauvegarder
-            additional_info: Informations supplémentaires à sauvegarder
-        """
-        from .api import Workspace, Project, Toolchain
-        
-        # Calculer un hash pour le workspace
-        workspace_hash = self._calculate_workspace_hash(workspace)
-        
-        # Préparer les données à sauvegarder
-        cache_data = {
-            "version": self.cache_version,
-            "timestamp": time.time(),
-            "jenga_file": str(self.jenga_file),
-            "workspace_hash": workspace_hash,
-            "workspace": {
-                "name": workspace.name,
-                "location": workspace.location,
-                "configurations": workspace.configurations,
-                "platforms": workspace.platforms,
-                "startproject": workspace.startproject,
-            },
-            "projects": {},
-            "toolchains": {},
-            "additional_info": additional_info or {}
-        }
-        
-        # Sauvegarder les projets (sans les fichiers résolus)
-        for name, project in workspace.projects.items():
-            cache_data["projects"][name] = self._serialize_project(project)
-        
-        # Sauvegarder les toolchains
-        for name, toolchain in workspace.toolchains.items():
-            cache_data["toolchains"][name] = self._serialize_toolchain(toolchain)
-        
-        # Sauvegarder le cache
-        try:
-            with open(self.cache_file, 'w', encoding='utf-8') as f:
-                json.dump(cache_data, f, indent=2, ensure_ascii=False)
-            
-            # print(f"✅ Cache sauvegardé: {self.cache_file}")
-        except Exception as e:
-            print(f"⚠️ Warning: Failed to save cache: {e}")
-    
-    def load_workspace(self):
-        """
-        Charger un workspace depuis le cache
-        
-        Returns:
-            Workspace chargé ou None
-        """
-        from .api import Workspace, Project, Toolchain, ProjectKind, Language, Optimization
-        
-        if not self.cache_file.exists():
-            return None
-        
-        try:
-            with open(self.cache_file, 'r', encoding='utf-8') as f:
-                cache_data = json.load(f)
-            
-            # Vérifier la version
-            if cache_data.get("version") != self.cache_version:
-                return None
-            
-            # Créer le workspace
-            ws_data = cache_data["workspace"]
-            workspace = Workspace(
-                name=ws_data["name"],
-                location=ws_data.get("location", ""),
-                configurations=ws_data.get("configurations", ["Debug", "Release"]),
-                platforms=ws_data.get("platforms", ["Windows"]),
-                startproject=ws_data.get("startproject", "")
-            )
-            
-            # Restaurer les toolchains
-            for name, tc_data in cache_data.get("toolchains", {}).items():
-                toolchain = Toolchain(
-                    name=name,
-                    compiler=tc_data.get("compiler", "")
-                )
-                
-                # Restaurer les attributs
-                for key, value in tc_data.items():
-                    if key != "name" and hasattr(toolchain, key):
-                        setattr(toolchain, key, value)
-                
-                workspace.toolchains[name] = toolchain
-            
-            # Restaurer les projets
-            for name, proj_data in cache_data.get("projects", {}).items():
-                # Créer le projet
-                project = Project(
-                    name=name,
-                    kind=ProjectKind(proj_data["kind"]) if proj_data.get("kind") else ProjectKind.CONSOLE_APP,
-                    language=Language(proj_data["language"]) if proj_data.get("language") else Language.CPP,
-                    location=proj_data.get("location", ".")
-                )
-                
-                # Restaurer les attributs simples
-                simple_attrs = [
-                    'cppdialect', 'cdialect', 'pchheader', 'pchsource',
-                    'objdir', 'targetdir', 'targetname', 'warnings',
-                    'toolchain', '_explicit_toolchain', 'is_test',
-                    'parent_project', 'testmainfile', 'testmaintemplate',
-                    'androidapplicationid', 'androidversioncode', 
-                    'androidversionname', 'androidminsdk', 'androidtargetsdk',
-                    'androidsign', 'androidkeystore', 'androidkeystorepass',
-                    'androidkeyalias', 'iosbundleid', 'iosversion', 'iosminsdk'
-                ]
-                
-                for attr in simple_attrs:
-                    if attr in proj_data:
-                        setattr(project, attr, proj_data[attr])
-                
-                # Restaurer les listes
-                list_attrs = [
-                    'files', 'excludefiles', 'excludemainfiles',
-                    'includedirs', 'libdirs', 'links', 'dependson',
-                    'dependfiles', 'embedresources', 'defines',
-                    'prebuildcommands', 'postbuildcommands',
-                    'prelinkcommands', 'postlinkcommands',
-                    'testoptions', 'testfiles'
-                ]
-                
-                for attr in list_attrs:
-                    if attr in proj_data:
-                        setattr(project, attr, proj_data[attr])
-                
-                # Restaurer les dicts
-                if 'system_defines' in proj_data:
-                    project.system_defines = proj_data['system_defines']
-                if 'system_links' in proj_data:
-                    project.system_links = proj_data['system_links']
-                if '_filtered_defines' in proj_data:
-                    project._filtered_defines = proj_data['_filtered_defines']
-                if '_filtered_optimize' in proj_data:
-                    project._filtered_optimize = {
-                        k: Optimization(v) for k, v in proj_data['_filtered_optimize'].items()
-                    }
-                if '_filtered_symbols' in proj_data:
-                    project._filtered_symbols = proj_data['_filtered_symbols']
-                
-                # Restaurer l'optimization
-                if 'optimize' in proj_data:
-                    project.optimize = Optimization(proj_data['optimize'])
-                
-                # Restaurer symbols
-                if 'symbols' in proj_data:
-                    project.symbols = proj_data['symbols']
-                
-                # Ajouter au workspace
-                workspace.projects[name] = project
-            
-            # print(f"✅ Cache chargé: {len(workspace.projects)} projets")
-            return workspace
-            
-        except Exception as e:
-            print(f"⚠️ Warning: Failed to load cache: {e}")
-            return None
-    
-    def _serialize_project(self, project) -> Dict[str, Any]:
-        """Sérialiser un projet pour le cache"""
-        # Exclure les attributs temporaires et les gros objets
-        exclude_attrs = {
-            '_current_filter', '_in_workspace', '_standalone',
-            '_external', '_external_file', '_external_dir',
-            '_original_location'
-        }
-        
-        serialized = {}
-        
-        for attr_name in dir(project):
-            # Ignorer les attributs privés spéciaux et méthodes
-            if attr_name.startswith('__') or callable(getattr(project, attr_name)):
-                continue
-            
-            # Ignorer les attributs exclus
-            if attr_name in exclude_attrs:
-                continue
-            
-            try:
-                value = getattr(project, attr_name)
-                
-                # Gérer les types spéciaux
-                if hasattr(value, 'value'):  # Enum
-                    serialized[attr_name] = value.value
-                elif isinstance(value, (str, int, float, bool, type(None))):
-                    serialized[attr_name] = value
-                elif isinstance(value, (list, tuple)):
-                    serialized[attr_name] = list(value)
-                elif isinstance(value, dict):
-                    serialized[attr_name] = dict(value)
-                # Ignorer les autres types (comme les objets complexes)
-                
-            except:
-                pass
-        
-        return serialized
-    
-    def _serialize_toolchain(self, toolchain) -> Dict[str, Any]:
-        """Sérialiser un toolchain pour le cache"""
-        serialized = {}
-        
-        for attr_name in dir(toolchain):
-            if attr_name.startswith('_') or callable(getattr(toolchain, attr_name)):
-                continue
-            
-            try:
-                value = getattr(toolchain, attr_name)
-                
-                if isinstance(value, (str, int, float, bool, type(None))):
-                    serialized[attr_name] = value
-                elif isinstance(value, (list, tuple)):
-                    serialized[attr_name] = list(value)
-                elif isinstance(value, dict):
-                    serialized[attr_name] = dict(value)
-                    
-            except:
-                pass
-        
-        return serialized
-    
-    def _calculate_workspace_hash(self, workspace) -> str:
-        """Calculer un hash pour le workspace"""
-        import hashlib
-        
-        hasher = hashlib.md5()
-        
-        # Inclure les métadonnées du workspace
-        hasher.update(workspace.name.encode())
-        hasher.update(workspace.location.encode())
-        hasher.update(str(workspace.configurations).encode())
-        hasher.update(str(workspace.platforms).encode())
-        
-        # Inclure les noms des projets et toolchains
-        hasher.update(str(sorted(workspace.projects.keys())).encode())
-        hasher.update(str(sorted(workspace.toolchains.keys())).encode())
-        
-        return hasher.hexdigest()
-    
-    def clear(self):
-        """Effacer le cache"""
-        try:
-            if self.cache_file.exists():
-                self.cache_file.unlink()
-            if self.files_cache_file.exists():
-                self.files_cache_file.unlink()
-            # print("✅ Cache effacé")
-        except:
-            pass
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Obtenir des statistiques sur le cache"""
-        stats = {
-            "cache_file_exists": self.cache_file.exists(),
-            "files_cache_entries": len(self.files_cache),
-            "cache_dir": str(self.cache_dir)
-        }
-        
-        if self.cache_file.exists():
-            stats["cache_size"] = self.cache_file.stat().st_size
-            stats["cache_mtime"] = time.ctime(self.cache_file.stat().st_mtime)
-        
-        return stats
+        # Compter les projets qui ne commencent pas par '__'
+        non_internal = [p for p in workspace.projects.keys() if not p.startswith('__')]
+        if not non_internal:
+            self._Log("Workspace has no non-internal projects – treating as invalid.", "warning")
+            return False
+        return True
 
+    # -----------------------------------------------------------------------
+    # Private helpers – _PascalCase
+    # -----------------------------------------------------------------------
 
-class ConfigurationLoader:
-    """Loads .jenga configuration files"""
-    
-    @staticmethod
-    def find_jenga_file(start_dir: str = ".") -> Optional[Path]:
-        """Find .jenga file in current or parent directories"""
-        current = Path(start_dir).resolve()
-        
-        # Search in current and parent directories
-        for directory in [current] + list(current.parents):
-            for nken_file in directory.glob("*.jenga"):
-                return nken_file
-        
-        return None
-    
-    @staticmethod
-    def comment_jenga_imports(jenga_code: str) -> str:
-        """
-        Comment out all jenga imports to avoid import errors
-        Handles various import formats
-        """
-        lines = jenga_code.split('\n')
-        commented_lines = []
-        
-        for line in lines:
-            # Skip already commented lines
-            stripped = line.lstrip()
-            if stripped.startswith('#'):
-                commented_lines.append(line)
-                continue
-            
-            # Pattern to detect various jenga imports
-            patterns = [
-                # from XXX.jenga.core.api import xxx
-                r'^\s*from\s+(\w+\.)*jenga\.',
-                # from jenga.core.api import xxx  
-                r'^\s*from\s+jenga\.',
-                # import XXX.jenga.core.api as xxx
-                r'^\s*import\s+(\w+\.)*jenga\.',
-                # import jenga.core.api as xxx
-                r'^\s*import\s+jenga\.',
-                # from XXX.jenga import xxx
-                r'^\s*from\s+(\w+\.)*jenga\s+import\s+',
-                # import XXX.jenga as xxx
-                r'^\s*import\s+(\w+\.)*jenga\s+as\s+',
-                # import jenga as xxx
-                r'^\s*import\s+jenga\s+as\s+',
-                # import XXX.jenga
-                r'^\s*import\s+(\w+\.)*jenga(\s+|$)',
-                # import jenga
-                r'^\s*import\s+jenga(\s+|$)',
-            ]
-            
-            is_jenga_import = False
-            for pattern in patterns:
-                if re.match(pattern, line, re.IGNORECASE):
-                    is_jenga_import = True
-                    break
-            
-            if is_jenga_import:
-                # Check if it's a multi-line import (ends with backslash or parenthesis)
-                if line.rstrip().endswith('\\') or '(' in line:
-                    # It's a multi-line import, we need to handle it differently
-                    commented_lines.append(f"# {line}  # Auto-commented by Jenga loader")
-                    # We'll need to comment subsequent lines until the import ends
-                    # This is handled by the multi-line logic below
-                else:
-                    # Single line import, just comment it
-                    commented_lines.append(f"# {line}  # Auto-commented by Jenga loader")
-            else:
-                commented_lines.append(line)
-        
-        # Now handle multi-line imports by checking for continued lines
-        final_lines = []
-        in_multiline_import = False
-        
-        for line in commented_lines:
-            stripped = line.lstrip()
-            
-            # Check if this line starts a multi-line import that we've commented
-            if stripped.startswith('#') and any(pattern in line for pattern in [
-                'from jenga', 'import jenga', 'jenga.core', 'jenga import'
-            ]):
-                # Check if it continues on next line
-                if line.rstrip().endswith('\\'):
-                    in_multiline_import = True
-                    final_lines.append(line)
-                    continue
-                elif '(' in line and not ')' in line:
-                    # Multi-line import with parentheses
-                    in_multiline_import = True
-                    final_lines.append(line)
-                    continue
-            
-            # If we're in a multi-line import, continue commenting
-            if in_multiline_import:
-                if not stripped.startswith('#'):
-                    final_lines.append(f"# {line}  # Auto-commented by Jenga loader")
-                else:
-                    final_lines.append(line)
-                
-                # Check if this ends the multi-line import
-                if ')' in line or not line.rstrip().endswith('\\'):
-                    in_multiline_import = False
-            else:
-                final_lines.append(line)
-        
-        return '\n'.join(final_lines)
-    
-    @staticmethod
-    def load(file_path: str = None) -> Optional[object]:
-        """
-        Load a .jenga configuration file
-        Returns the workspace object
-        """
-        
-        # Reset global state
-        reset_state()
-        
-        # Find .jenga file
-        if file_path is None:
-            nken_path = ConfigurationLoader.find_jenga_file()
-            if nken_path is None:
-                Display.error("No .jenga file found in current directory or parents")
-                return None
+    def _Log(self, message: str, level: str = "info") -> None:
+        """Log conditionnel selon verbose."""
+        if not self.verbose and level not in ("error", "warning"):
+            return
+        if level == "error":
+            Colored.PrintError(f"[Loader] {message}")
+        elif level == "warning":
+            Colored.PrintWarning(f"[Loader] {message}")
         else:
-            nken_path = Path(file_path)
-            if not nken_path.exists():
-                Display.error(f"Configuration file not found: {file_path}")
-                return None
-        
-        Display.info(f"Loading configuration: {nken_path.name}")
-        
-        try:
-            # Get absolute path
-            nken_path = nken_path.resolve()
-            
-            # Change to the directory containing the .jenga file
-            original_dir = Path.cwd()
-            nken_dir = nken_path.parent
-            
-            # Add the directory to Python path
-            sys.path.insert(0, str(nken_dir))
-            
-            # Import the Tools.core module to make API available
-            tools_dir = Path(__file__).parent.parent
-            if str(tools_dir) not in sys.path:
-                sys.path.insert(0, str(tools_dir))
-            
-            # Import core.api to get API functions
-            try:
-                import core.api as api
-            except ImportError:
-                # Fallback: try absolute import from Tools
-                sys.path.insert(0, str(tools_dir.parent))
-                from Tools import core
-                api = core.api
-            
-            # Read the .jenga file with UTF-8 encoding
-            with open(nken_path, 'r', encoding='utf-8') as f:
-                jenga_code = f.read()
-            
-            # Comment out all jenga imports
-            jenga_code = ConfigurationLoader.comment_jenga_imports(jenga_code)
-            
-            # Also remove any other potential problematic imports
-            # This handles edge cases like relative imports that might conflict
-            additional_patterns = [
-                # Remove any 'from .api import' lines (these might be leftover from templates)
-                (r'^\s*from\s+\.api\s+import\s+.*$', r'# \g<0>  # Auto-commented by Jenga loader'),
-                # Remove 'from api import' 
-                (r'^\s*from\s+api\s+import\s+.*$', r'# \g<0>  # Auto-commented by Jenga loader'),
-                # Remove 'import api'
-                (r'^\s*import\s+api(\s+|$)', r'# \g<0>  # Auto-commented by Jenga loader'),
-            ]
-            
-            for pattern, replacement in additional_patterns:
-                jenga_code = re.sub(pattern, replacement, jenga_code, flags=re.MULTILINE)
-            
-            # Create execution environment with API module
-            exec_globals = {
-                '__file__': str(nken_path),
-                '__name__': '__main__',
-                '__builtins__': __builtins__,
-            }
-            
-            # Import the API module into the execution context
-            # This way, when .jenga calls workspace(), it modifies api._current_workspace
-            exec_globals.update({name: getattr(api, name) for name in dir(api) if not name.startswith('_')})
-            
-            # Also add commonly used functions from api to avoid NameError
-            # Add aliases for commonly used API functions
-            api_aliases = {
-                'workspace': api.workspace,
-                'project': api.project,
-                'toolchain': api.toolchain,
-                'filter': api.filter,
-                'consoleapp': api.consoleapp,
-                'windowedapp': api.windowedapp,
-                'staticlib': api.staticlib,
-                'sharedlib': api.sharedlib,
-                'language': api.language,
-                'cppdialect': api.cppdialect,
-                'configurations': api.configurations,
-                'platforms': api.platforms,
-                'startproject': api.startproject,
-                'files': api.files,
-                'excludefiles': api.excludefiles,
-                'includedirs': api.includedirs,
-                'libdirs': api.libdirs,
-                'links': api.links,
-                'dependson': api.dependson,
-                'dependfiles': api.dependfiles,
-                'defines': api.defines,
-                'objdir': api.objdir,
-                'targetdir': api.targetdir,
-                'targetname': api.targetname,
-                'optimize': api.optimize,
-                'symbols': api.symbols,
-                'cppcompiler': api.cppcompiler,
-                'ccompiler': api.ccompiler,
-                'cxxflags': api.cxxflags,
-                'prebuild': api.prebuild,
-                'postbuild': api.postbuild,
-                'prelink': api.prelink,
-                'postlink': api.postlink,
-                'usetoolchain': api.usetoolchain,
-                'encoding': api.encoding,
-            }
-            
-            exec_globals.update(api_aliases)
-            
-            # Add the API module itself
-            exec_globals['api'] = api
-            
-            # Execute the .jenga file
-            try:
-                exec(jenga_code, exec_globals)
-            except NameError as e:
-                Display.error(f"NameError in configuration file: {e}")
-                Display.info("This might be due to missing imports. The following API functions are available:")
-                Display.info("  workspace(), project(), toolchain(), filter(), configurations(), platforms()")
-                Display.info("  consoleapp(), staticlib(), sharedlib(), language(), cppdialect()")
-                Display.info("  files(), includedirs(), defines(), optimize(), symbols()")
-                Display.info("  See documentation for complete list of available functions.")
-                return None
-            except Exception as e:
-                Display.error(f"Error executing configuration file: {e}")
-                import traceback
-                traceback.print_exc()
-                return None
-            
-            # Now get workspace from api module (not from exec_globals)
-            workspace = api.get_current_workspace()
-            
-            if workspace is None:
-                # ✅ SOLUTION: Check if a standalone project was defined
-                # Access the global variable directly from the api module
-                current_proj = getattr(api, '_current_project', None)
-                
-                if current_proj is not None:
-                    Display.info(f"Standalone project detected: {current_proj.name}")
-                    
-                    # Create automatic workspace for standalone project
-                    workspace = api.Workspace(name=f"Auto_{nken_path.stem}")
-                    workspace.location = str(nken_dir)
-                    workspace.configurations = ["Debug", "Release", "Dist"]
-                    workspace.platforms = ["Windows", "Linux", "MacOS"]
-                    
-                    # Add the standalone project to the workspace
-                    workspace.projects[current_proj.name] = current_proj
-                    
-                    # Set project location if not already set
-                    if not current_proj.location or current_proj.location == ".":
-                        current_proj.location = str(nken_dir)
-                    
-                    # Create default toolchain
-                    default_tc = api.Toolchain(name="default", compiler="clang++")
-                    default_tc.cppcompiler = "clang++"
-                    default_tc.ccompiler = "clang"
-                    default_tc.linker = "clang++"
-                    default_tc.archiver = "ar"
-                    workspace.toolchains["default"] = default_tc
-                    
-                    # Assign toolchain to project if not set
-                    if not current_proj.toolchain:
-                        current_proj.toolchain = "default"
-                    
-                    Display.success(f"Auto-created workspace '{workspace.name}' for standalone project '{current_proj.name}'")
+            Colored.PrintInfo(f"[Loader] {message}")
+
+    def _PrepareGlobals(self,
+                        filePath: Path,
+                        parentWorkspace: Optional[Any] = None,
+                        isInclude: bool = False) -> dict:
+        """
+        Prépare le dictionnaire global pour l'exécution d'un fichier .jenga.
+        Réinitialise l'état de l'API et injecte les symboles publics.
+        """
+        # Réinitialisation propre
+        Api.resetstate()
+
+        # Si on est dans un include, on crée un workspace temporaire qui hérite
+        if parentWorkspace is not None:
+            tempWks = Api.Workspace(name=f"__include_{filePath.stem}__")
+            tempWks.location = str(filePath.parent)
+            # Héritage des toolchains et unitest
+            tempWks.toolchains = dict(parentWorkspace.toolchains)
+            tempWks.defaultToolchain = parentWorkspace.defaultToolchain
+            tempWks.unitestConfig = parentWorkspace.unitestConfig
+            Api._currentWorkspace = tempWks
+        else:
+            # Fichier racine : le workspace sera créé par l'utilisateur
+            Api._currentWorkspace = None
+
+        # Construction du contexte d'exécution
+        globals_dict = {
+            '__file__': str(filePath),
+            '__name__': '__main__' if parentWorkspace is None else '__external__',
+            '__builtins__': __builtins__,
+            'Path': Path,
+        }
+
+        # Injecter tous les symboles publics de l'API
+        for name in Api.__all__:
+            if not name.startswith('_'):
+                globals_dict[name] = getattr(Api, name)
+
+        return globals_dict
+
+    def _CreateExpanderForWorkspace(self, workspace: Any) -> VariableExpander:
+        """Crée un expandeur configuré pour un workspace donné."""
+        expander = VariableExpander(
+            workspace=workspace,
+            baseDir=Path(workspace.location) if workspace.location else Path.cwd(),
+            jengaRoot=None  # auto-détecté
+        )
+        if workspace.unitestConfig:
+            expander.SetUnitestConfig(workspace.unitestConfig)
+        return expander
+
+    def _PostProcessWorkspace(self, workspace: Any, entryFile: Path) -> None:
+        """
+        Applique les transformations après chargement :
+        - Définit les valeurs par défaut (objDir, targetDir)
+        - Expansion des variables (sans résolution des chemins relatifs pour les sources)
+        - Résolution des chemins de sortie et des toolchains (deviennent absolus)
+        """
+        if workspace is None:
+            return
+
+        if not workspace.location:
+            workspace.location = str(entryFile.parent)
+
+        # Inject global Jenga toolchains (shared registry) before expansions.
+        ApplyGlobalRegistryToWorkspace(workspace)
+
+        baseDir = Path(workspace.location).resolve()
+        expander = self._CreateExpanderForWorkspace(workspace)
+        self._expandCache[str(entryFile)] = expander
+
+        # ------------------------------------------------------------
+        # 1. Valeurs par défaut pour objDir et targetDir (avec variables)
+        # ------------------------------------------------------------
+        for proj in workspace.projects.values():
+            if proj.objDir is None or proj.objDir == "":
+                proj.objDir = "%{wks.location}/Build/Obj/%{cfg.buildcfg}/%{prj.name}"
+            if proj.targetDir is None or proj.targetDir == "":
+                if proj.kind in (Api.ProjectKind.STATIC_LIB, Api.ProjectKind.SHARED_LIB):
+                    proj.targetDir = "%{wks.location}/Build/Lib/%{cfg.buildcfg}/%{prj.name}"
                 else:
-                    Display.error("No workspace or project defined in configuration file")
-                    Display.info("Your .jenga file must contain either:")
-                    Display.info("  1. A workspace: with workspace('YourName'): ...")
-                    Display.info("  2. A standalone project: with project('YourName'): ...")
-                    Display.info("")
-                    Display.info("Debug info:")
-                    Display.info(f"  - File: {nken_path}")
-                    Display.info(f"  - api._current_project: {getattr(api, '_current_project', 'NOT FOUND')}")
-                    Display.info(f"  - api._current_workspace: {getattr(api, '_current_workspace', 'NOT FOUND')}")
-                    Display.info("")
-                    Display.info("Common issues:")
-                    Display.info("  - Missing 'with workspace(...)' or 'with project(...)' statement")
-                    Display.info("  - API functions called outside context")
-                    Display.info("  - Syntax errors in the .jenga file")
-                    return None
-            
-            # Set workspace location to the directory containing .jenga file
-            if not workspace.location:
-                workspace.location = str(nken_dir)
-            
-            # Validate workspace has at least one toolchain
-            if not workspace.toolchains:
-                Display.warning("No toolchains defined - creating default toolchain")
-                # Create a default toolchain
-                default_tc = api.Toolchain(name="default", compiler="clang++")
-                default_tc.cppcompiler = "clang++"
-                default_tc.ccompiler = "clang"
-                default_tc.linker = "clang++"
-                default_tc.archiver = "ar"
-                workspace.toolchains["default"] = default_tc
-            
-            Display.success(f"Workspace '{workspace.name}' loaded with {len(workspace.projects)} project(s)")
-            
+                    proj.targetDir = "%{wks.location}/Build/Bin/%{cfg.buildcfg}/%{prj.name}"
+
+        # ------------------------------------------------------------
+        # 2. Expansion des variables dans TOUT le workspace.
+        #    Puis second passage projet par projet pour résoudre %{prj.*}
+        #    (le passage global n'a pas de projet courant).
+        # ------------------------------------------------------------
+        expander.ExpandAll(workspace, recursive=True)
+        for proj in workspace.projects.values():
+            expander.SetProject(proj)
+            expander.ExpandAll(proj, recursive=True)
+
+        # ------------------------------------------------------------
+        # 3. Résolution des chemins de sortie et des toolchains (doivent être absolus)
+        # ------------------------------------------------------------
+        for proj in workspace.projects.values():
+            # Location du projet (optionnel, peut rester relatif)
+            if proj.location and not proj.location.startswith('%{'):
+                proj.location = expander.ResolvePath(proj.location, baseDir)
+
+            # Chemins de sortie → absolus
+            if proj.objDir:
+                proj.objDir = expander.ResolvePath(proj.objDir, baseDir)
+            if proj.targetDir:
+                proj.targetDir = expander.ResolvePath(proj.targetDir, baseDir)
+
+            # PCH (fichiers spécifiques)
+            if proj.pchHeader and not proj.pchHeader.startswith('%{'):
+                proj.pchHeader = expander.ResolvePath(proj.pchHeader, baseDir)
+            if proj.pchSource and not proj.pchSource.startswith('%{'):
+                proj.pchSource = expander.ResolvePath(proj.pchSource, baseDir)
+
+            # Fichiers de test (fichiers spécifiques, pas des patterns)
+            if proj.testMainFile and not proj.testMainFile.startswith('%{'):
+                proj.testMainFile = expander.ResolvePath(proj.testMainFile, baseDir)
+            if proj.testMainTemplate and not proj.testMainTemplate.startswith('%{'):
+                proj.testMainTemplate = expander.ResolvePath(proj.testMainTemplate, baseDir)
+
+        # ------------------------------------------------------------
+        # 4. Résolution des chemins des toolchains (absolus)
+        # ------------------------------------------------------------
+        for tc in workspace.toolchains.values():
+            if tc.toolchainDir and not tc.toolchainDir.startswith('%{'):
+                tc.toolchainDir = expander.ResolvePath(tc.toolchainDir, baseDir)
+            if tc.sysroot and not tc.sysroot.startswith('%{'):
+                tc.sysroot = expander.ResolvePath(tc.sysroot, baseDir)
+
+        self._Log(f"Workspace '{workspace.name}' post-processed.")
+
+    # -----------------------------------------------------------------------
+    # Public API – PascalCase
+    # -----------------------------------------------------------------------
+
+    def LoadWorkspace(self, entryFile: str) -> Optional[Any]:
+        """
+        Charge le workspace à partir du fichier .jenga donné.
+        Retourne l'objet Workspace (Api.Workspace) ou None en cas d'erreur.
+        """
+        filePath = Path(entryFile).resolve()
+        if not filePath.exists():
+            raise FileNotFoundError(f"Jenga file not found: {filePath}")
+
+        self._Log(f"Loading workspace from {filePath}")
+
+        globals_dict = self._PrepareGlobals(filePath, parentWorkspace=None)
+
+        # Changer de répertoire pendant l'exécution (comportement de l'API include)
+        old_cwd = Path.cwd()
+        os.chdir(filePath.parent)
+
+        try:
+            exec(filePath.read_text(encoding='utf-8-sig'), globals_dict)
+            workspace = Api.getcurrentworkspace()
+            if workspace is None:
+                raise RuntimeError("No workspace defined in the entry file.")
+            self._PostProcessWorkspace(workspace, filePath)
+            self._currentWorkspace = workspace
             return workspace
-            
         except Exception as e:
-            Display.error(f"Error loading configuration: {e}")
-            import traceback
-            traceback.print_exc()
+            Colored.PrintError(f"Error loading workspace: {e}")
+            if self.verbose:
+                traceback.print_exc()
             return None
-        
         finally:
-            # Restore original directory
-            if 'original_dir' in locals():
-                import os
-                os.chdir(original_dir)
+            os.chdir(old_cwd)
+            # On ne reset pas l'API ici car on veut garder le workspace chargé
+            # Api.resetstate() serait trop brutal; on le fait manuellement ?
 
+    def LoadExternalFile(self,
+                         filePath: str,
+                         parentWorkspace: Any) -> Tuple[Any, Dict[str, Any]]:
+        """
+        Charge un fichier .jenga externe (via include) et retourne
+        le workspace temporaire ainsi qu'un dictionnaire de métadonnées.
+        Utilisé par le cache pour recharger un fichier individuellement.
+        """
+        fp = Path(filePath).resolve()
+        if not fp.exists():
+            raise FileNotFoundError(f"External file not found: {fp}")
 
-def load_workspace(file_path: str = None) -> Optional[object]:
-    """Convenience function to load workspace"""
-    return ConfigurationLoader.load(file_path)
+        self._Log(f"Loading external file: {fp}")
 
+        globals_dict = self._PrepareGlobals(fp, parentWorkspace, isInclude=True)
 
-if __name__ == "__main__":
-    # Test the loader
-    workspace = load_workspace()
-    if workspace:
-        print(f"Loaded workspace: {workspace.name}")
-        print(f"Projects: {list(workspace.projects.keys())}")
+        old_cwd = Path.cwd()
+        os.chdir(fp.parent)
+
+        try:
+            exec(fp.read_text(encoding='utf-8-sig'), globals_dict)
+            tempWks = Api._currentWorkspace
+            if tempWks is None:
+                # Si le fichier ne définit pas de workspace, on en crée un factice
+                tempWks = Api.Workspace(name=f"__dummy_{fp.stem}__")
+                tempWks.location = str(fp.parent)
+            # On ne post-process pas ici, ce sera fait lors de la fusion dans le cache
+            return tempWks, {
+                'path': str(fp),
+                'timestamp': fp.stat().st_mtime,
+                'projects': list(tempWks.projects.keys()),
+                'toolchains': list(tempWks.toolchains.keys()),
+            }
+        except Exception as e:
+            Colored.PrintError(f"Error loading external file {fp}: {e}")
+            if self.verbose:
+                traceback.print_exc()
+            raise
+        finally:
+            os.chdir(old_cwd)
+            # On ne reset pas complètement l'état car on a besoin du résultat
+            # Cependant, l'API a modifié _currentWorkspace, _currentProject, etc.
+            # On va les réinitialiser manuellement après récupération.
+            # Pour l'instant, on garde tel quel, l'appelant devra gérer.
+
+    def LoadProject(self, projectFile: str) -> Optional[Any]:
+        """
+        Charge un fichier .jenga qui ne contient qu'un seul projet (standalone).
+        Retourne l'objet Project ou None.
+        """
+        filePath = Path(projectFile).resolve()
+        if not filePath.exists():
+            raise FileNotFoundError(f"Project file not found: {filePath}")
+
+        self._Log(f"Loading standalone project from {filePath}")
+
+        # On crée un workspace temporaire pour accueillir le projet
+        Api.resetstate()
+        wks = Api.Workspace(name=f"__standalone_{filePath.stem}__")
+        wks.location = str(filePath.parent)
+        Api._currentWorkspace = wks
+
+        globals_dict = {
+            '__file__': str(filePath),
+            '__name__': '__project__',
+            '__builtins__': __builtins__,
+            'Path': Path,
+        }
+        # Injecter API
+        for name in Api.__all__:
+            if not name.startswith('_'):
+                globals_dict[name] = getattr(Api, name)
+
+        old_cwd = Path.cwd()
+        os.chdir(filePath.parent)
+
+        try:
+            exec(filePath.read_text(encoding='utf-8-sig'), globals_dict)
+            # Récupérer le projet courant ou le premier du workspace
+            proj = Api._currentProject
+            if proj is None and wks.projects:
+                proj = next(iter(wks.projects.values()))
+            if proj is None:
+                raise RuntimeError("No project defined in the file.")
+
+            # Expansion
+            expander = VariableExpander(workspace=wks, project=proj, baseDir=filePath.parent)
+            expander.ExpandAll(proj, recursive=True)
+            proj._standalone = True
+            return proj
+        except Exception as e:
+            Colored.PrintError(f"Error loading project: {e}")
+            if self.verbose:
+                traceback.print_exc()
+            return None
+        finally:
+            os.chdir(old_cwd)
+            Api.resetstate()
+
+    def GetExpanderForWorkspace(self, workspace: Any) -> Optional[VariableExpander]:
+        """Retourne l'expandeur associé à un workspace (créé si nécessaire)."""
+        # On utilise le chemin du workspace.location comme clé
+        key = str(Path(workspace.location).resolve()) if workspace.location else "."
+        if key not in self._expandCache:
+            self._expandCache[key] = self._CreateExpanderForWorkspace(workspace)
+        return self._expandCache[key]
+
+    def Reset(self) -> None:
+        """Réinitialise le loader (supprime les caches d'expandeur)."""
+        self._expandCache.clear()
+        self._currentWorkspace = None
+        self._currentProject = None
+        Api.resetstate()

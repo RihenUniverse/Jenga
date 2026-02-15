@@ -78,7 +78,7 @@ namespace nkentseu {
             size_t mCurrentTest;
             size_t mTotalTests;
             size_t mTotalWidth;
-            std::chrono::_V2::steady_clock::time_point mStartTime;
+            std::chrono::steady_clock::time_point mStartTime;
         };
     }
 }

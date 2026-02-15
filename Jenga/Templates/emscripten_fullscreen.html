@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{{ TITLE }}}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Sans scroll */
+            background-color: #000;
+        }
+
+        body.with-scroll {
+            overflow: auto; /* Avec scroll */
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        #output {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.8);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            display: none;
+            z-index: 1000;
+        }
+
+        #output.show {
+            display: block;
+        }
+
+        .spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <div class="spinner" id="spinner"></div>
+        <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    </div>
+    <div id="output"></div>
+
+    <script>
+        // Configuration
+        var enableScroll = false; // Changer à true pour activer le scroll
+        var showConsole = false;  // Changer à true pour afficher la console
+
+        if (enableScroll) {
+            document.body.classList.add('with-scroll');
+        }
+
+        if (showConsole) {
+            document.getElementById('output').classList.add('show');
+        }
+
+        // Gestion du redimensionnement du canvas
+        var canvas = document.getElementById('canvas');
+
+        function resizeCanvas() {
+            var container = document.getElementById('canvas-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Configuration Emscripten
+        var Module = {
+            preRun: [],
+            postRun: [],
+            print: (function() {
+                var element = document.getElementById('output');
+                if (element) element.value = '';
+                return function(text) {
+                    if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+                    console.log(text);
+                    if (element && showConsole) {
+                        element.innerHTML += text + '\n';
+                        element.scrollTop = element.scrollHeight;
+                    }
+                };
+            })(),
+            canvas: (function() {
+                var canvas = document.getElementById('canvas');
+                canvas.addEventListener("webglcontextlost", function(e) {
+                    alert('WebGL context lost. You will need to reload the page.');
+                    e.preventDefault();
+                }, false);
+                return canvas;
+            })(),
+            setStatus: function(text) {
+                var spinner = document.getElementById('spinner');
+                if (!text) {
+                    spinner.style.display = 'none';
+                } else {
+                    spinner.style.display = 'block';
+                }
+                console.log('Status:', text);
+            },
+            totalDependencies: 0,
+            monitorRunDependencies: function(left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : '');
+            }
+        };
+
+        Module.setStatus('Downloading...');
+
+        window.onerror = function() {
+            Module.setStatus('Exception thrown, see JavaScript console');
+            document.getElementById('spinner').style.display = 'none';
+        };
+    </script>
+    {{{ SCRIPT }}}
+</body>
+</html>
