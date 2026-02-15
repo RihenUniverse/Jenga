@@ -38,7 +38,7 @@ Le package est conçu pour être **installable** via `pip` et fournit un point d
 ### Depuis les sources (développement)
 
 ```bash
-git clone https://github.com/jenga-build/Jenga.git
+git clone https://github.com/RihenUniverse/Jenga.git
 cd Jenga
 pip install -e .
 ```
@@ -230,7 +230,7 @@ Contrairement à des systèmes comme Meson ou Scons, il propose un **DSL intégr
 ### Depuis les sources
 
 ```bash
-git clone https://github.com/jenga-build/Jenga.git
+git clone https://github.com/RihenUniverse/Jenga.git
 cd Jenga
 pip install -e .
 ```
@@ -290,21 +290,21 @@ La documentation complète est organisée par module dans le dépôt :
 
 | Module                              | Description                                     |
 |-------------------------------------|-------------------------------------------------|
-| [Jenga/](./Jenga/README.md)      | Package Python – API et point d'entrée         |
-| [Jenga/Commands/](./Jenga/Commands/README.md) | Toutes les commandes CLI                     |
-| [Jenga/Core/](./Jenga/Core/README.md)         | Moteur de build (loader, cache, builder, …)   |
-| [Jenga/Core/Builders/](./Jenga/Core/Builders/README.md) | Implémentations plateforme                 |
-| [Jenga/Unitest/](./Jenga/Unitest/README.md)   | Framework de tests C++                        |
-| [Jenga/Utils/](./Jenga/Utils/README.md)       | Utilitaires transversaux                      |
+| [Jenga/](/Jenga/README.md)      | Package Python – API et point d'entrée         |
+| [Jenga/Commands/](/Jenga/Commands/README.md) | Toutes les commandes CLI                     |
+| [Jenga/Core/](/Jenga/Core/README.md)         | Moteur de build (loader, cache, builder, …)   |
+| [Jenga/Core/Builders/](/Jenga/Core/Builders/README.md) | Implémentations plateforme                 |
+| [Jenga/Unitest/](/Jenga/Unitest/README.md)   | Framework de tests C++                        |
+| [Jenga/Utils/](/Jenga/Utils/README.md)       | Utilitaires transversaux                      |
 
-Consultez également le [Guide de contribution](./CONTRIBUTING.md) (à créer).
+Consultez également le [Guide de contribution](/CONTRIBUTING.md) (à créer).
 
 ---
 
 ## 🤝 Contribuer
 
 Les contributions sont les bienvenues !  
-Merci de lire le [guide du contributeur](./CONTRIBUTING.md) avant de soumettre une pull request.
+Merci de lire le [guide du contributeur](/CONTRIBUTING.md) avant de soumettre une pull request.
 
 **Rappel des conventions de nommage :**
 - PascalCase : classes, méthodes publiques, énumérations
@@ -319,7 +319,7 @@ Merci de lire le [guide du contributeur](./CONTRIBUTING.md) avant de soumettre u
 ## 📄 Licence
 
 Ce projet est sous licence propriétaire.  
-Pour toute demande d'utilisation, veuillez contacter l'équipe Jenga à l'adresse `team@jenga.build`.
+Pour toute demande d'utilisation, veuillez contacter l'équipe Jenga à l'adresse `rihen.universe@gmail.com`.
 
 ---
 
