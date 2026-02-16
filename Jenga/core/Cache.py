@@ -170,14 +170,108 @@ class Cache:
         filehash = self._ComputeFileHash(filepath)
         return mtime, filehash
 
-    def _GetAllJengaFiles(self) -> Set[Path]:
-        """Retourne tous les fichiers .jenga sous workspaceRoot."""
-        files = set()
+    def _NormalizeTrackedPath(self, rawPath: str) -> Optional[Path]:
+        """Normalise un chemin .jenga (absolu/réel) et retourne None si invalide."""
+        if not rawPath:
+            return None
+        p = Path(rawPath)
+        if not p.is_absolute():
+            p = self.workspaceRoot / p
+        try:
+            p = p.resolve()
+        except Exception:
+            return None
+        if p.suffix.lower() != ".jenga":
+            return None
+        return p
+
+    def _GetEngineSignature(self) -> str:
+        """
+        Signature du moteur Jenga influençant le chargement workspace/cache.
+        Si cette signature change, le cache doit être regénéré.
+        """
+        files_to_track = [
+            Path(__file__).resolve(),
+            (Path(__file__).parent / "Api.py").resolve(),
+            (Path(__file__).parent / "Loader.py").resolve(),
+            (Path(__file__).parent / "Variables.py").resolve(),
+            (Path(__file__).parent / "Builder.py").resolve(),
+        ]
+
+        digest = hashlib.sha256()
+        digest.update(b"engine:jenga-core")
+        digest.update(f"cache-format:{self._CACHE_VERSION}".encode("utf-8"))
+
+        for fp in files_to_track:
+            digest.update(str(fp).encode("utf-8"))
+            if fp.exists():
+                try:
+                    digest.update(fp.read_bytes())
+                except Exception:
+                    # Si un fichier est inaccessible, inclure juste le chemin.
+                    pass
+
+        return digest.hexdigest()
+
+    def _GetAllJengaFiles(self,
+                          entryFile: Optional[Path] = None,
+                          workspace: Optional[Any] = None,
+                          conn: Optional[sqlite3.Connection] = None) -> Set[Path]:
+        """
+        Retourne l'ensemble des fichiers .jenga à surveiller :
+          - tous les .jenga sous workspaceRoot
+          - le fichier d'entrée
+          - les fichiers source_file référencés (projects/toolchains)
+          - les _externalFile présents sur les objets en mémoire
+        """
+        files: Set[Path] = set()
+
+        # 1) Fichiers .jenga sous workspace root
         for p in self.workspaceRoot.rglob("*.jenga"):
-            # Ignorer les réperoires cachés (comme .jenga, .git, etc.)
-            if any(part.startswith('.') for part in p.relative_to(self.workspaceRoot).parts):
-                continue
+            try:
+                # Ignorer les répertoires cachés (comme .jenga, .git, etc.)
+                if any(part.startswith('.') for part in p.relative_to(self.workspaceRoot).parts):
+                    continue
+            except Exception:
+                # Si relative_to échoue (chemin inattendu), on le garde.
+                pass
             files.add(p.resolve())
+
+        # 2) Fichier d'entrée
+        if entryFile:
+            try:
+                files.add(entryFile.resolve())
+            except Exception:
+                pass
+
+        # 3) Références provenant du workspace en mémoire
+        if workspace is not None:
+            for proj in getattr(workspace, "projects", {}).values():
+                tracked = self._NormalizeTrackedPath(getattr(proj, "_externalFile", ""))
+                if tracked is not None and tracked.exists():
+                    files.add(tracked)
+            for tc in getattr(workspace, "toolchains", {}).values():
+                tracked = self._NormalizeTrackedPath(getattr(tc, "_externalFile", ""))
+                if tracked is not None and tracked.exists():
+                    files.add(tracked)
+
+        # 4) Références persistées en base (utile pour includes hors workspace root)
+        if conn is not None:
+            try:
+                rows = conn.execute("""
+                    SELECT source_file FROM projects
+                    UNION
+                    SELECT source_file FROM toolchains
+                """).fetchall()
+                for row in rows:
+                    source_file = row["source_file"] if isinstance(row, sqlite3.Row) else row[0]
+                    tracked = self._NormalizeTrackedPath(source_file)
+                    if tracked is not None and tracked.exists():
+                        files.add(tracked)
+            except Exception:
+                # Tables absentes ou format ancien : on ignore silencieusement.
+                pass
+
         return files
 
     # -----------------------------------------------------------------------
@@ -498,9 +592,13 @@ class Cache:
                 "INSERT OR REPLACE INTO workspace (key, value, updated_at) VALUES (?, ?, ?)",
                 ("workspace", workspace_json, now)
             )
+            conn.execute(
+                "INSERT OR REPLACE INTO workspace (key, value, updated_at) VALUES (?, ?, ?)",
+                ("engine_signature", self._GetEngineSignature(), now)
+            )
 
             # Sauvegarder tous les fichiers .jenga du workspace
-            all_files = self._GetAllJengaFiles()
+            all_files = self._GetAllJengaFiles(entryFile=entryFile, workspace=workspace)
             for fp in all_files:
                 try:
                     mtime, fhash = self._GetFileMetadata(fp)
@@ -575,6 +673,17 @@ class Cache:
             Colored.PrintInfo("Cache format changed, reloading...")
             return None
 
+        current_engine_signature = self._GetEngineSignature()
+        cached_engine_signature_row = conn.execute(
+            "SELECT value FROM workspace WHERE key='engine_signature'"
+        ).fetchone()
+        cached_engine_signature = (
+            cached_engine_signature_row["value"] if cached_engine_signature_row else None
+        )
+        if cached_engine_signature != current_engine_signature:
+            Colored.PrintInfo("Jenga engine changed, reloading workspace...")
+            return None
+
         try:
             workspace = self._DeserializeWorkspace(row['value'])
             if workspace is None or not hasattr(workspace, 'projects'):
@@ -587,7 +696,7 @@ class Cache:
         cached_files = conn.execute("SELECT path, mtime, hash FROM files").fetchall()
         cached_files_dict = {row['path']: (row['mtime'], row['hash']) for row in cached_files}
 
-        current_files = self._GetAllJengaFiles()
+        current_files = self._GetAllJengaFiles(entryFile=entryFile, workspace=workspace, conn=conn)
         current_files_set = {str(p) for p in current_files}
 
         added = [p for p in current_files_set if p not in cached_files_dict]
@@ -721,7 +830,7 @@ class Cache:
         cached_files = conn.execute("SELECT path, mtime, hash FROM files").fetchall()
         cached_dict = {row['path']: (row['mtime'], row['hash']) for row in cached_files}
 
-        current_files = self._GetAllJengaFiles()
+        current_files = self._GetAllJengaFiles(entryFile=entryFile, workspace=currentWorkspace, conn=conn)
         current_set = {str(p) for p in current_files}
 
         added = [p for p in current_set if p not in cached_dict]

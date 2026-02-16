@@ -108,6 +108,7 @@ class HarmonyOsBuilder(Builder):
 
         compiler = self.toolchain.cxxPath if project.language.value in ("C++", "Objective-C++") else self.toolchain.ccPath
         args = [compiler, "-c", "-o", str(obj)]
+        args.extend(self.GetDependencyFlags(str(obj)))
         args.extend(self._GetCompilerFlags(project))
         args.append(str(src))
 

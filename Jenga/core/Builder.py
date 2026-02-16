@@ -51,10 +51,21 @@ class Builder(abc.ABC):
         if workspace:
             from .Variables import VariableExpander
             self._expander = VariableExpander(workspace=workspace)
+            platform_value = platform if platform else targetOs.value
+            target_env_value = targetEnv.value if targetEnv else ""
             self._expander.SetConfig({
                 'name': config,
                 'buildcfg': config,
-                'platform': platform,
+                'configuration': config,
+                'platform': platform_value,
+                'system': targetOs.value,
+                'os': targetOs.value,
+                'arch': targetArch.value,
+                'architecture': targetArch.value,
+                'targetos': targetOs.value,
+                'targetarch': targetArch.value,
+                'env': target_env_value,
+                'targetenv': target_env_value,
             })
 
         self.state = BuildState(workspace)
@@ -206,6 +217,190 @@ class Builder(abc.ABC):
         else:
             base_dir = workspace_base
         return str((base_dir / p).resolve())
+
+    # -----------------------------------------------------------------------
+    # Filter application (system/config)
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _NormalizeSystemName(system_name: str) -> str:
+        raw = (system_name or "").strip().lower()
+        aliases = {
+            "win": "windows",
+            "win32": "windows",
+            "win64": "windows",
+            "linux": "linux",
+            "gnu/linux": "linux",
+            "mac": "macos",
+            "osx": "macos",
+            "darwin": "macos",
+            "web": "web",
+            "emscripten": "web",
+            "ios": "ios",
+            "android": "android",
+            "harmony": "harmonyos",
+            "harmonyos": "harmonyos",
+        }
+        return aliases.get(raw, raw)
+
+    def _FilterMatches(self, filter_name: str) -> bool:
+        """Return True if a filter string matches current build context."""
+        if not filter_name:
+            return False
+        raw = filter_name.strip()
+        lowered = raw.lower()
+
+        # system:Windows
+        if lowered.startswith("system:"):
+            system_value = raw.split(":", 1)[1].strip()
+            expected = self._NormalizeSystemName(system_value)
+            active_os = self._NormalizeSystemName(self.targetOs.value)
+            active_platform = ""
+            if self.platform:
+                active_platform = self._NormalizeSystemName(self.platform.split("-", 1)[0])
+            return expected in {active_os, active_platform}
+
+        # configurations:Debug, configuration:Release, config:Debug
+        for prefix in ("configurations:", "configuration:", "config:", "cfg:"):
+            if lowered.startswith(prefix):
+                cfg_value = raw.split(":", 1)[1].strip().lower()
+                return cfg_value == self.config.lower()
+
+        return False
+
+    @staticmethod
+    def _AppendUnique(items: List[str], values: List[str]) -> None:
+        for value in values:
+            if value not in items:
+                items.append(value)
+
+    def _ApplyProjectFilters(self, project: Project) -> None:
+        """
+        Materialize filtered properties onto project for the active target/config.
+        Called once per project/build context.
+        """
+        context_key = f"{self.targetOs.value}|{self.config}"
+        if getattr(project, "_jenga_applied_filter_context", None) == context_key:
+            return
+
+        # 1) system links collected via links() inside filter("system:...")
+        active_system = self._NormalizeSystemName(self.targetOs.value)
+        for system_name, libs in project.systemLinks.items():
+            if self._NormalizeSystemName(system_name) == active_system:
+                self._AppendUnique(project.links, list(libs))
+        for system_name, defs in project.systemDefines.items():
+            if self._NormalizeSystemName(system_name) == active_system:
+                self._AppendUnique(project.defines, list(defs))
+
+        # 2) generic filtered properties captured by API
+        for filter_name, defs in project._filteredDefines.items():
+            if self._FilterMatches(filter_name):
+                self._AppendUnique(project.defines, list(defs))
+
+        for filter_name, opt in project._filteredOptimize.items():
+            if self._FilterMatches(filter_name):
+                project.optimize = opt
+
+        for filter_name, sym in project._filteredSymbols.items():
+            if self._FilterMatches(filter_name):
+                project.symbols = sym
+
+        for filter_name, warn in project._filteredWarnings.items():
+            if self._FilterMatches(filter_name):
+                project.warnings = warn
+
+        project._jenga_applied_filter_context = context_key
+
+    # -----------------------------------------------------------------------
+    # Incremental compilation helpers
+    # -----------------------------------------------------------------------
+
+    def GetDependencyFilePath(self, objectFile: str) -> Path:
+        """Dependency sidecar path used by GCC/Clang style compilers."""
+        return Path(f"{objectFile}.d")
+
+    def GetDependencyFlags(self, objectFile: str) -> List[str]:
+        """
+        Dependency emission flags for GCC/Clang:
+        -MMD (user headers), -MF (output), -MT (target).
+        """
+        dep_file = self.GetDependencyFilePath(objectFile)
+        return ["-MMD", "-MF", str(dep_file), "-MT", str(objectFile)]
+
+    def _ParseDependencyFile(self, depFile: Path, project: Project) -> List[Path]:
+        """
+        Parse a Make-style .d dependency file and return normalized paths.
+        This parser is tolerant to Windows drive letters and escaped colons.
+        """
+        if not depFile.exists():
+            return []
+        try:
+            content = depFile.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return []
+
+        content = content.replace("\\\r\n", " ").replace("\\\n", " ")
+        tokens = content.split()
+        deps: List[Path] = []
+        after_target = False
+
+        for token in tokens:
+            if token == "\\":
+                continue
+            if not after_target:
+                if token.endswith(":"):
+                    after_target = True
+                continue
+
+            cleaned = token.strip().rstrip("\\")
+            cleaned = cleaned.replace("\\ ", " ").replace("\\:", ":")
+            if not cleaned:
+                continue
+
+            p = Path(cleaned)
+            if not p.is_absolute():
+                p = Path(self.ResolveProjectPath(project, cleaned))
+            else:
+                p = p.resolve()
+            deps.append(p)
+
+        return deps
+
+    def _NeedsCompileSource(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+        """
+        Return True if source must be recompiled:
+          - object missing
+          - source newer than object
+          - dependency file missing
+          - any dependency newer than object
+        """
+        src = Path(sourceFile)
+        obj = Path(objectFile)
+        if not src.exists():
+            return False
+        if not obj.exists():
+            return True
+
+        obj_mtime = obj.stat().st_mtime
+        if src.stat().st_mtime > obj_mtime:
+            return True
+
+        dep_file = self.GetDependencyFilePath(objectFile)
+        if not dep_file.exists():
+            return True
+
+        deps = self._ParseDependencyFile(dep_file, project)
+        if not deps:
+            return True
+
+        for dep in deps:
+            try:
+                if dep.exists() and dep.stat().st_mtime > obj_mtime:
+                    return True
+            except OSError:
+                return True
+
+        return False
 
     # ============================================================
     # Support modules C++20
@@ -415,6 +610,9 @@ class Builder(abc.ABC):
         if self.state.IsProjectCompiled(project.name):
             return True
 
+        # Apply filter(system/config) materialization before any build decision.
+        self._ApplyProjectFilters(project)
+
         # Create logger with project info
         kind_str = project.kind.name if hasattr(project.kind, 'name') else str(project.kind)
         workspace_root = self.workspace.location if self.workspace else None
@@ -485,6 +683,12 @@ class Builder(abc.ABC):
             obj_name = src_path.with_suffix(self.GetObjectExtension()).name
             obj_path = obj_dir / obj_name
 
+            if not self._NeedsCompileSource(project, str(src_path), str(obj_path)):
+                object_files.append(str(obj_path))
+                self.state.AddProjectOutput(project.name, str(obj_path))
+                logger.LogCached(str(src_path))
+                continue
+
             self._lastResult = None
             if self.Compile(project, str(src_path), str(obj_path)):
                 object_files.append(str(obj_path))
@@ -499,7 +703,9 @@ class Builder(abc.ABC):
             logger.PrintStats()
             return False
 
-        # Auto-wire local library dependencies for link phase.
+        # Auto-wire local library dependencies for link phase while preserving
+        # the user-declared link order (important for GNU-like linkers).
+        dep_link_map: Dict[str, str] = {}
         for dep_name in project.dependsOn:
             dep_proj = self.workspace.projects.get(dep_name)
             if not dep_proj:
@@ -510,9 +716,28 @@ class Builder(abc.ABC):
             dep_out = str(self.GetTargetPath(dep_proj))
             if dep_dir not in project.libDirs:
                 project.libDirs.append(dep_dir)
-            if dep_out not in project.links:
-                project.links.append(dep_out)
-            project.links = [l for l in project.links if l != dep_name]
+            dep_link_map[dep_name] = dep_out
+
+        if dep_link_map:
+            new_links: List[str] = []
+            seen: set[str] = set()
+
+            for link in project.links:
+                resolved = dep_link_map.get(link, link)
+                if resolved not in seen:
+                    new_links.append(resolved)
+                    seen.add(resolved)
+
+            # Ensure dependencies are present even if not explicitly listed in links().
+            missing_dep_outputs: List[str] = []
+            for dep_out in dep_link_map.values():
+                if dep_out not in seen:
+                    missing_dep_outputs.append(dep_out)
+                    seen.add(dep_out)
+
+            # Missing auto-wired dependency archives are prepended so that
+            # GNU-like linkers resolve their symbols before system/provider libs.
+            project.links = missing_dep_outputs + new_links
 
         if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP,
                             ProjectKind.SHARED_LIB, ProjectKind.STATIC_LIB,

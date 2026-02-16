@@ -143,12 +143,12 @@ class Loader:
         # ------------------------------------------------------------
         for proj in workspace.projects.values():
             if proj.objDir is None or proj.objDir == "":
-                proj.objDir = "%{wks.location}/Build/Obj/%{cfg.buildcfg}/%{prj.name}"
+                proj.objDir = "%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}"
             if proj.targetDir is None or proj.targetDir == "":
                 if proj.kind in (Api.ProjectKind.STATIC_LIB, Api.ProjectKind.SHARED_LIB):
-                    proj.targetDir = "%{wks.location}/Build/Lib/%{cfg.buildcfg}/%{prj.name}"
+                    proj.targetDir = "%{wks.location}/Build/Lib/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}"
                 else:
-                    proj.targetDir = "%{wks.location}/Build/Bin/%{cfg.buildcfg}/%{prj.name}"
+                    proj.targetDir = "%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}"
 
         # ------------------------------------------------------------
         # 2. Expansion des variables dans TOUT le workspace.

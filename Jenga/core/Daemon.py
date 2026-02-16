@@ -233,12 +233,21 @@ class Daemon:
         target = args.get('target')
         verbose = args.get('verbose', False)
 
-        # TODO: instancier le builder approprié
         from ..Commands.Build import BuildCommand
-        builder = BuildCommand.CreateBuilder(
-            self.workspace, config, platform, target, verbose
-        )
-        return_code = builder.Build(target)
+        if BuildCommand.IsAllPlatformsRequest(platform):
+            platforms = BuildCommand.GetAllDeclaredPlatforms(self.workspace)
+            return_code = BuildCommand.BuildAcrossPlatforms(
+                self.workspace,
+                config=config,
+                platforms=platforms,
+                target=target,
+                verbose=verbose
+            )
+        else:
+            builder = BuildCommand.CreateBuilder(
+                self.workspace, config, platform, target, verbose
+            )
+            return_code = builder.Build(target)
         return {
             'status': 'ok' if return_code == 0 else 'error',
             'return_code': return_code

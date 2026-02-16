@@ -237,11 +237,9 @@ class VariableExpander:
         Résolution d'une variable non namespacée (%{name}, %{targetdir}, ...).
         Priorité: cfg -> project -> workspace -> env.
         """
-        if self._config and var in self._config:
-            return str(self._config[var])
-        for key in (var, var.lower(), var.upper()):
-            if self._config and key in self._config:
-                return str(self._config[key])
+        val = self._GetConfigVariable(var)
+        if val is not None:
+            return val
         val = self._GetProjectVariable(self._project, var)
         if val is not None:
             return val
@@ -252,6 +250,34 @@ class VariableExpander:
             return os.environ[var]
         if var.upper() in os.environ:
             return os.environ[var.upper()]
+        return None
+
+    def _GetConfigVariable(self, var: str) -> Optional[str]:
+        """Récupère une variable de configuration avec aliases et casse tolérante."""
+        if self._config is None:
+            return None
+
+        key = var.lower()
+        aliases = {
+            'config': 'buildcfg',
+            'configuration': 'buildcfg',
+            'system': 'targetos',
+            'os': 'targetos',
+            'arch': 'targetarch',
+            'architecture': 'targetarch',
+            'env': 'targetenv',
+        }
+
+        candidates = [var, key, var.upper()]
+        alias = aliases.get(key)
+        if alias:
+            candidates.extend([alias, alias.lower(), alias.upper()])
+
+        for candidate in candidates:
+            if candidate in self._config:
+                value = self._config[candidate]
+                return '' if value is None else str(value)
+
         return None
 
     def _ExpandString(self, text: str) -> str:
@@ -272,7 +298,8 @@ class VariableExpander:
 
             # 1. Configuration courante
             if namespace == 'cfg' and self._config is not None:
-                return self._config.get(variable, match.group(0))
+                cfg_val = self._GetConfigVariable(variable)
+                return cfg_val if cfg_val is not None else match.group(0)
 
             # 2. Workspace
             if namespace in ('wks', 'workspace'):

@@ -175,8 +175,8 @@ class UnitestConfig:
 
     # For compile mode – project properties
     kind: ProjectKind = ProjectKind.STATIC_LIB
-    objDir: str = "%{wks.location}/Build/Obj/Unitest"
-    targetDir: str = "%{wks.location}/Build/Lib"
+    objDir: str = "%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}"
+    targetDir: str = "%{wks.location}/Build/Lib/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}"
     targetName: str = "Unitest"
     cxxflags: List[str] = field(default_factory=list)
     ldflags: List[str] = field(default_factory=list)
@@ -635,8 +635,8 @@ class test:
             self._testProject.includeDirs.append("%{Jenga.Unitest.Source}/src")
 
         # Set output directories
-        self._testProject.targetDir = "%{wks.location}/Build/Tests/%{cfg.buildcfg}"
-        self._testProject.objDir = "%{wks.location}/Build/Obj/%{cfg.buildcfg}/%{prj.name}"
+        self._testProject.targetDir = "%{wks.location}/Build/Tests/%{cfg.buildcfg}-%{cfg.system}"
+        self._testProject.objDir = "%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}"
 
         # Add to workspace
         _currentWorkspace.projects[testName] = self._testProject

@@ -141,6 +141,7 @@ class IOSBuilder(Builder):
             compiler,
             "-c",
             "-o", str(obj),
+            *self.GetDependencyFlags(str(obj)),
             f"-target", self.target_triple,
             f"-isysroot", str(self.sdk_path),
             f"-mios-version-min={self.min_version}",

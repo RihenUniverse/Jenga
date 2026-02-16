@@ -302,6 +302,7 @@ class WindowsBuilder(Builder):
             args.append(str(src))
         else:
             args = [self.toolchain.ccPath, "-c", "-o", str(obj)]
+            args.extend(self.GetDependencyFlags(str(obj)))
             args.extend(self._GetClangCommonFlags(project))
             pch_file = getattr(project, "_jengaPchFile", "")
             if pch_file:
@@ -389,6 +390,7 @@ class WindowsBuilder(Builder):
 
     def _CompileMinGW(self, project: Project, src: Path, obj: Path) -> bool:
         args = [self.toolchain.ccPath, "-c", "-o", str(obj)]
+        args.extend(self.GetDependencyFlags(str(obj)))
         args.extend(self._GetGCCCommonFlags(project))
         pch_header = getattr(project, "_jengaPchHeaderResolved", "")
         if pch_header:

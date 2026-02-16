@@ -21,6 +21,7 @@ from ..Core import Api
 
 class BuildCommand:
     """jenga build [--config NAME] [--platform NAME] [--target PROJECT] [--no-cache] [--verbose]"""
+    ALL_PLATFORMS_TOKEN = "jengaall"
 
     @staticmethod
     def CreateBuilder(workspace, config: str, platform: str, target: Optional[str], verbose: bool) -> Builder:
@@ -85,11 +86,78 @@ class BuildCommand:
         )
 
     @staticmethod
+    def IsAllPlatformsRequest(platform: Optional[str]) -> bool:
+        """True si --platform jengaall a été demandé."""
+        return bool(platform) and platform.strip().lower() == BuildCommand.ALL_PLATFORMS_TOKEN
+
+    @staticmethod
+    def GetAllDeclaredPlatforms(workspace) -> List[str]:
+        """
+        Génère la liste des plateformes à construire pour jengaall
+        à partir des target OS et architectures déclarés.
+        """
+        oses = workspace.targetOses or [Platform.GetHostOS()]
+        archs = workspace.targetArchs or [Platform.GetHostArchitecture()]
+
+        platforms: List[str] = []
+        for os_enum in oses:
+            os_name = os_enum.value if hasattr(os_enum, "value") else str(os_enum)
+            for arch_enum in archs:
+                arch_name = arch_enum.value if hasattr(arch_enum, "value") else str(arch_enum)
+                platform_name = f"{os_name}-{arch_name}" if arch_name else os_name
+                if platform_name not in platforms:
+                    platforms.append(platform_name)
+        return platforms
+
+    @staticmethod
+    def BuildAcrossPlatforms(workspace, config: str, platforms: List[str],
+                             target: Optional[str], verbose: bool) -> int:
+        """
+        Build séquentiel sur plusieurs plateformes.
+        Continue même si une plateforme échoue, puis renvoie un code global.
+        """
+        if not platforms:
+            Colored.PrintError("No platform available for --platform jengaall.")
+            return 1
+
+        Colored.PrintInfo(f"Building across {len(platforms)} platform(s): {', '.join(platforms)}")
+        failures = 0
+
+        for idx, platform_name in enumerate(platforms, start=1):
+            Colored.PrintInfo(f"\n[{idx}/{len(platforms)}] Building platform: {platform_name}")
+            try:
+                builder = BuildCommand.CreateBuilder(
+                    workspace,
+                    config=config,
+                    platform=platform_name,
+                    target=target,
+                    verbose=verbose
+                )
+            except Exception as e:
+                failures += 1
+                Colored.PrintError(f"[{platform_name}] Cannot create builder: {e}")
+                continue
+
+            ret = builder.Build(target)
+            if ret != 0:
+                failures += 1
+                Colored.PrintError(f"[{platform_name}] Build failed.")
+            else:
+                Colored.PrintSuccess(f"[{platform_name}] Build succeeded.")
+
+        if failures:
+            Colored.PrintError(f"Multi-platform build finished with {failures} failure(s).")
+            return 1
+
+        Colored.PrintSuccess("Multi-platform build succeeded.")
+        return 0
+
+    @staticmethod
     def Execute(args: List[str]) -> int:
 
         parser = argparse.ArgumentParser(prog="jenga build", description="Build the workspace or a specific project.")
         parser.add_argument("--config", default="Debug", help="Build configuration (Debug, Release, etc.)")
-        parser.add_argument("--platform", default=None, help="Target platform (Windows, Linux, Android-arm64, etc.)")
+        parser.add_argument("--platform", default=None, help="Target platform (Windows, Linux, Android-arm64, etc.) or 'jengaall'")
         parser.add_argument("--target", default=None, help="Specific project to build")
         parser.add_argument("--no-cache", action="store_true", help="Ignore cache and reload workspace")
         parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
@@ -110,6 +178,10 @@ class BuildCommand:
                 Colored.PrintError("No .jenga workspace file found.")
                 return 1
         workspace_root = entry_file.parent
+
+        if BuildCommand.IsAllPlatformsRequest(parsed.platform):
+            # Multi-platform orchestration is done in direct mode from CLI.
+            parsed.no_daemon = True
 
         # Essayer d'utiliser le daemon si disponible
         if not parsed.no_daemon:
@@ -137,6 +209,8 @@ class BuildCommand:
         loader = Loader(verbose=parsed.verbose)
         cache = Cache(workspace_root)
 
+        loaded_from_cache = False
+
         if parsed.no_cache:
             cache.Invalidate()
             workspace = loader.LoadWorkspace(str(entry_file))
@@ -144,6 +218,7 @@ class BuildCommand:
                 cache.SaveWorkspace(workspace, entry_file, loader)
         else:
             workspace = cache.LoadWorkspace(entry_file, loader)
+            loaded_from_cache = workspace is not None
             if workspace is None:
                 Colored.PrintInfo("Loading workspace...")
                 workspace = loader.LoadWorkspace(str(entry_file))
@@ -153,6 +228,17 @@ class BuildCommand:
         if workspace is None:
             Colored.PrintError("Failed to load workspace.")
             return 1
+
+        if BuildCommand.IsAllPlatformsRequest(parsed.platform):
+            platforms = BuildCommand.GetAllDeclaredPlatforms(workspace)
+            return BuildCommand.BuildAcrossPlatforms(
+                workspace,
+                config=parsed.config,
+                platforms=platforms,
+                target=parsed.target,
+                verbose=parsed.verbose
+            )
+
         # 2. Créer le builder
         try:
             builder = BuildCommand.CreateBuilder(
@@ -167,4 +253,35 @@ class BuildCommand:
             return 1
 
         # 3. Exécuter le build
-        return builder.Build(parsed.target)
+        result = builder.Build(parsed.target)
+
+        # Fallback robuste: si le build échoue avec un cache "no changes",
+        # on force un rechargement complet une seule fois.
+        if (
+            result != 0
+            and not parsed.no_cache
+            and loaded_from_cache
+            and getattr(workspace, "_cache_status", "") == "no_changes"
+        ):
+            Colored.PrintWarning("Build failed with cached workspace. Retrying once with fresh workspace...")
+            cache.Invalidate()
+            workspace = loader.LoadWorkspace(str(entry_file))
+            if workspace is None:
+                return result
+            cache.SaveWorkspace(workspace, entry_file, loader)
+
+            try:
+                builder = BuildCommand.CreateBuilder(
+                    workspace,
+                    config=parsed.config,
+                    platform=parsed.platform,
+                    target=parsed.target,
+                    verbose=parsed.verbose
+                )
+            except Exception as e:
+                Colored.PrintError(f"Cannot create builder after cache refresh: {e}")
+                return result
+
+            return builder.Build(parsed.target)
+
+        return result

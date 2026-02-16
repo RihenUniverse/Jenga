@@ -87,7 +87,12 @@ class CleanCommand:
 
         # Déterminer les configurations et plateformes à nettoyer
         configs = [parsed.config] if parsed.config else workspace.configurations
-        platforms = [parsed.platform] if parsed.platform else (workspace.platforms or ["Default"])
+        if parsed.platform:
+            platforms = [parsed.platform]
+        elif workspace.targetOses:
+            platforms = [os.value for os in workspace.targetOses]
+        else:
+            platforms = workspace.platforms or [Platform.GetHostOS().value]
 
         # Déterminer les projets à nettoyer
         projects_to_clean = []
@@ -103,10 +108,23 @@ class CleanCommand:
         for config in configs:
             for platform in platforms:
                 expander = loader.GetExpanderForWorkspace(workspace)
+                parts = (platform or "").split('-') if platform else []
+                system = parts[0] if parts and parts[0] else Platform.GetHostOS().value
+                arch = parts[1] if len(parts) > 1 and parts[1] else Platform.GetHostArchitecture().value
+                env = parts[2] if len(parts) > 2 and parts[2] else ""
                 fake_config = {
                     'name': config,
                     'buildcfg': config,
+                    'configuration': config,
                     'platform': platform,
+                    'system': system,
+                    'os': system,
+                    'arch': arch,
+                    'architecture': arch,
+                    'targetos': system,
+                    'targetarch': arch,
+                    'env': env,
+                    'targetenv': env,
                 }
                 expander.SetConfig(fake_config)
 
