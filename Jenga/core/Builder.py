@@ -307,6 +307,7 @@ class Builder(abc.ABC):
                 "excludeMainFiles": list(project.excludeMainFiles),
                 "includeDirs": list(project.includeDirs),
                 "libDirs": list(project.libDirs),
+                "dependsOn": list(project.dependsOn),
                 "links": list(project.links),
                 "defines": list(project.defines),
                 "objDir": project.objDir,
@@ -325,6 +326,7 @@ class Builder(abc.ABC):
         project.excludeMainFiles = list(base["excludeMainFiles"])
         project.includeDirs = list(base["includeDirs"])
         project.libDirs = list(base["libDirs"])
+        project.dependsOn = list(base["dependsOn"])
         project.links = list(base["links"])
         project.defines = list(base["defines"])
         project.objDir = base["objDir"]
@@ -361,6 +363,9 @@ class Builder(abc.ABC):
         for filter_name, dirs in getattr(project, "_filteredLibDirs", {}).items():
             if self._FilterMatches(filter_name):
                 self._AppendUnique(project.libDirs, list(dirs))
+        for filter_name, deps in getattr(project, "_filteredDependsOn", {}).items():
+            if self._FilterMatches(filter_name):
+                self._AppendUnique(project.dependsOn, list(deps))
 
         for filter_name, defs in project._filteredDefines.items():
             if self._FilterMatches(filter_name):
@@ -947,6 +952,10 @@ class Builder(abc.ABC):
 
     def Build(self, targetProject: Optional[str] = None) -> int:
         from ..Utils.Reporter import BuildCoordinator
+
+        # Materialize all context-dependent filters before dependency resolution.
+        for proj in self.workspace.projects.values():
+            self._ApplyProjectFilters(proj)
 
         # Resolve build order
         try:

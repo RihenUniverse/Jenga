@@ -323,6 +323,7 @@ class Project:
     _filteredTargetName: Dict[str, str] = field(default_factory=dict)
     _filteredPchHeader: Dict[str, str] = field(default_factory=dict)
     _filteredPchSource: Dict[str, str] = field(default_factory=dict)
+    _filteredDependsOn: Dict[str, List[str]] = field(default_factory=dict)
     _filteredDefines: Dict[str, List[str]] = field(default_factory=dict)
     _filteredLinks: Dict[str, List[str]] = field(default_factory=dict)
     _filteredOptimize: Dict[str, Optimization] = field(default_factory=dict)
@@ -1115,7 +1116,12 @@ def links(libs: List[str]) -> None:
 
 def dependson(deps: List[str]) -> None:
     if _currentProject:
-        _currentProject.dependsOn.extend(deps)
+        if _currentFilter:
+            if _currentFilter not in _currentProject._filteredDependsOn:
+                _currentProject._filteredDependsOn[_currentFilter] = []
+            _currentProject._filteredDependsOn[_currentFilter].extend(deps)
+        else:
+            _currentProject.dependsOn.extend(deps)
 
 def dependfiles(patterns: List[str]) -> None:
     if _currentProject:
