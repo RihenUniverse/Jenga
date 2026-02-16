@@ -266,6 +266,21 @@ class Builder(abc.ABC):
                 cfg_value = raw.split(":", 1)[1].strip().lower()
                 return cfg_value == self.config.lower()
 
+        # architecture:x86_64 / arch:arm64
+        for prefix in ("architecture:", "arch:", "targetarch:"):
+            if lowered.startswith(prefix):
+                arch_value = raw.split(":", 1)[1].strip().lower()
+                return arch_value == self.targetArch.value.lower()
+
+        # platform:Windows-x86_64
+        if lowered.startswith("platform:"):
+            platform_value = raw.split(":", 1)[1].strip().lower()
+            active_platform = (self.platform or "").strip().lower()
+            if active_platform:
+                return platform_value == active_platform
+            # fallback: compare against target os when --platform not explicitly set
+            return platform_value == self.targetOs.value.lower()
+
         return False
 
     @staticmethod
@@ -279,9 +294,47 @@ class Builder(abc.ABC):
         Materialize filtered properties onto project for the active target/config.
         Called once per project/build context.
         """
-        context_key = f"{self.targetOs.value}|{self.config}"
+        context_key = f"{self.targetOs.value}|{self.targetArch.value}|{self.config}|{self.platform or ''}"
         if getattr(project, "_jenga_applied_filter_context", None) == context_key:
             return
+
+        # Snapshot project base values once, then re-materialize on each context.
+        base = getattr(project, "_jenga_filter_base_state", None)
+        if base is None:
+            base = {
+                "files": list(project.files),
+                "excludeFiles": list(project.excludeFiles),
+                "excludeMainFiles": list(project.excludeMainFiles),
+                "includeDirs": list(project.includeDirs),
+                "libDirs": list(project.libDirs),
+                "links": list(project.links),
+                "defines": list(project.defines),
+                "objDir": project.objDir,
+                "targetDir": project.targetDir,
+                "targetName": project.targetName,
+                "pchHeader": project.pchHeader,
+                "pchSource": project.pchSource,
+                "optimize": project.optimize,
+                "symbols": project.symbols,
+                "warnings": project.warnings,
+            }
+            project._jenga_filter_base_state = base
+
+        project.files = list(base["files"])
+        project.excludeFiles = list(base["excludeFiles"])
+        project.excludeMainFiles = list(base["excludeMainFiles"])
+        project.includeDirs = list(base["includeDirs"])
+        project.libDirs = list(base["libDirs"])
+        project.links = list(base["links"])
+        project.defines = list(base["defines"])
+        project.objDir = base["objDir"]
+        project.targetDir = base["targetDir"]
+        project.targetName = base["targetName"]
+        project.pchHeader = base["pchHeader"]
+        project.pchSource = base["pchSource"]
+        project.optimize = base["optimize"]
+        project.symbols = base["symbols"]
+        project.warnings = base["warnings"]
 
         # 1) system links collected via links() inside filter("system:...")
         active_system = self._NormalizeSystemName(self.targetOs.value)
@@ -293,9 +346,43 @@ class Builder(abc.ABC):
                 self._AppendUnique(project.defines, list(defs))
 
         # 2) generic filtered properties captured by API
+        for filter_name, files in getattr(project, "_filteredFiles", {}).items():
+            if self._FilterMatches(filter_name):
+                self._AppendUnique(project.files, list(files))
+        for filter_name, files in getattr(project, "_filteredExcludeFiles", {}).items():
+            if self._FilterMatches(filter_name):
+                self._AppendUnique(project.excludeFiles, list(files))
+        for filter_name, files in getattr(project, "_filteredExcludeMainFiles", {}).items():
+            if self._FilterMatches(filter_name):
+                self._AppendUnique(project.excludeMainFiles, list(files))
+        for filter_name, dirs in getattr(project, "_filteredIncludeDirs", {}).items():
+            if self._FilterMatches(filter_name):
+                self._AppendUnique(project.includeDirs, list(dirs))
+        for filter_name, dirs in getattr(project, "_filteredLibDirs", {}).items():
+            if self._FilterMatches(filter_name):
+                self._AppendUnique(project.libDirs, list(dirs))
+
         for filter_name, defs in project._filteredDefines.items():
             if self._FilterMatches(filter_name):
                 self._AppendUnique(project.defines, list(defs))
+        for filter_name, links in getattr(project, "_filteredLinks", {}).items():
+            if self._FilterMatches(filter_name):
+                self._AppendUnique(project.links, list(links))
+        for filter_name, obj_dir in getattr(project, "_filteredObjDir", {}).items():
+            if self._FilterMatches(filter_name):
+                project.objDir = obj_dir
+        for filter_name, target_dir in getattr(project, "_filteredTargetDir", {}).items():
+            if self._FilterMatches(filter_name):
+                project.targetDir = target_dir
+        for filter_name, target_name in getattr(project, "_filteredTargetName", {}).items():
+            if self._FilterMatches(filter_name):
+                project.targetName = target_name
+        for filter_name, pch_header in getattr(project, "_filteredPchHeader", {}).items():
+            if self._FilterMatches(filter_name):
+                project.pchHeader = pch_header
+        for filter_name, pch_source in getattr(project, "_filteredPchSource", {}).items():
+            if self._FilterMatches(filter_name):
+                project.pchSource = pch_source
 
         for filter_name, opt in project._filteredOptimize.items():
             if self._FilterMatches(filter_name):

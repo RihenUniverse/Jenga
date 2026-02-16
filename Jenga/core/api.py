@@ -313,7 +313,18 @@ class Project:
 
     # Filter context – internal
     _currentFilter: Optional[str] = None
+    _filteredFiles: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredExcludeFiles: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredExcludeMainFiles: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredIncludeDirs: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredLibDirs: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredObjDir: Dict[str, str] = field(default_factory=dict)
+    _filteredTargetDir: Dict[str, str] = field(default_factory=dict)
+    _filteredTargetName: Dict[str, str] = field(default_factory=dict)
+    _filteredPchHeader: Dict[str, str] = field(default_factory=dict)
+    _filteredPchSource: Dict[str, str] = field(default_factory=dict)
     _filteredDefines: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredLinks: Dict[str, List[str]] = field(default_factory=dict)
     _filteredOptimize: Dict[str, Optimization] = field(default_factory=dict)
     _filteredSymbols: Dict[str, bool] = field(default_factory=dict)
     _filteredWarnings: Dict[str, WarningLevel] = field(default_factory=dict)
@@ -1017,48 +1028,88 @@ def location(path: str) -> None:
 # --- Files and directories ---
 def files(patterns: List[str]) -> None:
     if _currentProject:
-        _currentProject.files.extend(patterns)
+        if _currentFilter:
+            if _currentFilter not in _currentProject._filteredFiles:
+                _currentProject._filteredFiles[_currentFilter] = []
+            _currentProject._filteredFiles[_currentFilter].extend(patterns)
+        else:
+            _currentProject.files.extend(patterns)
 
 def excludefiles(patterns: List[str]) -> None:
     if _currentProject:
-        _currentProject.excludeFiles.extend(patterns)
+        if _currentFilter:
+            if _currentFilter not in _currentProject._filteredExcludeFiles:
+                _currentProject._filteredExcludeFiles[_currentFilter] = []
+            _currentProject._filteredExcludeFiles[_currentFilter].extend(patterns)
+        else:
+            _currentProject.excludeFiles.extend(patterns)
 
 removefiles = excludefiles
 
 def excludemainfiles(patterns: List[str]) -> None:
     if _currentProject:
-        _currentProject.excludeMainFiles.extend(patterns)
+        if _currentFilter:
+            if _currentFilter not in _currentProject._filteredExcludeMainFiles:
+                _currentProject._filteredExcludeMainFiles[_currentFilter] = []
+            _currentProject._filteredExcludeMainFiles[_currentFilter].extend(patterns)
+        else:
+            _currentProject.excludeMainFiles.extend(patterns)
 
 removemainfiles = excludemainfiles
 
 def includedirs(dirs: List[str]) -> None:
     if _currentProject:
-        _currentProject.includeDirs.extend(dirs)
+        if _currentFilter:
+            if _currentFilter not in _currentProject._filteredIncludeDirs:
+                _currentProject._filteredIncludeDirs[_currentFilter] = []
+            _currentProject._filteredIncludeDirs[_currentFilter].extend(dirs)
+        else:
+            _currentProject.includeDirs.extend(dirs)
 
 def libdirs(dirs: List[str]) -> None:
     if _currentProject:
-        _currentProject.libDirs.extend(dirs)
+        if _currentFilter:
+            if _currentFilter not in _currentProject._filteredLibDirs:
+                _currentProject._filteredLibDirs[_currentFilter] = []
+            _currentProject._filteredLibDirs[_currentFilter].extend(dirs)
+        else:
+            _currentProject.libDirs.extend(dirs)
 
 def objdir(path: str) -> None:
     if _currentProject:
-        _currentProject.objDir = path
+        if _currentFilter:
+            _currentProject._filteredObjDir[_currentFilter] = path
+        else:
+            _currentProject.objDir = path
 
 def targetdir(path: str) -> None:
     if _currentProject:
-        _currentProject.targetDir = path
+        if _currentFilter:
+            _currentProject._filteredTargetDir[_currentFilter] = path
+        else:
+            _currentProject.targetDir = path
 
 def targetname(name: str) -> None:
     if _currentProject:
-        _currentProject.targetName = name
+        if _currentFilter:
+            _currentProject._filteredTargetName[_currentFilter] = name
+        else:
+            _currentProject.targetName = name
 
 # --- Dependencies ---
 def links(libs: List[str]) -> None:
     if _currentProject:
-        if _currentFilter and _currentFilter.startswith("system:"):
-            system = _currentFilter.split(":")[1]
-            if system not in _currentProject.systemLinks:
-                _currentProject.systemLinks[system] = []
-            _currentProject.systemLinks[system].extend(libs)
+        if _currentFilter:
+            if _currentFilter not in _currentProject._filteredLinks:
+                _currentProject._filteredLinks[_currentFilter] = []
+            _currentProject._filteredLinks[_currentFilter].extend(libs)
+
+            # Keep legacy per-system map for compatibility/introspection.
+            if _currentFilter.startswith("system:"):
+                system = _currentFilter.split(":")[1]
+                if system not in _currentProject.systemLinks:
+                    _currentProject.systemLinks[system] = []
+                _currentProject.systemLinks[system].extend(libs)
         else:
             _currentProject.links.extend(libs)
 
@@ -1124,11 +1175,17 @@ def warnings(level: Union[str, WarningLevel]) -> None:
 # --- Precompiled headers ---
 def pchheader(header: str) -> None:
     if _currentProject:
-        _currentProject.pchHeader = header
+        if _currentFilter:
+            _currentProject._filteredPchHeader[_currentFilter] = header
+        else:
+            _currentProject.pchHeader = header
 
 def pchsource(source: str) -> None:
     if _currentProject:
-        _currentProject.pchSource = source
+        if _currentFilter:
+            _currentProject._filteredPchSource[_currentFilter] = source
+        else:
+            _currentProject.pchSource = source
 
 # --- Build hooks ---
 def prebuild(cmds: List[str]) -> None:
