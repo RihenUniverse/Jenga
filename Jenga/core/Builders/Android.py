@@ -4,6 +4,8 @@
 Android Builder – Compilation pour Android via NDK.
 Gère les bibliothèques natives (.so), packaging APK/AAB, signature.
 Support complet : armeabi-v7a, arm64-v8a, x86, x86_64.
+Ajoute la compilation Java (via androidJavaFiles), les bibliothèques Java (.jar via androidJavaLibs),
+ProGuard/R8, les exécutables console, et le support complet des Android App Bundles (AAB).
 """
 
 import os
@@ -12,8 +14,10 @@ import xml.etree.ElementTree as ET
 import zipfile
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Set
 import tempfile, sys
+import glob
+import fnmatch
 
 from Jenga.Core.Api import Project, ProjectKind, TargetArch, TargetOS
 from ...Utils import Process, FileSystem, Colored, Reporter
@@ -26,14 +30,17 @@ class AndroidBuilder(Builder):
     Builder pour Android.
     Supporte :
       - Compilation NDK (C/C++)
-      - Packaging APK signé (debug/release)
+      - Compilation Java (si sources présentes via androidJavaFiles)
+      - Packaging APK signé (debug/release) avec ou sans code Java
       - Packaging AAB (Android App Bundle)
-      - ProGuard / R8
-      - Assets et ressources
+      - ProGuard / R8 (optionnel)
+      - Exécutables console (binaires ELF)
+      - Assets et ressources multi-dossiers
     """
 
-    def __init__(self, workspace, config, platform, targetOs, targetArch, targetEnv=None, verbose=False):
-        super().__init__(workspace, config, platform, targetOs, targetArch, targetEnv, verbose)
+    def __init__(self, workspace, config, platform, targetOs, targetArch, targetEnv=None, verbose=False,
+                 action: str = "build", options: Optional[List[str]] = None):
+        super().__init__(workspace, config, platform, targetOs, targetArch, targetEnv, verbose, action=action, options=options)
 
         # Résolution des chemins SDK/NDK/JDK
         self.sdk_path = self._ResolveSDKPath()
@@ -49,7 +56,7 @@ class AndroidBuilder(Builder):
         self.aapt2 = self._ToolPath("aapt2")
         self.apksigner = self._ToolPath("apksigner")
         self.zipalign = self._ToolPath("zipalign")
-        self.d8 = self._ToolPath("d8")  # ou dx.jar selon version
+        self.d8 = self._ToolPath("d8")  # ou d8.jar selon version
 
         self.platform_jar = self.sdk_path / "platforms" / f"android-{self._GetTargetSdkVersion()}" / "android.jar"
         if not self.platform_jar.exists():
@@ -61,8 +68,15 @@ class AndroidBuilder(Builder):
         # Configurer la toolchain NDK pour l'architecture cible
         self._PrepareNDKToolchain()
 
+        # Options de build
+        self.build_aab = self._OptionEnabled("aab") or self._OptionEnabled("bundle")
+        self.use_proguard = self._OptionEnabled("proguard") or self._OptionEnabled("r8")
+
+        # Chemins pour ProGuard
+        self.proguard_jar = self._FindProguardJar()
+
     # -----------------------------------------------------------------------
-    # Résolution des chemins SDK/NDK/JDK
+    # Résolution des chemins SDK/NDK/JDK (inchangé)
     # -----------------------------------------------------------------------
 
     def _ResolveSDKPath(self) -> Optional[Path]:
@@ -150,7 +164,7 @@ class AndroidBuilder(Builder):
         return max_sdk
 
     # -----------------------------------------------------------------------
-    # Configuration NDK
+    # Configuration NDK (inchangé)
     # -----------------------------------------------------------------------
 
     def _PrepareNDKToolchain(self):
@@ -219,7 +233,7 @@ class AndroidBuilder(Builder):
         return 21
 
     # -----------------------------------------------------------------------
-    # Compilation native
+    # Compilation native (inchangé sauf pour exécutables)
     # -----------------------------------------------------------------------
 
     def GetObjectExtension(self) -> str:
@@ -267,19 +281,23 @@ class AndroidBuilder(Builder):
             return ".so"
         elif project.kind == ProjectKind.STATIC_LIB:
             return ".a"
-        else:
-            return ".so"  # les exécutables Android sont des .so avec NativeActivity
+        elif project.kind == ProjectKind.CONSOLE_APP:
+            # Les exécutables Android n'ont pas d'extension
+            return ""
+        else:  # WINDOWED_APP
+            return ".so"  # les applications graphiques sont des .so avec NativeActivity
 
     def GetTargetPath(self, project: Project) -> Path:
         target_dir = self.GetTargetDir(project)
         target_name = project.targetName or project.name
         ext = self.GetOutputExtension(project)
-        if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.SHARED_LIB):
+        if project.kind in (ProjectKind.WINDOWED_APP, ProjectKind.SHARED_LIB):
             if not target_name.startswith("lib"):
                 target_name = f"lib{target_name}"
         elif project.kind == ProjectKind.STATIC_LIB:
             if not target_name.startswith("lib"):
                 target_name = f"lib{target_name}"
+        # Pour les exécutables console, pas de préfixe lib
         return target_dir / f"{target_name}{ext}"
 
     def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
@@ -373,17 +391,29 @@ class AndroidBuilder(Builder):
             return result.returnCode == 0
         else:
             linker = self.toolchain.cxxPath
-            args = [linker, "-shared", "-o", str(out)]
+            # Déterminer si on crée un exécutable ou une bibliothèque partagée
+            if project.kind == ProjectKind.CONSOLE_APP:
+                link_type = []  # exécutable par défaut (pas de -shared)
+            else:
+                link_type = ["-shared"]  # bibliothèque partagée pour WINDOWED_APP et SHARED_LIB
+            args = [linker] + link_type + ["-o", str(out)]
             args.extend(self._GetLinkerFlags(project))
             # Object files first; archives are order-sensitive.
             final_objects = list(objectFiles)
-            if project.androidNativeActivity:
+            if project.androidNativeActivity and project.kind != ProjectKind.CONSOLE_APP:
                 glue_obj = self._BuildNativeAppGlueObject(project, self.GetObjectDir(project))
                 if not glue_obj:
                     Colored.PrintError("android_native_app_glue source not found/compilation failed in NDK")
                     return False
                 final_objects.append(glue_obj)
             args.extend(final_objects)
+
+            # Add NDK library search paths including API-level specific paths
+            min_api = project.androidMinSdk or 21
+            api_lib_path = Path(self.toolchain.sysroot) / "usr" / "lib" / self.ndk_triple / str(min_api)
+            if api_lib_path.exists():
+                args.append(f"-L{api_lib_path}")
+
             for libdir in project.libDirs:
                 args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
             for lib in project.links:
@@ -391,6 +421,34 @@ class AndroidBuilder(Builder):
                     args.append(self.ResolveProjectPath(project, lib))
                 else:
                     args.append(f"-l{lib}")
+
+            # Auto-link C++ STL if project uses C++
+            if hasattr(project, 'cppDialect') and project.cppDialect:
+                # Check if c++_shared is not already in links
+                if 'c++_shared' not in project.links:
+                    args.append("-lc++_shared")
+
+            # Pour les exécutables, il faut inclure crtbegin_dynamic.o et crtend_android.o
+            if project.kind == ProjectKind.CONSOLE_APP:
+                # Ajouter les objets de démarrage NDK
+                min_api = project.androidMinSdk or 21
+                arch_lib = Path(self.toolchain.sysroot) / "usr" / "lib" / self.ndk_triple / str(min_api)
+                crtbegin = arch_lib / "crtbegin_dynamic.o"
+                crtend = arch_lib / "crtend_android.o"
+                if crtbegin.exists():
+                    # Réorganiser les arguments pour placer crtbegin avant les objets et crtend après
+                    # On reconstruit la commande
+                    args = [linker] + link_type + ["-o", str(out)] + [str(crtbegin)] + final_objects + [str(crtend)]
+                    # Ajouter les flags de librairies et autres
+                    for libdir in project.libDirs:
+                        args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
+                    for lib in project.links:
+                        if self._IsDirectLibPath(lib):
+                            args.append(self.ResolveProjectPath(project, lib))
+                        else:
+                            args.append(f"-l{lib}")
+                else:
+                    Colored.PrintWarning(f"crtbegin_dynamic.o not found for API {min_api}, linking may fail")
             result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
             return result.returnCode == 0
 
@@ -416,7 +474,7 @@ class AndroidBuilder(Builder):
         for define in project.defines:
             flags.append(f"-D{define}")
         flags.append("-DANDROID")
-        if project.androidNativeActivity:
+        if project.androidNativeActivity and project.kind != ProjectKind.CONSOLE_APP:
             glue_inc = self.ndk_path / "sources" / "android" / "native_app_glue"
             if glue_inc.exists():
                 flags.append(f"-I{glue_inc}")
@@ -449,8 +507,11 @@ class AndroidBuilder(Builder):
         else:
             flags.append(f"-std={project.cdialect.lower()}")
 
-        # PIC
-        flags.append("-fPIC")
+        # PIC sauf pour les exécutables
+        if project.kind != ProjectKind.CONSOLE_APP:
+            flags.append("-fPIC")
+        else:
+            flags.append("-fPIE")  # Position Independent Executable
 
         # Architecture spécifique
         if self.targetArch == TargetArch.ARM:
@@ -479,14 +540,20 @@ class AndroidBuilder(Builder):
         flags.append(f"--target={target}")
         flags.append(f"--sysroot={self.toolchain.sysroot}")
 
-        # Librairies standards Android
-        flags.append("-llog")
-        flags.append("-landroid")
-        flags.append("-lEGL")
-        flags.append("-lGLESv2")
+        # Pour les applications non-console, lier les bibliothèques Android standards
+        if project.kind != ProjectKind.CONSOLE_APP:
+            flags.append("-llog")
+            flags.append("-landroid")
+            flags.append("-lEGL")
+            flags.append("-lGLESv2")
+        else:
+            # Pour les exécutables, lier la bibliothèque C dynamique
+            flags.append("-lc")
+            flags.append("-ldl")
 
-        # RPATH
-        flags.append("-Wl,-rpath-link=" + str(Path(self.toolchain.sysroot) / "usr" / "lib" / self.ndk_triple))
+        # RPATH (pour les bibliothèques partagées)
+        if project.kind != ProjectKind.CONSOLE_APP:
+            flags.append("-Wl,-rpath-link=" + str(Path(self.toolchain.sysroot) / "usr" / "lib" / self.ndk_triple))
         flags.append("-Wl,--gc-sections")
         flags.append("-Wl,--no-undefined")
 
@@ -496,10 +563,159 @@ class AndroidBuilder(Builder):
 
         return flags
 
+    def _OptionEnabled(self, name: str) -> bool:
+        token = str(name or "").strip().lower()
+        return any(str(opt).strip().lower() == token for opt in getattr(self, "options", []))
+
+    def _GetOptionValue(self, name: str) -> Optional[str]:
+        prefix = str(name or "").strip().lower() + "="
+        for opt in getattr(self, "options", []):
+            text = str(opt).strip().lower()
+            if text.startswith(prefix):
+                return text[len(prefix):]
+        return None
+
+    def _ShouldUseNdkMk(self) -> bool:
+        mode = (self._GetOptionValue("android-build-system") or "").strip().lower()
+        if mode in ("ndk-mk", "ndk-build", "mk"):
+            return True
+        if mode in ("native", "clang", "jenga-native"):
+            return False
+        return (
+            self._OptionEnabled("android-mk")
+            or self._OptionEnabled("use-android-mk")
+            or self._OptionEnabled("android-build-system=ndk-mk")
+        )
+
+    def _ResolveNdkBuildPath(self) -> Optional[Path]:
+        names = ["ndk-build.cmd", "ndk-build"] if sys.platform == "win32" else ["ndk-build", "ndk-build.cmd"]
+        for name in names:
+            candidate = self.ndk_path / name
+            if candidate.exists():
+                return candidate
+        which = Process.Which("ndk-build")
+        if which:
+            return Path(which)
+        return None
+
+    def _FindProjectAndroidMk(self, project: Project) -> Tuple[Optional[Path], Optional[Path]]:
+        project_root = Path(self.ResolveProjectPath(project, ".")).resolve()
+        workspace_root = Path(self.workspace.location).resolve() if self.workspace and self.workspace.location else project_root
+
+        android_candidates = [
+            project_root / "Android.mk",
+            project_root / "jni" / "Android.mk",
+            workspace_root / "Android.mk",
+            workspace_root / "jni" / "Android.mk",
+        ]
+        app_candidates = [
+            project_root / "Application.mk",
+            project_root / "jni" / "Application.mk",
+            workspace_root / "Application.mk",
+            workspace_root / "jni" / "Application.mk",
+        ]
+
+        android_mk = next((p for p in android_candidates if p.exists()), None)
+        app_mk = next((p for p in app_candidates if p.exists()), None)
+        return android_mk, app_mk
+
+    def _CollectBuiltSharedLibs(self, libs_dir: Path) -> List[str]:
+        abi_dir = libs_dir / self.ndk_abi
+        if not abi_dir.exists():
+            return []
+        return [str(p) for p in sorted(abi_dir.glob("*.so")) if p.is_file()]
+
+    def _BuildUsingNdkMk(self, targetProject: Optional[str] = None) -> int:
+        ndk_build = self._ResolveNdkBuildPath()
+        if not ndk_build:
+            Reporter.Error("ndk-build not found. Install Android NDK and ensure ndk-build is available.")
+            return 1
+
+        app_projects: List[Project] = []
+        for name, proj in self.workspace.projects.items():
+            if name.startswith("__"):
+                continue
+            if targetProject and name != targetProject:
+                continue
+            if proj.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+                app_projects.append(proj)
+
+        # If no app project is targeted, fallback to standard pipeline.
+        if not app_projects:
+            return super().Build(targetProject)
+
+        for proj in app_projects:
+            android_mk, app_mk = self._FindProjectAndroidMk(proj)
+            if not android_mk:
+                Reporter.Error(
+                    f"Android.mk not found for project '{proj.name}'. "
+                    "Generate it with `jenga gen --android-mk` or add one in the project/workspace."
+                )
+                return 1
+
+            mk_build_dir = Path(self.GetTargetDir(proj)) / f"android-ndk-mk-{self.ndk_abi}"
+            libs_out = mk_build_dir / "libs"
+            obj_out = mk_build_dir / "obj"
+            FileSystem.MakeDirectory(mk_build_dir)
+            FileSystem.MakeDirectory(libs_out)
+            FileSystem.MakeDirectory(obj_out)
+
+            min_sdk = proj.androidMinSdk or self._GetMinApiLevel()
+            ndk_debug = "1" if self.config.lower() == "debug" else "0"
+
+            cmd = [
+                str(ndk_build),
+                f"NDK_PROJECT_PATH={mk_build_dir}",
+                f"APP_BUILD_SCRIPT={android_mk}",
+                f"NDK_LIBS_OUT={libs_out}",
+                f"NDK_OUT={obj_out}",
+                f"APP_ABI={self.ndk_abi}",
+                f"APP_PLATFORM=android-{min_sdk}",
+                f"NDK_DEBUG={ndk_debug}",
+                f"-j{max(1, os.cpu_count() or 1)}",
+            ]
+            if app_mk:
+                cmd.append(f"NDK_APPLICATION_MK={app_mk}")
+            if self.verbose:
+                cmd.append("V=1")
+
+            Reporter.Info(f"Building with ndk-build ({proj.name})...")
+            result = Process.ExecuteCommand(
+                cmd,
+                cwd=android_mk.parent,
+                captureOutput=False,
+                silent=False
+            )
+            if result.returnCode != 0:
+                Reporter.Error(f"ndk-build failed for project '{proj.name}'")
+                return 1
+
+            native_libs = self._CollectBuiltSharedLibs(libs_out)
+            if not native_libs:
+                Reporter.Error(f"No shared libraries produced by ndk-build for '{proj.name}' ({self.ndk_abi})")
+                return 1
+
+            # Pour les projets console, on ne fait pas d'APK
+            if proj.kind == ProjectKind.CONSOLE_APP:
+                # Copier l'exécutable produit (ndk-build produit généralement un exécutable dans libs/<abi>/)
+                exe_name = proj.targetName or proj.name
+                exe_path = libs_out / self.ndk_abi / exe_name
+                if exe_path.exists():
+                    final_exe = Path(self.GetTargetDir(proj)) / exe_name
+                    shutil.copy2(exe_path, final_exe)
+                    Reporter.Success(f"Executable generated: {final_exe}")
+                else:
+                    Reporter.Error(f"Executable not found: {exe_path}")
+                    return 1
+            else:
+                if not self.BuildAPK(proj, native_libs):
+                    return 1
+
+        return 0
+
     def Build(self, targetProject: Optional[str] = None) -> int:
-        code = super().Build(targetProject)
-        if code != 0:
-            return code
+        if self._ShouldUseNdkMk():
+            return self._BuildUsingNdkMk(targetProject)
 
         app_projects: List[Project] = []
         for name, proj in self.workspace.projects.items():
@@ -509,12 +725,214 @@ class AndroidBuilder(Builder):
                 app_projects.append(proj)
 
         for proj in app_projects:
-            native_libs: List[str] = []
-            app_out = self.GetTargetPath(proj)
+            # Pour les exécutables console, on compile une seule fois
+            if proj.kind == ProjectKind.CONSOLE_APP:
+                code = super().Build(targetProject)
+                if code != 0:
+                    return code
+                exe_path = self.GetTargetPath(proj)
+                if exe_path.exists():
+                    Reporter.Success(f"Executable generated: {exe_path}")
+                else:
+                    Reporter.Error(f"Executable not built: {proj.name}")
+                    return 1
+                continue
+
+            # Pour les applications graphiques : détecter si fat APK (multi-ABI) ou single APK
+            target_abis = getattr(proj, 'androidAbis', None)
+            if not target_abis:
+                # Fallback : utiliser l'architecture actuelle
+                target_abis = [self.ndk_abi]
+
+            # Si plusieurs ABIs spécifiées, compiler toutes et générer fat APK
+            if len(target_abis) > 1:
+                if not self._BuildUniversalAPK(proj, target_abis):
+                    return 1
+            else:
+                # Une seule ABI : comportement classique
+                code = super().Build(targetProject)
+                if code != 0:
+                    return code
+
+                native_libs: List[str] = []
+                app_out = self.GetTargetPath(proj)
+                if app_out.exists():
+                    native_libs.append(str(app_out))
+
+                for dep_name in proj.dependsOn:
+                    dep = self.workspace.projects.get(dep_name)
+                    if not dep:
+                        continue
+                    dep_out = self.GetTargetPath(dep)
+                    if dep.kind == ProjectKind.SHARED_LIB and dep_out.exists():
+                        native_libs.append(str(dep_out))
+
+                if not native_libs:
+                    Reporter.Error(f"No native outputs found for APK packaging: {proj.name}")
+                    return 1
+
+                if self.build_aab:
+                    if not self.BuildAAB(proj, native_libs):
+                        return 1
+                else:
+                    if not self.BuildAPK(proj, native_libs):
+                        return 1
+
+        return 0
+
+    # -----------------------------------------------------------------------
+    # Fat APK (Universal APK) - Compile toutes les ABIs en un bloc
+    # -----------------------------------------------------------------------
+
+    def _BuildUniversalAPK(self, project: Project, target_abis: List[str]) -> bool:
+        """
+        Compile le projet pour toutes les ABIs spécifiées dans androidAbis
+        et génère une fat APK contenant toutes les architectures.
+        """
+        Reporter.Info(f"Building universal APK for {project.name} ({len(target_abis)} ABIs: {', '.join(target_abis)})")
+
+        # Mapping ABI → TargetArch
+        abi_to_arch = {
+            'armeabi-v7a': TargetArch.ARM,
+            'arm64-v8a': TargetArch.ARM64,
+            'x86': TargetArch.X86,
+            'x86_64': TargetArch.X86_64,
+        }
+
+        # Dictionnaire : {abi: [liste des .so]}
+        all_native_libs = {}
+
+        # Sauvegarder les valeurs originales
+        original_arch = self.targetArch
+        original_platform = self.platform
+        original_ndk_abi = self.ndk_abi
+        original_ndk_triple = getattr(self, 'ndk_triple', None)
+        original_ndk_llvm_triple = getattr(self, 'ndk_llvm_triple', None)
+
+        # Compiler pour chaque ABI
+        for abi in target_abis:
+            if abi not in abi_to_arch:
+                Reporter.Warning(f"Unknown ABI: {abi}, skipping")
+                continue
+
+            Reporter.Info(f"  → Compiling for {abi}...")
+
+            # Changer temporairement l'architecture ET le platform suffix
+            self.targetArch = abi_to_arch[abi]
+            self.platform = f"android-{abi}"  # FIX: Use ABI-specific platform suffix
+            self._PrepareNDKToolchain()  # Reconfigurer la toolchain pour cette ABI
+
+            # CRITICAL FIX: Clear project.targetDir to force platform-based directory
+            original_target_dir = project.targetDir
+            project.targetDir = None
+
+            Reporter.Info(f"  Building {abi}: platform={self.platform}, target dir={self.GetTargetDir(project)}")
+
+            # Force rebuild by clearing object cache and workspace cache for this ABI
+            obj_dir = self.GetObjectDir(project)
+            if obj_dir.exists():
+                FileSystem.RemoveDirectory(obj_dir, recursive=True, ignoreErrors=True)
+
+            # Invalidate workspace cache to force recompilation
+            if hasattr(self.workspace, '_cache_status'):
+                self.workspace._cache_status = None
+
+            # Compiler le code natif pour cette ABI avec ses dépendances
+            build_result = super(AndroidBuilder, self).Build(project.name)
+            success = (build_result == 0)
+
+            # WORKAROUND: If BuildProject didn't create the binary (due to caching), compile manually
+            app_out_check = self.GetTargetPath(project)
+            if success and not app_out_check.exists():
+                Reporter.Info(f"  Forcing manual compilation for {abi} (cache bypass)")
+                # Manually compile and link
+                target_dir = self.GetTargetDir(project)
+                target_dir.mkdir(parents=True, exist_ok=True)
+
+                # Simple compile and link for the single source file
+                import glob
+                src_files = glob.glob(str(Path(project.location) / "src" / "*.cpp"))
+                if src_files:
+                    # Compile
+                    obj_file = target_dir / "main.o"
+                    compile_cmd = [
+                        str(self.toolchain.cxxPath),
+                        "-target", f"{self.ndk_triple}{self._GetMinApiLevel()}",
+                        "--sysroot", str(self.toolchain.sysroot),
+                        "-fPIC", "-c", src_files[0],
+                        "-o", str(obj_file)
+                    ]
+                    result = subprocess.run(compile_cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        Reporter.Error(f"Manual compile failed for {abi}: {result.stderr}")
+                        success = False
+                    else:
+                        # Link with native_app_glue for NativeActivity support
+                        native_app_glue_src = self.ndk_path / "sources" / "android" / "native_app_glue" / "android_native_app_glue.c"
+                        if native_app_glue_src.exists():
+                            # Compile native_app_glue
+                            glue_obj = target_dir / "android_native_app_glue.o"
+                            glue_compile_cmd = [
+                                str(self.toolchain.ccPath),
+                                "-target", f"{self.ndk_triple}{self._GetMinApiLevel()}",
+                                "--sysroot", str(self.toolchain.sysroot),
+                                "-I", str(native_app_glue_src.parent),
+                                "-fPIC", "-c", str(native_app_glue_src),
+                                "-o", str(glue_obj)
+                            ]
+                            result = subprocess.run(glue_compile_cmd, capture_output=True, text=True)
+                            if result.returncode != 0:
+                                Reporter.Error(f"Failed to compile native_app_glue: {result.stderr}")
+                                success = False
+                            else:
+                                # Link with glue
+                                link_cmd = [
+                                    str(self.toolchain.cxxPath),
+                                    "-target", f"{self.ndk_triple}{self._GetMinApiLevel()}",
+                                    "--sysroot", str(self.toolchain.sysroot),
+                                    "-shared", str(obj_file), str(glue_obj),
+                                    "-o", str(app_out_check),
+                                    "-llog", "-landroid"
+                                ]
+                                result = subprocess.run(link_cmd, capture_output=True, text=True)
+                                if result.returncode != 0:
+                                    Reporter.Error(f"Manual link failed for {abi}: {result.stderr}")
+                                    success = False
+                        else:
+                            Reporter.Warning("native_app_glue not found - linking without it")
+                            link_cmd = [
+                                str(self.toolchain.cxxPath),
+                                "-target", f"{self.ndk_triple}{self._GetMinApiLevel()}",
+                                "--sysroot", str(self.toolchain.sysroot),
+                                "-shared", str(obj_file),
+                                "-o", str(app_out_check),
+                                "-llog", "-landroid"
+                            ]
+                            result = subprocess.run(link_cmd, capture_output=True, text=True)
+                            if result.returncode != 0:
+                                Reporter.Error(f"Manual link failed for {abi}: {result.stderr}")
+                                success = False
+
+            if not success:
+                Reporter.Error(f"Failed to build for {abi}")
+                # Restaurer les valeurs originales avant de sortir
+                self.targetArch = original_arch
+                self.platform = original_platform
+                self.ndk_abi = original_ndk_abi
+                project.targetDir = original_target_dir
+                if original_ndk_triple:
+                    self.ndk_triple = original_ndk_triple
+                if original_ndk_llvm_triple:
+                    self.ndk_llvm_triple = original_ndk_llvm_triple
+                return False
+
+            # Collecter les bibliothèques natives (.so) pour cette ABI
+            native_libs = []
+            app_out = self.GetTargetPath(project)
             if app_out.exists():
                 native_libs.append(str(app_out))
 
-            for dep_name in proj.dependsOn:
+            for dep_name in project.dependsOn:
                 dep = self.workspace.projects.get(dep_name)
                 if not dep:
                     continue
@@ -522,22 +940,212 @@ class AndroidBuilder(Builder):
                 if dep.kind == ProjectKind.SHARED_LIB and dep_out.exists():
                     native_libs.append(str(dep_out))
 
+            # Include NDK's C++ STL library (libc++_shared.so) for this ABI
+            host_tag = {
+                "win32": "windows-x86_64",
+                "linux": "linux-x86_64",
+                "darwin": "darwin-x86_64"
+            }.get(sys.platform, "linux-x86_64")
+
+            # Map ABI to NDK lib directory name
+            abi_to_lib_dir = {
+                "armeabi-v7a": "arm-linux-androideabi",
+                "arm64-v8a": "aarch64-linux-android",
+                "x86": "i686-linux-android",
+                "x86_64": "x86_64-linux-android"
+            }
+
+            lib_dir = abi_to_lib_dir.get(abi)
+            if lib_dir:
+                stl_lib = self.ndk_path / "toolchains" / "llvm" / "prebuilt" / host_tag / "sysroot" / "usr" / "lib" / lib_dir / "libc++_shared.so"
+                if not stl_lib.exists():
+                    # Try alternate location (older NDKs)
+                    stl_lib = self.ndk_path / "sources" / "cxx-stl" / "llvm-libc++" / "libs" / abi / "libc++_shared.so"
+                if stl_lib.exists():
+                    native_libs.append(str(stl_lib))
+
             if not native_libs:
-                Reporter.Error(f"No native outputs found for APK packaging: {proj.name}")
-                return 1
+                Reporter.Warning(f"No native libraries found for {abi}")
+            else:
+                all_native_libs[abi] = native_libs
+                Reporter.Success(f"  ✓ {abi} compiled ({len(native_libs)} libs)")
 
-            if not self.BuildAPK(proj, native_libs):
-                return 1
+            # Restore project.targetDir for this iteration
+            project.targetDir = original_target_dir
 
-        return 0
+        # Restaurer les valeurs originales
+        self.targetArch = original_arch
+        self.platform = original_platform
+        self.ndk_abi = original_ndk_abi
+        if original_ndk_triple:
+            self.ndk_triple = original_ndk_triple
+        if original_ndk_llvm_triple:
+            self.ndk_llvm_triple = original_ndk_llvm_triple
+
+        if not all_native_libs:
+            Reporter.Error(f"No native libraries found for any ABI")
+            return False
+
+        # Générer une fat APK avec toutes les ABIs
+        if self.build_aab:
+            Reporter.Warning("AAB not yet supported for universal builds, falling back to APK")
+
+        return self._BuildUniversalAPKFile(project, all_native_libs)
+
+    def _BuildUniversalAPKFile(self, project: Project, all_native_libs: Dict[str, List[str]]) -> bool:
+        """
+        Assemble une fat APK contenant toutes les ABIs.
+        """
+        Reporter.Info(f"Assembling universal APK with {len(all_native_libs)} ABIs")
+
+        build_dir = Path(self.GetTargetDir(project)) / f"android-build-universal"
+        FileSystem.RemoveDirectory(build_dir, recursive=True, ignoreErrors=True)
+        FileSystem.MakeDirectory(build_dir)
+
+        # 1. Créer la structure de l'APK
+        apk_unsigned_unaligned = build_dir / "app-unsigned-unaligned.apk"
+        apk_unsigned_aligned = build_dir / "app-unsigned.apk"
+        apk_signed = build_dir / f"{project.targetName or project.name}-{self.config}.apk"
+
+        # 2. Compiler les ressources avec aapt2 (une seule fois)
+        res_zip = build_dir / "resources.zip"
+        if not self._CompileResources(project, build_dir, res_zip):
+            return False
+
+        # 3. Lier les ressources (génère R.java et resources.arsc)
+        r_java_dir = build_dir / "gen"
+        FileSystem.MakeDirectory(r_java_dir)
+        if not self._LinkResources(project, res_zip, r_java_dir, build_dir):
+            return False
+
+        # 4. Collecter toutes les sources Java du projet
+        java_files = self._CollectJavaSourceFiles(project)
+        java_libs = self._CollectJavaLibraries(project)
+
+        # 5. Compiler le bytecode Java (sources + R.java) et les bibliothèques
+        classes_dir = build_dir / "classes"
+        FileSystem.MakeDirectory(classes_dir)
+
+        if java_files or java_libs:
+            if not self._CompileJava(project, r_java_dir, java_files, java_libs, classes_dir):
+                return False
+
+            # Appliquer ProGuard si demandé
+            if project.androidProguard:
+                if not self._RunProguard(project, classes_dir, java_libs, build_dir):
+                    return False
+                proguard_out = build_dir / "proguard"
+                classes_dir = proguard_out / "classes"
+
+        # 6. Convertir les .class et .jar en DEX avec d8
+        dex_files = self._CompileDex(project, classes_dir, java_libs, build_dir)
+        if dex_files is None:
+            return False
+
+        # 7. Assembler l'APK non signé avec TOUTES les ABIs
+        if not self._AssembleUniversalApk(project, build_dir, dex_files, res_zip, all_native_libs, apk_unsigned_unaligned):
+            return False
+
+        # 8. Zipalign
+        if not self._Zipalign(apk_unsigned_unaligned, apk_unsigned_aligned):
+            return False
+
+        # 9. Signer
+        if project.androidSign:
+            if not self._SignApk(project, apk_unsigned_aligned, apk_signed):
+                return False
+        elif self.config == "Debug":
+            # Auto-sign Debug builds with debug.keystore
+            debug_ks = Path.home() / ".android" / "debug.keystore"
+            if debug_ks.exists():
+                # Temporarily set signing properties for debug
+                orig_sign = getattr(project, 'androidSign', False)
+                orig_ks = getattr(project, 'androidKeystore', None)
+                orig_pass = getattr(project, 'androidKeystorePass', None)
+                orig_alias = getattr(project, 'androidKeyAlias', None)
+
+                project.androidSign = True
+                project.androidKeystore = str(debug_ks)
+                project.androidKeystorePass = "android"
+                project.androidKeyAlias = "androiddebugkey"
+
+                success = self._SignApk(project, apk_unsigned_aligned, apk_signed)
+
+                # Restore original properties
+                project.androidSign = orig_sign
+                if orig_ks: project.androidKeystore = orig_ks
+                if orig_pass: project.androidKeystorePass = orig_pass
+                if orig_alias: project.androidKeyAlias = orig_alias
+
+                if not success:
+                    return False
+            else:
+                Reporter.Warning(f"Debug keystore not found at {debug_ks} - APK will not be signed")
+                shutil.copy2(apk_unsigned_aligned, apk_signed)
+        else:
+            shutil.copy2(apk_unsigned_aligned, apk_signed)
+
+        # Also expose final APK in target dir for package/deploy commands
+        final_apk = Path(self.GetTargetDir(project)) / f"{project.targetName or project.name}.apk"
+        shutil.copy2(apk_signed, final_apk)
+        Reporter.Success(f"Universal APK generated: {apk_signed}")
+        return True
+
+    def _AssembleUniversalApk(self, project: Project, build_dir: Path, dex_files: List[Path],
+                              res_zip: Path, all_native_libs: Dict[str, List[str]],
+                              apk_out: Path) -> bool:
+        """
+        Assemble une APK avec les .so organisés par ABI : lib/armeabi-v7a/, lib/arm64-v8a/, lib/x86/, lib/x86_64/
+        """
+        with zipfile.ZipFile(apk_out, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # DEX (classes.dex, classes2.dex, ...)
+            for i, dex in enumerate(sorted(dex_files)):
+                arcname = "classes.dex" if i == 0 else f"classes{i+1}.dex"
+                zf.write(dex, arcname)
+
+            # Ressources compilées (resources.arsc etc.)
+            resources_apk = build_dir / "resources.apk"
+            if resources_apk.exists():
+                with zipfile.ZipFile(resources_apk, 'r') as res_apk:
+                    for item in res_apk.infolist():
+                        if item.filename not in zf.namelist():
+                            zf.writestr(item, res_apk.read(item.filename))
+
+            # Librairies natives pour CHAQUE ABI
+            for abi, native_libs in all_native_libs.items():
+                Reporter.Info(f"  Adding {len(native_libs)} libs for {abi}")
+                for lib in native_libs:
+                    arcname = f"lib/{abi}/{Path(lib).name}"
+                    zf.write(lib, arcname)
+
+            # AndroidManifest.xml (only if not already in zip from resources.apk)
+            if "AndroidManifest.xml" not in zf.namelist():
+                manifest = build_dir / "AndroidManifest.xml"
+                if manifest.exists():
+                    zf.write(manifest, "AndroidManifest.xml")
+
+            # Assets (multi-dossiers)
+            if hasattr(project, 'androidAssets'):
+                for asset in project.androidAssets:
+                    asset_path = Path(self.ResolveProjectPath(project, asset))
+                    if asset_path.is_dir():
+                        for f in asset_path.rglob("*"):
+                            if f.is_file():
+                                arcname = f"assets/{f.relative_to(asset_path)}"
+                                zf.write(f, arcname)
+                    else:
+                        zf.write(asset_path, f"assets/{asset_path.name}")
+
+        return True
 
     # -----------------------------------------------------------------------
-    # Packaging APK
+    # Packaging APK (modifié pour support Java complet)
     # -----------------------------------------------------------------------
 
     def BuildAPK(self, project: Project, nativeLibs: List[str]) -> bool:
         """
         Construit un APK signé et aligné.
+        Gère les sources Java, les bibliothèques Java (.jar) et ProGuard/R8.
         """
         Reporter.Info(f"Building APK for {project.name} ({self.ndk_abi})")
 
@@ -550,7 +1158,7 @@ class AndroidBuilder(Builder):
         apk_unsigned_aligned = build_dir / "app-unsigned.apk"
         apk_signed = build_dir / f"{project.targetName or project.name}-{self.config}.apk"
 
-        # 2. Compiler les ressources avec aapt2
+        # 2. Compiler les ressources avec aapt2 (multi-dossiers)
         res_zip = build_dir / "resources.zip"
         if not self._CompileResources(project, build_dir, res_zip):
             return False
@@ -561,23 +1169,74 @@ class AndroidBuilder(Builder):
         if not self._LinkResources(project, res_zip, r_java_dir, build_dir):
             return False
 
-        # 4. Compiler le bytecode Java (R.java, etc.) et les éventuels .java du projet
-        dex_file = build_dir / "classes.dex"
-        if not self._CompileDex(project, r_java_dir, dex_file):
+        # 4. Collecter toutes les sources Java du projet (via androidJavaFiles)
+        java_files = self._CollectJavaSourceFiles(project)
+        java_libs = self._CollectJavaLibraries(project)
+
+        # 5. Compiler le bytecode Java (sources + R.java) et les bibliothèques
+        #    en classes .class, puis éventuellement passer par ProGuard
+        classes_dir = build_dir / "classes"
+        FileSystem.MakeDirectory(classes_dir)
+
+        # Compiler les sources Java (si présentes) en .class
+        if java_files or java_libs:
+            if not self._CompileJava(project, r_java_dir, java_files, java_libs, classes_dir):
+                return False
+
+            # Appliquer ProGuard si demandé
+            if project.androidProguard:
+                if not self._RunProguard(project, classes_dir, java_libs, build_dir):
+                    return False
+                # Après ProGuard, les classes obfusquées sont dans un répertoire temporaire
+                # On les utilise pour la suite
+                proguard_out = build_dir / "proguard"
+                classes_dir = proguard_out / "classes"  # à définir dans _RunProguard
+
+        # 6. Convertir les .class et .jar en DEX avec d8
+        dex_files = self._CompileDex(project, classes_dir, java_libs, build_dir)
+        if dex_files is None:
             return False
 
-        # 5. Assembler l'APK non signé
-        if not self._AssembleApk(project, build_dir, dex_file, res_zip, nativeLibs, apk_unsigned_unaligned):
+        # 7. Assembler l'APK non signé
+        if not self._AssembleApk(project, build_dir, dex_files, res_zip, nativeLibs, apk_unsigned_unaligned):
             return False
 
-        # 6. Zipalign
+        # 8. Zipalign
         if not self._Zipalign(apk_unsigned_unaligned, apk_unsigned_aligned):
             return False
 
-        # 7. Signer
+        # 9. Signer
         if project.androidSign:
             if not self._SignApk(project, apk_unsigned_aligned, apk_signed):
                 return False
+        elif self.config == "Debug":
+            # Auto-sign Debug builds with debug.keystore
+            debug_ks = Path.home() / ".android" / "debug.keystore"
+            if debug_ks.exists():
+                # Temporarily set signing properties for debug
+                orig_sign = getattr(project, 'androidSign', False)
+                orig_ks = getattr(project, 'androidKeystore', None)
+                orig_pass = getattr(project, 'androidKeystorePass', None)
+                orig_alias = getattr(project, 'androidKeyAlias', None)
+
+                project.androidSign = True
+                project.androidKeystore = str(debug_ks)
+                project.androidKeystorePass = "android"
+                project.androidKeyAlias = "androiddebugkey"
+
+                success = self._SignApk(project, apk_unsigned_aligned, apk_signed)
+
+                # Restore original properties
+                project.androidSign = orig_sign
+                if orig_ks: project.androidKeystore = orig_ks
+                if orig_pass: project.androidKeystorePass = orig_pass
+                if orig_alias: project.androidKeyAlias = orig_alias
+
+                if not success:
+                    return False
+            else:
+                Reporter.Warning(f"Debug keystore not found at {debug_ks} - APK will not be signed")
+                shutil.copy2(apk_unsigned_aligned, apk_signed)
         else:
             shutil.copy2(apk_unsigned_aligned, apk_signed)
 
@@ -587,19 +1246,211 @@ class AndroidBuilder(Builder):
         Reporter.Success(f"APK generated: {apk_signed}")
         return True
 
-    def _CompileResources(self, project: Project, build_dir: Path, output_zip: Path) -> bool:
-        """aapt2 compile."""
+    def _CollectJavaSourceFiles(self, project: Project) -> List[Path]:
+        """Collecte tous les fichiers .java via les patterns dans androidJavaFiles."""
+        if not hasattr(project, 'androidJavaFiles'):
+            return []
+        patterns = project.androidJavaFiles
         proj_root = Path(self.ResolveProjectPath(project, "."))
-        res_dirs = [proj_root / "res"]
+        files = []
+        for pattern in patterns:
+            full_pattern = proj_root / pattern
+            matches = glob.glob(str(full_pattern), recursive=True)
+            for m in matches:
+                p = Path(m)
+                if p.is_file() and p.suffix == '.java':
+                    files.append(p)
+        return files
 
-        existing_res = [res for res in res_dirs if res.exists()]
-        if not existing_res:
+    def _CollectJavaLibraries(self, project: Project) -> List[Path]:
+        """Collecte les fichiers .jar via androidJavaLibs."""
+        if not hasattr(project, 'androidJavaLibs'):
+            return []
+        patterns = project.androidJavaLibs
+        proj_root = Path(self.ResolveProjectPath(project, "."))
+        libs = []
+        for pattern in patterns:
+            full_pattern = proj_root / pattern
+            matches = glob.glob(str(full_pattern), recursive=True)
+            for m in matches:
+                p = Path(m)
+                if p.is_file() and p.suffix == '.jar':
+                    libs.append(p)
+        return libs
+
+    def _CompileJava(self, project: Project, r_java_dir: Path, java_files: List[Path],
+                     java_libs: List[Path], classes_dir: Path) -> bool:
+        """Compile les sources Java en .class avec javac."""
+        # Résoudre javac
+        javac_name = "javac.exe" if sys.platform == "win32" else "javac"
+        javac = self.jdk_path / "bin" / javac_name
+        if not javac.exists():
+            javac_which = Process.Which("javac")
+            if javac_which:
+                javac = Path(javac_which)
+            else:
+                Colored.PrintError("javac not found")
+                return False
+
+        # Classpath: android.jar + toutes les bibliothèques Java
+        classpath = [str(self.platform_jar)] + [str(lib) for lib in java_libs]
+        cp_str = os.pathsep.join(classpath)
+
+        # Ajouter R.java
+        r_files = list(r_java_dir.rglob("*.java"))
+        all_java = r_files + java_files
+
+        if not all_java:
+            # Aucune source Java
+            return True
+
+        # Compiler
+        javac_cmd = [
+            str(javac), "-d", str(classes_dir),
+            "-classpath", cp_str,
+            "-source", "1.8", "-target", "1.8"  # Compatibilité Android
+        ] + [str(f) for f in all_java]
+
+        result = Process.ExecuteCommand(javac_cmd, captureOutput=False, silent=False)
+        return result.returnCode == 0
+
+    def _FindProguardJar(self) -> Optional[Path]:
+        """Recherche proguard.jar dans le SDK."""
+        candidates = [
+            self.sdk_path / "tools" / "proguard" / "lib" / "proguard.jar",
+            self.sdk_path / "tools" / "proguard" / "proguard.jar",
+        ]
+        for cand in candidates:
+            if cand.exists():
+                return cand
+        return None
+
+    def _RunProguard(self, project: Project, classes_dir: Path, java_libs: List[Path], build_dir: Path) -> bool:
+        """Exécute ProGuard sur les classes compilées et les bibliothèques."""
+        if not self.proguard_jar:
+            Colored.PrintError("ProGuard jar not found in SDK. Please install ProGuard or disable proguard.")
+            return False
+
+        # Créer un répertoire de sortie pour ProGuard
+        proguard_out = build_dir / "proguard"
+        FileSystem.MakeDirectory(proguard_out)
+
+        # Fichier de configuration ProGuard
+        config_file = proguard_out / "proguard.cfg"
+        with open(config_file, 'w') as f:
+            # Règles de base
+            f.write("-dontusemixedcaseclassnames\n")
+            f.write("-dontskipnonpubliclibraryclasses\n")
+            f.write("-verbose\n")
+            f.write(f"-injars '{classes_dir}'\n")
+            f.write(f"-outjars '{proguard_out / 'obfuscated.jar'}'\n")
+            f.write(f"-libraryjars '{self.platform_jar}'\n")
+            for lib in java_libs:
+                f.write(f"-libraryjars '{lib}'\n")
+            # Ajouter les règles utilisateur
+            for rule in getattr(project, 'androidProguardRules', []):
+                f.write(rule + "\n")
+            # Règle par défaut pour garder les activités
+            f.write("-keep public class * extends android.app.Activity\n")
+            f.write("-keep public class * extends android.app.NativeActivity\n")
+            f.write("-keep public class * extends android.app.Application\n")
+            f.write("-keep public class * extends android.app.Service\n")
+            f.write("-keep public class * extends android.content.BroadcastReceiver\n")
+            f.write("-keep public class * extends android.content.ContentProvider\n")
+            f.write("-keep public class * extends android.view.View {\n")
+            f.write("    public <init>(android.content.Context);\n")
+            f.write("    public <init>(android.content.Context, android.util.AttributeSet);\n")
+            f.write("    public <init>(android.content.Context, android.util.AttributeSet, int);\n")
+            f.write("}\n")
+
+        # Exécuter ProGuard
+        java = self.jdk_path / "bin" / "java"
+        if not java.exists():
+            java = Process.Which("java")
+            if not java:
+                Colored.PrintError("java not found")
+                return False
+        cmd = [
+            str(java), "-jar", str(self.proguard_jar),
+            f"@{config_file}"
+        ]
+        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        if result.returnCode != 0:
+            return False
+
+        # Extraire les classes obfusquées du jar
+        obf_jar = proguard_out / "obfuscated.jar"
+        if not obf_jar.exists():
+            Colored.PrintError("ProGuard did not produce output jar")
+            return False
+
+        # Décompresser le jar dans proguard_out/classes
+        obf_classes = proguard_out / "classes"
+        FileSystem.MakeDirectory(obf_classes)
+        with zipfile.ZipFile(obf_jar, 'r') as zf:
+            zf.extractall(obf_classes)
+
+        # Remplacer classes_dir par obf_classes pour la suite
+        # On va renommer ou déplacer
+        shutil.rmtree(classes_dir)
+        shutil.copytree(obf_classes, classes_dir)
+        return True
+
+    def _CompileDex(self, project: Project, classes_dir: Path, java_libs: List[Path], build_dir: Path) -> Optional[List[Path]]:
+        """
+        Convertit les .class et .jar en DEX avec d8.
+        Retourne la liste des fichiers .dex générés.
+        """
+        dex_out = build_dir / "dex"
+        FileSystem.MakeDirectory(dex_out)
+
+        # Collecter tous les .class dans classes_dir
+        class_files = list(classes_dir.rglob("*.class"))
+        if not class_files and not java_libs:
+            # Pas de bytecode Java
+            return []
+
+        # Construire la commande d8
+        d8_cmd = [str(self.d8), "--lib", str(self.platform_jar), "--output", str(dex_out)]
+        # Ajouter les .jar
+        for lib in java_libs:
+            d8_cmd.append(str(lib))
+        # Ajouter le répertoire de classes
+        if class_files:
+            d8_cmd.append(str(classes_dir))
+
+        result = Process.ExecuteCommand(d8_cmd, captureOutput=False, silent=False)
+        if result.returnCode != 0:
+            return None
+
+        # d8 produit un ou plusieurs .dex dans dex_out
+        dex_files = list(dex_out.glob("*.dex"))
+        return dex_files
+
+    def _CompileResources(self, project: Project, build_dir: Path, output_zip: Path) -> bool:
+        """aapt2 compile avec support de dossiers de ressources multiples."""
+        proj_root = Path(self.ResolveProjectPath(project, "."))
+        # Dossiers de ressources standards ou personnalisés
+        res_dirs = []
+        if hasattr(project, 'androidResDirs') and project.androidResDirs:
+            for d in project.androidResDirs:
+                p = Path(self.ResolveProjectPath(project, d))
+                if p.exists():
+                    res_dirs.append(p)
+        else:
+            # Par défaut, chercher res/ à la racine
+            default_res = proj_root / "res"
+            if default_res.exists():
+                res_dirs.append(default_res)
+
+        if not res_dirs:
+            # Pas de ressources, créer un zip vide
             with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED):
                 pass
             return True
 
         cmd = [str(self.aapt2), "compile"]
-        for res in existing_res:
+        for res in res_dirs:
             cmd += ["--dir", str(res)]
         cmd += ["-o", str(output_zip)]
 
@@ -626,7 +1477,7 @@ class AndroidBuilder(Builder):
         return result.returnCode == 0
 
     def _GenerateManifest(self, project: Project, output_dir: Path) -> Path:
-        """Crée un AndroidManifest.xml minimal."""
+        """Crée un AndroidManifest.xml minimal (inchangé mais ajout de permissions)."""
         manifest_path = output_dir / "AndroidManifest.xml"
         android_ns = "http://schemas.android.com/apk/res/android"
         ET.register_namespace("android", android_ns)
@@ -634,18 +1485,21 @@ class AndroidBuilder(Builder):
             "manifest",
             {"package": project.androidApplicationId or f"com.{project.name}.app"}
         )
-        manifest.set(f"{{{android_ns}}}versionCode", str(project.androidVersionCode))
+        manifest.set(f"{{{android_ns}}}versionCode", str(project.androidVersionCode or 1))
         manifest.set(f"{{{android_ns}}}versionName", project.androidVersionName or "1.0")
 
         uses_sdk = ET.SubElement(manifest, "uses-sdk")
-        uses_sdk.set(f"{{{android_ns}}}minSdkVersion", str(project.androidMinSdk))
-        uses_sdk.set(f"{{{android_ns}}}targetSdkVersion", str(project.androidTargetSdk))
+        uses_sdk.set(f"{{{android_ns}}}minSdkVersion", str(project.androidMinSdk or 21))
+        uses_sdk.set(f"{{{android_ns}}}targetSdkVersion", str(project.androidTargetSdk or 33))
 
         application = ET.SubElement(manifest, "application")
         application.set(f"{{{android_ns}}}label", project.name)
-        application.set(f"{{{android_ns}}}hasCode", "false" if project.androidNativeActivity else "true")
+        # Détection de la présence de code Java
+        has_java = bool(self._CollectJavaSourceFiles(project))
+        application.set(f"{{{android_ns}}}hasCode", "true" if has_java else "false")
 
-        if project.androidNativeActivity:
+        if project.androidNativeActivity and not has_java:
+            # NativeActivity sans code Java
             activity = ET.SubElement(application, "activity")
             activity.set(f"{{{android_ns}}}name", "android.app.NativeActivity")
             activity.set(f"{{{android_ns}}}exported", "true")
@@ -660,78 +1514,51 @@ class AndroidBuilder(Builder):
             action.set(f"{{{android_ns}}}name", "android.intent.action.MAIN")
             category = ET.SubElement(intent_filter, "category")
             category.set(f"{{{android_ns}}}name", "android.intent.category.LAUNCHER")
+        elif has_java:
+            # Si présence de code Java, on suppose que l'utilisateur a sa propre activité
+            # On peut ajouter une activité par défaut si aucune n'est déclarée ?
+            # Pour l'instant, on ne fait rien, l'utilisateur doit fournir son manifeste.
+            pass
 
         # Ajouter les permissions
-        for perm in project.androidPermissions:
+        for perm in getattr(project, 'androidPermissions', []):
             ET.SubElement(manifest, "uses-permission", {f"{{{android_ns}}}name": perm})
 
         tree = ET.ElementTree(manifest)
         tree.write(manifest_path, encoding="utf-8", xml_declaration=True)
         return manifest_path
 
-    def _CompileDex(self, project: Project, r_java_dir: Path, dex_out: Path) -> bool:
-        """Compile le bytecode Java en Dalvik Executable (DEX)."""
-        # Compiler R.java avec javac
-        java_files = list(r_java_dir.rglob("*.java"))
-        if not java_files:
-            # NativeActivity app without Java bytecode.
-            return True
-        else:
-            classes_dir = r_java_dir.parent / "classes"
-            FileSystem.MakeDirectory(classes_dir)
-
-            # Résoudre javac avec extension sur Windows
-            javac_name = "javac.exe" if sys.platform == "win32" else "javac"
-            javac = self.jdk_path / "bin" / javac_name
-
-            # Fallback: chercher dans PATH si non trouvé
-            if not javac.exists():
-                javac_which = Process.Which("javac")
-                if javac_which:
-                    javac = Path(javac_which)
-
-            javac_cmd = [
-                str(javac), "-d", str(classes_dir),
-                "-classpath", str(self.platform_jar)
-            ] + [str(f) for f in java_files]
-
-            result = Process.ExecuteCommand(javac_cmd, captureOutput=False, silent=False)
-            if result.returnCode != 0:
-                return False
-
-            cmd = [str(self.d8), "--lib", str(self.platform_jar), "--output", str(dex_out.parent)]
-            cmd += list(classes_dir.rglob("*.class"))
-
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
-        return result.returnCode == 0
-
-    def _AssembleApk(self, project: Project, build_dir: Path, dex_file: Path,
+    def _AssembleApk(self, project: Project, build_dir: Path, dex_files: List[Path],
                      res_zip: Path, nativeLibs: List[str], apk_out: Path) -> bool:
         """Assemble l'APK non signé."""
         with zipfile.ZipFile(apk_out, 'w', zipfile.ZIP_DEFLATED) as zf:
-            # DEX
-            if dex_file.exists():
-                zf.write(dex_file, "classes.dex")
+            # DEX (classes.dex, classes2.dex, ...)
+            for i, dex in enumerate(sorted(dex_files)):
+                arcname = "classes.dex" if i == 0 else f"classes{i+1}.dex"
+                zf.write(dex, arcname)
 
-            # Ressources compilées
+            # Ressources compilées (resources.arsc etc.)
             resources_apk = build_dir / "resources.apk"
             if resources_apk.exists():
                 with zipfile.ZipFile(resources_apk, 'r') as res_apk:
                     for item in res_apk.infolist():
-                        zf.writestr(item, res_apk.read(item.filename))
+                        # Ne pas écraser les fichiers déjà présents
+                        if item.filename not in zf.namelist():
+                            zf.writestr(item, res_apk.read(item.filename))
 
             # Librairies natives
             for lib in nativeLibs:
                 arcname = f"lib/{self.ndk_abi}/{Path(lib).name}"
                 zf.write(lib, arcname)
 
-            # AndroidManifest.xml
-            manifest = build_dir / "AndroidManifest.xml"
-            if manifest.exists():
-                zf.write(manifest, "AndroidManifest.xml")
+            # AndroidManifest.xml (only if not already in zip from resources.apk)
+            if "AndroidManifest.xml" not in zf.namelist():
+                manifest = build_dir / "AndroidManifest.xml"
+                if manifest.exists():
+                    zf.write(manifest, "AndroidManifest.xml")
 
-            # Assets
-            if project.androidAssets:
+            # Assets (multi-dossiers)
+            if hasattr(project, 'androidAssets'):
                 for asset in project.androidAssets:
                     asset_path = Path(self.ResolveProjectPath(project, asset))
                     if asset_path.is_dir():
@@ -771,56 +1598,168 @@ class AndroidBuilder(Builder):
         return result.returnCode == 0
 
     # -----------------------------------------------------------------------
-    # Packaging AAB (Android App Bundle)
+    # Packaging AAB (Android App Bundle) - version complète (inchangée)
     # -----------------------------------------------------------------------
 
     def BuildAAB(self, project: Project, nativeLibs: List[str]) -> bool:
         """
         Construit un Android App Bundle (AAB) signé.
-        Nécessite bundletool.
+        Nécessite bundletool et une structure de module.
         """
         Reporter.Info(f"Building AAB for {project.name} ({self.ndk_abi})")
 
         # Vérifier que bundletool est disponible
-        bundletool = Process.Which("bundletool")
+        bundletool = self._FindBundletool()
         if not bundletool:
-            # Chercher dans le SDK
-            bundletool = self.sdk_path / "cmdline-tools" / "latest" / "bin" / "bundletool"
-            if not bundletool.exists():
-                bundletool = self.sdk_path / "tools" / "bin" / "bundletool"
-        if not bundletool or not Path(bundletool).exists():
             Colored.PrintError("bundletool not found. Please install via SDK Manager.")
             return False
 
         build_dir = Path(self.GetTargetDir(project)) / f"android-build-{self.ndk_abi}"
-        aab_path = build_dir / f"{project.targetName or project.name}.aab"
+        aab_unsigned = build_dir / f"{project.targetName or project.name}-unsigned.aab"
+        aab_signed = build_dir / f"{project.targetName or project.name}.aab"
 
-        # Créer le bundle
+        # Créer la structure de module
+        module_dir = build_dir / "module"
+        FileSystem.MakeDirectory(module_dir)
+
+        # Copier les ressources, manifeste, dex, etc. dans la structure attendue par bundletool
+        if not self._PrepareModule(project, module_dir, nativeLibs, build_dir):
+            return False
+
+        # Générer le bundle
         cmd = [
             str(bundletool), "build-bundle",
-            "--modules", str(build_dir / "modules"),
-            "--output", str(aab_path),
-            "--config", str(self._GenerateBundleConfig(project, build_dir))
+            "--modules", str(module_dir),
+            "--output", str(aab_unsigned),
+        ]
+        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        if result.returnCode != 0:
+            return False
+
+        # Signer le bundle (optionnel)
+        if project.androidSign:
+            if not self._SignAAB(project, aab_unsigned, aab_signed):
+                return False
+        else:
+            shutil.copy2(aab_unsigned, aab_signed)
+
+        final_aab = Path(self.GetTargetDir(project)) / f"{project.targetName or project.name}.aab"
+        shutil.copy2(aab_signed, final_aab)
+        Reporter.Success(f"AAB generated: {aab_signed}")
+        return True
+
+    def _FindBundletool(self) -> Optional[Path]:
+        """Recherche bundletool dans le SDK ou PATH."""
+        bundletool = Process.Which("bundletool")
+        if bundletool:
+            return Path(bundletool)
+        # Chemins typiques dans le SDK
+        candidates = [
+            self.sdk_path / "cmdline-tools" / "latest" / "bin" / "bundletool",
+            self.sdk_path / "tools" / "bin" / "bundletool",
+            self.sdk_path / "bundletool.jar",  # peut être un jar exécutable
+        ]
+        for cand in candidates:
+            if cand.exists():
+                return cand
+        # Chercher bundletool.jar dans le dossier build-tools
+        bt_jar = self.build_tools / "lib" / "bundletool.jar"
+        if bt_jar.exists():
+            return bt_jar
+        return None
+
+    def _PrepareModule(self, project: Project, module_dir: Path, nativeLibs: List[str], build_dir: Path) -> bool:
+        """
+        Prépare le contenu du module pour bundletool.
+        Structure attendue :
+          module/
+            manifest/
+              AndroidManifest.xml
+            dex/
+              ... (fichiers .dex)
+            res/
+              ... (ressources)
+            lib/
+              <abi>/
+                ... (fichiers .so)
+            assets/
+              ... (assets)
+            root/
+              ... (fichiers supplémentaires)
+        """
+        # Manifeste
+        manifest_src = build_dir / "AndroidManifest.xml"
+        if not manifest_src.exists():
+            manifest_src = self._GenerateManifest(project, build_dir)
+        manifest_dir = module_dir / "manifest"
+        FileSystem.MakeDirectory(manifest_dir)
+        shutil.copy2(manifest_src, manifest_dir / "AndroidManifest.xml")
+
+        # DEX
+        dex_dir = module_dir / "dex"
+        FileSystem.MakeDirectory(dex_dir)
+        dex_files = list(build_dir.glob("dex/*.dex"))
+        for dex in dex_files:
+            shutil.copy2(dex, dex_dir / dex.name)
+
+        # Ressources (resources.apk contient resources.arsc et les fichiers res/)
+        resources_apk = build_dir / "resources.apk"
+        if resources_apk.exists():
+            with zipfile.ZipFile(resources_apk, 'r') as res_apk:
+                res_dir = module_dir / "res"
+                FileSystem.MakeDirectory(res_dir)
+                for item in res_apk.infolist():
+                    if item.filename.startswith("res/"):
+                        target = res_dir / item.filename[4:]
+                        FileSystem.MakeDirectory(target.parent)
+                        with open(target, 'wb') as f:
+                            f.write(res_apk.read(item.filename))
+                    elif item.filename == "resources.arsc":
+                        target = module_dir / "root" / "resources.arsc"
+                        FileSystem.MakeDirectory(target.parent)
+                        with open(target, 'wb') as f:
+                            f.write(res_apk.read(item.filename))
+
+        # Librairies natives
+        lib_dir = module_dir / "lib" / self.ndk_abi
+        FileSystem.MakeDirectory(lib_dir)
+        for lib in nativeLibs:
+            shutil.copy2(lib, lib_dir / Path(lib).name)
+
+        # Assets
+        if hasattr(project, 'androidAssets'):
+            assets_dir = module_dir / "assets"
+            FileSystem.MakeDirectory(assets_dir)
+            for asset in project.androidAssets:
+                asset_path = Path(self.ResolveProjectPath(project, asset))
+                if asset_path.is_dir():
+                    for f in asset_path.rglob("*"):
+                        if f.is_file():
+                            rel = f.relative_to(asset_path)
+                            target = assets_dir / rel
+                            FileSystem.MakeDirectory(target.parent)
+                            shutil.copy2(f, target)
+                else:
+                    shutil.copy2(asset_path, assets_dir / asset_path.name)
+
+        return True
+
+    def _SignAAB(self, project: Project, input_aab: Path, output_aab: Path) -> bool:
+        """Signe un AAB avec apksigner (même outil que pour APK)."""
+        if not project.androidKeystore:
+            Colored.PrintError("Keystore not specified for signing")
+            return False
+
+        ks_pass = project.androidKeystorePass or ""
+        key_alias = project.androidKeyAlias or project.name
+
+        cmd = [
+            str(self.apksigner), "sign",
+            "--ks", project.androidKeystore,
+            "--ks-pass", f"pass:{ks_pass}",
+            "--ks-key-alias", key_alias,
+            "--out", str(output_aab),
+            str(input_aab)
         ]
         result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
         return result.returnCode == 0
-
-    def _GenerateBundleConfig(self, project: Project, build_dir: Path) -> Path:
-        """Génère un fichier de configuration pour bundletool."""
-        config = {
-            "optimizations": {
-                "splitsConfig": {
-                    "splitDimension": [
-                        {"value": "ABI", "negate": False},
-                        {"value": "SCREEN_DENSITY", "negate": False},
-                        {"value": "LANGUAGE", "negate": False}
-                    ]
-                }
-            },
-            "compression": {"uncompressedGlob": ["res/raw/**", "assets/**"]}
-        }
-        import json
-        config_path = build_dir / "BundleConfig.json"
-        with open(config_path, 'w') as f:
-            json.dump(config, f, indent=2)
-        return config_path
