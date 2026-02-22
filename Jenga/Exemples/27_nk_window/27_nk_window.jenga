@@ -1,27 +1,39 @@
 #!/usr/bin/env python3
-from Jenga import *
+"""
+Jenga Example 27 — NK Window Framework
+Multi-Platform Windowing & Event System (7 platforms)
+
+Demonstrates a complete cross-platform windowing framework with:
+  - 7 platforms: Windows, Linux, macOS, Android, iOS, Web, HarmonyOS
+  - Unified API for window creation, events, rendering
+  - Platform-specific backends (Win32, X11/XCB, Cocoa, UIKit, Emscripten, etc.)
+  - Production-ready architecture
+
+Projects:
+  - NKWindow: Static library with platform abstraction
+  - Sandbox: Demo application using NKWindow API
+
+Usage:
+  jenga build                           # Build for host platform
+  jenga build --platform windows        # Windows (Win32)
+  jenga build --platform linux          # Linux (X11/XCB)
+  jenga build --platform android        # Android (NativeActivity + EGL)
+  jenga build --platform web            # Web (Emscripten + Canvas)
+  jenga build --platform harmonyos      # HarmonyOS (ArkUI Native)
+  jenga build --platform jengaall       # ALL platforms (except macOS for now)
+  jenga build --config Release          # Release build
+"""
 
 import os
+from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
 
+with workspace("NKWindow", location="."):
+    RegisterJengaGlobalToolchains()
 
-def AndroidConfig():
-    androidapplicationid("com.Jenga.nativedemo")
-    androidminsdk(24)
-    androidtargetsdk(34)
-    androidcompilesdk(34)
-    androidabis(["arm64-v8a", "x86_64"])
-    androidnativeactivity(True)
-
-
-def IosConfig():
-    iosbundleid("com.jenga.iosdemo")
-    iosversion("1.0")
-    iosminsdk("14.0")
-    iosbuildnumber(1)
-
-
-with workspace("Window"):
     configurations(["Debug", "Release"])
+
+    # Toutes les plateformes supportées
     targetoses([
         TargetOS.WINDOWS,
         TargetOS.LINUX,
@@ -31,36 +43,267 @@ with workspace("Window"):
         TargetOS.IOS,
         TargetOS.HARMONYOS,
     ])
+
     targetarchs([
         TargetArch.X86_64,
         TargetArch.ARM64,
         TargetArch.WASM32,
     ])
 
+    # Chemins Android SDK/NDK depuis environnement
     androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
     androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
+
+    # =========================================================================
+    # NKWindow — Bibliothèque statique multi-plateformes
+    # =========================================================================
 
     with project("NKWindow"):
         staticlib()
         language("C++")
+        cppdialect("C++17")
         location("NKWindow")
-        files([
-            "src/**.cpp",
-            "src/**.mm"
-        ])
-        includedirs(["src"])
-        AndroidConfig()
-        IosConfig()
 
-    with project("NKSandbox"):
-        windowedapp()
-        language("C++")
-        location("Sandbox")
-        files([
-            "src/Sandbox/main.cpp"
+        # Répertoires d'inclusion
+        includedirs([
+            "NKWindow/src",
+            "Externals",
         ])
-        includedirs(["%{NKWindow.location}/src"])
-        dependson("NKWindow")
-        AndroidConfig()
-        IosConfig()
-        embedresources(["assets/**"])
+
+        # Fichiers C++ communs (tous systèmes)
+        files([
+            "NKWindow/src/NKWindow/Core/**.cpp",
+            "NKWindow/src/NKWindow/Core/**.h",
+            "NKWindow/src/NKWindow/Core/**.hpp",
+        ])
+
+        # Chemins de sortie
+        objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+        targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+
+        # ── Windows (Win32 backend) ──────────────────────────────────────
+        with filter("system:Windows"):
+            usetoolchain("clang-mingw")
+            defines([
+                "NKENTSEU_PLATFORM_WIN32=1",
+                "NKENTSEU_FAMILY_WINDOWS=1",
+                "WIN32_LEAN_AND_MEAN",
+                "_UNICODE",
+                "UNICODE",
+            ])
+            files([
+                "NKWindow/src/NKWindow/Platform/Win32/**.cpp",
+                "NKWindow/src/NKWindow/Platform/Win32/**.h",
+            ])
+            links(["user32", "gdi32", "opengl32", "dwmapi", "shell32"])
+
+        # ── Linux (X11/XCB backend) ──────────────────────────────────────
+        with filter("system:Linux"):
+            usetoolchain("zig-linux-x64")
+            defines([
+                "NKENTSEU_PLATFORM_XCB=1",
+                "NKENTSEU_FAMILY_LINUX=1",
+            ])
+            files([
+                "NKWindow/src/NKWindow/Platform/Linux/**.cpp",
+                "NKWindow/src/NKWindow/Platform/Linux/**.h",
+                "NKWindow/src/NKWindow/Platform/XCB/**.cpp",
+                "NKWindow/src/NKWindow/Platform/XCB/**.h",
+                # Alternative: XLib si défini
+                # "NKWindow/src/NKWindow/Platform/XLib/**.cpp",
+            ])
+            links(["X11", "xcb", "GL", "pthread"])
+
+        # ── macOS (Cocoa backend) ────────────────────────────────────────
+        with filter("system:macOS"):
+            usetoolchain("macos-clang")  # Direct par défaut
+            defines([
+                "NKENTSEU_PLATFORM_COCOA=1",
+                "NKENTSEU_FAMILY_APPLE=1",
+            ])
+            files([
+                "NKWindow/src/NKWindow/Platform/Cocoa/**.cpp",
+                "NKWindow/src/NKWindow/Platform/Cocoa/**.mm",
+                "NKWindow/src/NKWindow/Platform/Cocoa/**.h",
+            ])
+            frameworks(["Cocoa", "QuartzCore", "OpenGL", "Metal"])
+
+        # ── Android (NativeActivity + EGL) ───────────────────────────────
+        with filter("system:Android"):
+            usetoolchain("android-ndk")
+            defines([
+                "NKENTSEU_PLATFORM_ANDROID=1",
+                "__ANDROID_API__=24",
+            ])
+            files([
+                "NKWindow/src/NKWindow/Platform/Android/**.cpp",
+                "NKWindow/src/NKWindow/Platform/Android/**.h",
+            ])
+            links(["android", "log", "EGL", "GLESv3", "camera2ndk", "mediandk"])
+            # Configuration Android (pour app finale)
+            androidapplicationid("com.nkentseu.window")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidcompilesdk(34)
+            androidabis(["arm64-v8a", "x86_64"])
+            androidnativeactivity(True)
+
+        # ── iOS (UIKit backend) ──────────────────────────────────────────
+        with filter("system:iOS"):
+            usetoolchain("ios-clang")  # Direct par défaut
+            defines([
+                "NKENTSEU_PLATFORM_UIKIT=1",
+                "NKENTSEU_FAMILY_APPLE=1",
+            ])
+            files([
+                "NKWindow/src/NKWindow/Platform/UIKit/**.cpp",
+                "NKWindow/src/NKWindow/Platform/UIKit/**.mm",
+                "NKWindow/src/NKWindow/Platform/UIKit/**.h",
+            ])
+            frameworks(["UIKit", "QuartzCore", "OpenGLES", "AVFoundation"])
+            # Configuration iOS
+            iosbundleid("com.nkentseu.window")
+            iosversion("1.0")
+            iosminsdk("14.0")
+            iosbuildnumber(1)
+
+        # ── Web (Emscripten + Canvas) ────────────────────────────────────
+        with filter("system:Web"):
+            usetoolchain("emscripten")
+            defines([
+                "NKENTSEU_PLATFORM_WASM=1",
+                "__EMSCRIPTEN__=1",
+            ])
+            files([
+                "NKWindow/src/NKWindow/Platform/WASM/**.cpp",
+                "NKWindow/src/NKWindow/Platform/WASM/**.h",
+            ])
+            # Pas de links spécifiques (gérés par Emscripten)
+            emscripteninitialmemory(32)  # 32 MB
+
+        # ── HarmonyOS (ArkUI Native) ─────────────────────────────────────
+        with filter("system:HarmonyOS"):
+            usetoolchain("harmonyos-ndk")
+            defines([
+                "NKENTSEU_PLATFORM_HARMONYOS=1",
+                "__HARMONY__=1",
+            ])
+            files([
+                "NKWindow/src/NKWindow/Platform/Noop/**.cpp",  # Fallback si pas implémenté
+                "NKWindow/src/NKWindow/Platform/Noop/**.h",
+            ])
+            # TODO: Ajouter backend HarmonyOS réel quand disponible
+            # files(["NKWindow/src/NKWindow/Platform/HarmonyOS/**.cpp"])
+            links(["log", "EGL", "GLESv3"])
+
+        # ── Configurations Debug/Release ─────────────────────────────────
+        with filter("config:Debug"):
+            defines(["_DEBUG", "DEBUG"])
+            optimize("Off")
+            symbols(True)
+            runtime("Debug")
+
+        with filter("config:Release"):
+            defines(["NDEBUG", "RELEASE"])
+            optimize("Speed")
+            symbols(False)
+            runtime("Release")
+
+    # =========================================================================
+    # Sandbox — Application de démonstration
+    # =========================================================================
+
+    with project("Sandbox"):
+        windowedapp()  # Par défaut windowed
+        language("C++")
+        cppdialect("C++17")
+        location("Sandbox")
+
+        # Source de l'application
+        files([
+            "Sandbox/src/**.cpp",
+        ])
+
+        # Inclure NKWindow headers
+        includedirs([
+            "NKWindow/src",
+            "Externals",
+        ])
+
+        # Lien avec la bibliothèque NKWindow
+        links(["NKWindow"])
+        dependson(["NKWindow"])
+
+        # Chemins de sortie
+        objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+        targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+
+        # ── Windows ──────────────────────────────────────────────────────
+        with filter("system:Windows"):
+            windowedapp()
+            usetoolchain("clang-mingw")
+            defines(["NKENTSEU_PLATFORM_WIN32=1"])
+            links(["user32", "gdi32", "opengl32"])
+
+        # ── Linux ────────────────────────────────────────────────────────
+        with filter("system:Linux"):
+            windowedapp()
+            usetoolchain("zig-linux-x64")
+            defines(["NKENTSEU_PLATFORM_XCB=1"])
+            links(["X11", "xcb", "GL", "pthread"])
+
+        # ── macOS ────────────────────────────────────────────────────────
+        with filter("system:macOS"):
+            windowedapp()
+            usetoolchain("macos-clang")
+            defines(["NKENTSEU_PLATFORM_COCOA=1"])
+            frameworks(["Cocoa", "QuartzCore", "OpenGL"])
+
+        # ── Android ──────────────────────────────────────────────────────
+        with filter("system:Android"):
+            windowedapp()
+            usetoolchain("android-ndk")
+            defines(["NKENTSEU_PLATFORM_ANDROID=1"])
+            links(["android", "log", "EGL", "GLESv3"])
+            androidapplicationid("com.nkentseu.sandbox")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidcompilesdk(34)
+            androidabis(["arm64-v8a", "x86_64"])
+            androidnativeactivity(True)
+
+        # ── iOS ──────────────────────────────────────────────────────────
+        with filter("system:iOS"):
+            windowedapp()
+            usetoolchain("ios-clang")
+            defines(["NKENTSEU_PLATFORM_UIKIT=1"])
+            frameworks(["UIKit", "QuartzCore", "OpenGLES"])
+            iosbundleid("com.nkentseu.sandbox")
+            iosversion("1.0")
+            iosminsdk("14.0")
+            iosbuildnumber(1)
+
+        # ── Web ──────────────────────────────────────────────────────────
+        with filter("system:Web"):
+            consoleapp()  # Web utilise console app
+            usetoolchain("emscripten")
+            defines(["NKENTSEU_PLATFORM_WASM=1"])
+            emscripteninitialmemory(32)
+
+        # ── HarmonyOS ────────────────────────────────────────────────────
+        with filter("system:HarmonyOS"):
+            windowedapp()
+            usetoolchain("harmonyos-ndk")
+            defines(["NKENTSEU_PLATFORM_HARMONYOS=1"])
+            links(["log", "EGL", "GLESv3"])
+
+        # ── Configurations ───────────────────────────────────────────────
+        with filter("config:Debug"):
+            defines(["_DEBUG"])
+            optimize("Off")
+            symbols(True)
+
+        with filter("config:Release"):
+            defines(["NDEBUG"])
+            optimize("Speed")
+            symbols(False)
