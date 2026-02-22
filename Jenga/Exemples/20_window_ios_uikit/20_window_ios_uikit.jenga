@@ -1,0 +1,14 @@
+from Jenga import *
+
+with workspace("UIKitWindowDemo"):
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.IOS])
+    targetarchs([TargetArch.ARM64, TargetArch.X86_64])
+
+    with project("UIKitWindow"):
+        windowedapp()
+        language("Objective-C++")
+        files(["src/**.mm"])
+        iosbundleid("com.Jenga.uikitwindow")
+        iosversion("1.0")
+        iosminsdk("14.0")

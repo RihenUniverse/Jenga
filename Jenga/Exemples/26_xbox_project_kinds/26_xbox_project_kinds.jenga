@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+from Jenga import *
+
+with workspace("XboxProjectKinds", location="."):
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.XBOX_SERIES])
+    targetarchs([TargetArch.X86_64])
+
+    # Option CLI: --xbox-mode=uwp pour basculer en mode UWP Dev Mode.
+    newoption(
+        trigger="xbox-mode",
+        value="mode",
+        allowed=["gdk", "uwp"],
+        default="gdk",
+        description="Xbox build mode: gdk (GameCore) or uwp (Dev Mode)",
+    )
+
+    xboxmode("gdk")
+    xboxplatform("Scarlett")
+
+    with project("XboxStaticMath"):
+        staticlib()
+        language("C++")
+        cppdialect("C++20")
+        location("staticlib")
+        files(["src/**.cpp"])
+        includedirs(["include"])
+
+    with project("XboxSharedMath"):
+        sharedlib()
+        language("C++")
+        cppdialect("C++20")
+        location("sharedlib")
+        files(["src/**.cpp"])
+        includedirs(["include"])
+        defines(["XBOX_SHARED_MATH_EXPORTS"])
+
+    with project("XboxConsoleApp"):
+        consoleapp()
+        language("C++")
+        cppdialect("C++20")
+        location("console")
+        files(["src/main.cpp"])
+        includedirs([
+            "../staticlib/include",
+            "../sharedlib/include",
+        ])
+        links(["XboxStaticMath", "XboxSharedMath"])
+        dependson(["XboxStaticMath", "XboxSharedMath"])
+
+    with project("XboxWindowedApp"):
+        windowedapp()
+        language("C++")
+        cppdialect("C++20")
+        location("windowed")
+        files(["src/winmain.cpp"])
+        includedirs([
+            "../staticlib/include",
+            "../sharedlib/include",
+        ])
+        links(["XboxStaticMath", "XboxSharedMath", "user32"])
+        dependson(["XboxStaticMath", "XboxSharedMath"])

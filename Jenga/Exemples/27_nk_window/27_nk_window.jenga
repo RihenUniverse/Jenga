@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+from Jenga import *
+
+import os
+
+
+def AndroidConfig():
+    androidapplicationid("com.Jenga.nativedemo")
+    androidminsdk(24)
+    androidtargetsdk(34)
+    androidcompilesdk(34)
+    androidabis(["arm64-v8a", "x86_64"])
+    androidnativeactivity(True)
+
+
+def IosConfig():
+    iosbundleid("com.jenga.iosdemo")
+    iosversion("1.0")
+    iosminsdk("14.0")
+    iosbuildnumber(1)
+
+
+with workspace("Window"):
+    configurations(["Debug", "Release"])
+    targetoses([
+        TargetOS.WINDOWS,
+        TargetOS.LINUX,
+        TargetOS.MACOS,
+        TargetOS.ANDROID,
+        TargetOS.WEB,
+        TargetOS.IOS,
+        TargetOS.HARMONYOS,
+    ])
+    targetarchs([
+        TargetArch.X86_64,
+        TargetArch.ARM64,
+        TargetArch.WASM32,
+    ])
+
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
+
+    with project("NKWindow"):
+        staticlib()
+        language("C++")
+        location("NKWindow")
+        files([
+            "src/**.cpp",
+            "src/**.mm"
+        ])
+        includedirs(["src"])
+        AndroidConfig()
+        IosConfig()
+
+    with project("NKSandbox"):
+        windowedapp()
+        language("C++")
+        location("Sandbox")
+        files([
+            "src/Sandbox/main.cpp"
+        ])
+        includedirs(["%{NKWindow.location}/src"])
+        dependson("NKWindow")
+        AndroidConfig()
+        IosConfig()
+        embedresources(["assets/**"])

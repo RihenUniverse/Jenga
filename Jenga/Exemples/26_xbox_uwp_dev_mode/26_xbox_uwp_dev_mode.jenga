@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+from Jenga import *
+
+with workspace("XboxUwpDevMode", location="."):
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.XBOX_SERIES])
+    targetarchs([TargetArch.X86_64])
+
+    # Pipeline UWP explicite (Dev Mode Xbox)
+    xboxmode("uwp")
+    xboxplatform("UWP")
+
+    with project("UwpStaticMath"):
+        staticlib()
+        language("C++")
+        cppdialect("C++20")
+        location("uwp_staticlib")
+        files(["src/**.cpp"])
+        includedirs(["include"])
+
+    with project("UwpSharedMath"):
+        sharedlib()
+        language("C++")
+        cppdialect("C++20")
+        location("uwp_sharedlib")
+        files(["src/**.cpp"])
+        includedirs(["include"])
+        defines(["UWP_SHARED_MATH_EXPORTS"])
+
+    with project("UwpConsoleApp"):
+        consoleapp()
+        language("C++")
+        cppdialect("C++20")
+        location("uwp_console")
+        files(["src/main.cpp"])
+        includedirs([
+            "../uwp_staticlib/include",
+            "../uwp_sharedlib/include",
+        ])
+        links(["UwpStaticMath", "UwpSharedMath"])
+        dependson(["UwpStaticMath", "UwpSharedMath"])
+
+    with project("UwpWindowedApp"):
+        windowedapp()
+        language("C++")
+        cppdialect("C++20")
+        location("uwp_windowed")
+        files(["src/winmain.cpp"])
+        includedirs([
+            "../uwp_staticlib/include",
+            "../uwp_sharedlib/include",
+        ])
+        links(["UwpStaticMath", "UwpSharedMath"])
+        dependson(["UwpStaticMath", "UwpSharedMath"])

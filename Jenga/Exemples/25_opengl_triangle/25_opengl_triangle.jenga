@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""
+Jenga Example 25 — OpenGL Colored Triangle
+
+Renders a colored triangle with per-vertex color interpolation using
+OpenGL / OpenGL ES across multiple platforms from a single source file.
+
+Usage:
+  jenga build                           # Build for Windows (Win32 + WGL)
+  jenga build --platform android        # Build for Android (EGL + GLES3)
+  jenga build --platform web            # Build for Web (WebGL via Emscripten)
+  jenga build --platform linux          # Cross-compile for Linux (X11 + GLX)
+  jenga build --platform jengaall       # Build for ALL platforms
+  jenga build --config Release          # Release build
+"""
+import os
+from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
+
+with workspace("OpenGLTriangle", location="."):
+    RegisterJengaGlobalToolchains()
+    configurations(["Debug", "Release"])
+
+    targetoses([
+        TargetOS.WINDOWS,
+        TargetOS.LINUX,
+        TargetOS.ANDROID,
+        TargetOS.WEB,
+    ])
+
+    targetarchs([TargetArch.X86_64, TargetArch.ARM64, TargetArch.WASM32])
+
+    # ── Android SDK/NDK paths (from environment) ─────────────────────────
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", ""))
+
+    # ── Single Project — OpenGL colored triangle ─────────────────────────
+    with project("GLTriangle"):
+        windowedapp()
+        language("C++")
+        cppdialect("C++17")
+        files(["src/**.cpp"])
+
+        objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+        targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+
+        # ── Windows: Win32 + WGL + OpenGL ────────────────────────────────
+        with filter("system:Windows"):
+            usetoolchain("clang-mingw")
+            links(["opengl32", "gdi32", "user32"])
+            defines(["PLATFORM_WINDOWS"])
+
+        # ── Linux: X11 + GLX + OpenGL ────────────────────────────────────
+        with filter("system:Linux"):
+            usetoolchain("zig-linux-x64")
+            links(["GL", "X11"])
+            defines(["PLATFORM_LINUX"])
+
+        # ── Android: NativeActivity + EGL + GLES3 ────────────────────────
+        with filter("system:Android"):
+            windowedapp()
+            usetoolchain("android-ndk")
+            androidapplicationid("com.jenga.gltriangle")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidabis(["arm64-v8a", "x86_64"])
+            androidnativeactivity(True)
+            links(["EGL", "GLESv3", "android", "log"])
+            defines(["PLATFORM_ANDROID"])
+
+        # ── Web: Emscripten GLES2 → WebGL ────────────────────────────────
+        with filter("system:Web"):
+            consoleapp()
+            usetoolchain("emscripten")
+            defines(["PLATFORM_WEB"])
+            emscripteninitialmemory(16)
+
+        # ── Optimization per config ──────────────────────────────────────
+        with filter("config:Debug"):
+            defines(["_DEBUG"])
+            optimize("Off")
+            symbols(True)
+
+        with filter("config:Release"):
+            defines(["NDEBUG"])
+            optimize("Speed")
+            symbols(False)

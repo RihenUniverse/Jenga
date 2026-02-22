@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""
+Jenga Example 24 — All Platforms Build
+
+Demonstrates building the same project for every supported platform using
+a SINGLE project with filter-based kind and toolchain switching.
+
+Usage:
+  jenga build                           # Build for the host platform (Windows)
+  jenga build --platform jengaall       # Build for ALL platforms at once
+  jenga build --platform android        # Cross-compile for Android (APK)
+  jenga build --platform web            # Compile for WebAssembly
+  jenga build --platform linux          # Cross-compile for Linux (via Zig)
+  jenga build --config Release          # Release build
+"""
+import os
+from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
+
+with workspace("AllPlatforms", location="."):
+    RegisterJengaGlobalToolchains()
+    configurations(["Debug", "Release"])
+
+    targetoses([
+        TargetOS.WINDOWS,
+        TargetOS.LINUX,
+        TargetOS.ANDROID,
+        TargetOS.WEB,
+        # TargetOS.MACOS,   # Uncomment on macOS
+        # TargetOS.IOS,     # Uncomment on macOS with Xcode
+    ])
+
+    targetarchs([TargetArch.X86_64, TargetArch.ARM64, TargetArch.WASM32])
+
+    # ── Android SDK/NDK paths (from environment) ─────────────────────────
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", ""))
+
+    # ── Single Project — kind & toolchain change per platform via filters ─
+    with project("AllPlatformsApp"):
+        consoleapp()       # Default kind for desktop
+        language("C++")
+        cppdialect("C++17")
+        files(["src/**.cpp"])
+
+        objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+        targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+
+        # ── Windows ──────────────────────────────────────────────────────
+        with filter("system:Windows"):
+            consoleapp()
+            usetoolchain("clang-mingw")
+            defines(["PLATFORM_WINDOWS", "WIN32", "_UNICODE", "UNICODE"])
+
+        # ── Linux (cross-compile via Zig) ────────────────────────────────
+        with filter("system:Linux"):
+            consoleapp()
+            usetoolchain("zig-linux-x64")
+            defines(["PLATFORM_LINUX"])
+
+        # ── Android → Windowed App (NativeActivity) ──────────────────────
+        with filter("system:Android"):
+            windowedapp()
+            usetoolchain("android-ndk")
+            defines(["PLATFORM_ANDROID"])
+            androidapplicationid("com.jenga.allplatforms")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidabis(["arm64-v8a", "x86_64"])
+            androidnativeactivity(True)
+
+        # ── Web → Console App (.html + .wasm) ───────────────────────────
+        with filter("system:Web"):
+            consoleapp()
+            usetoolchain("emscripten")
+            defines(["PLATFORM_WEB"])
+            emscripteninitialmemory(16)
+
+        # ── Optimization per config ──────────────────────────────────────
+        with filter("config:Debug"):
+            defines(["_DEBUG"])
+            optimize("Off")
+            symbols(True)
+
+        with filter("config:Release"):
+            defines(["NDEBUG"])
+            optimize("Speed")
+            symbols(False)

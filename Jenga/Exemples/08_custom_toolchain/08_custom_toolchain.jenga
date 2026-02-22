@@ -1,0 +1,22 @@
+from Jenga import *
+
+with workspace("CustomToolchain"):
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.WINDOWS])
+    targetarchs([TargetArch.X86_64])
+
+    with toolchain("ucrt_clang", "clang"):
+        settarget("Windows", "x86_64", "mingw")
+        ccompiler("clang")
+        cppcompiler("clang++")
+        linker("clang++")
+        archiver("llvm-ar")
+        cflags(["-O2"])
+        cxxflags(["-O2", "-std=c++20"])
+
+    usetoolchain("ucrt_clang")
+
+    with project("ToolchainDemo"):
+        consoleapp()
+        language("C++")
+        files(["src/**.cpp"])

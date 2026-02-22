@@ -1,0 +1,45 @@
+import os
+from Jenga import *
+
+with workspace("SDL3AndroidMkDemo"):
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.ANDROID])
+    targetarchs([TargetArch.ARM64, TargetArch.X86_64])
+
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
+
+    # Premake-like custom options for filters and CLI.
+    newoption(trigger="with-sdl3", description="Enable SDL3-specific defines")
+    newoption(trigger="sdl3-root", value="path", description="Path to SDL3 Android package root")
+
+    with project("SDL3NativeDemo"):
+        windowedapp()
+        language("C++")
+        cppdialect("C++17")
+        files(["src/**.cpp"])
+        targetname("SDL3NativeDemo")
+
+        androidapplicationid("com.jenga.sdl3ndkmk")
+        androidversioncode(1)
+        androidversionname("1.0.0")
+        androidminsdk(24)
+        androidtargetsdk(34)
+        androidcompilesdk(34)
+        androidabis(["arm64-v8a", "x86_64"])
+        androidnativeactivity(True)
+
+        # Demonstrates options:... matching.
+        with filter("options:with-sdl3"):
+            defines(["USE_SDL3"])
+
+        # Demonstrates options:value matching.
+        with filter("options:sdl3-root=*"):
+            defines(["SDL3_ROOT_FROM_OPTION"])
+
+        # Distinguish default native flow from ndk-mk flow.
+        with filter("action:build and not options:android-build-system=ndk-mk"):
+            defines(["JENGA_ANDROID_NATIVE_FLOW"])
+
+        with filter("action:build and options:android-build-system=ndk-mk"):
+            defines(["JENGA_ANDROID_NDK_MK_FLOW"])

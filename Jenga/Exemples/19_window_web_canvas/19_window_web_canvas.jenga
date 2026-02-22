@@ -1,0 +1,25 @@
+from Jenga import *
+
+with workspace("WebCanvasDemo"):
+    configurations(["Release"])
+    targetoses([TargetOS.WEB])
+    targetarchs([TargetArch.WASM32])
+
+    with toolchain("emscripten", "emscripten"):
+        settarget("Web", "wasm32")
+        ccompiler(r"C:\emsdk-4.0.22\upstream\emscripten\emcc.bat")
+        cppcompiler(r"C:\emsdk-4.0.22\upstream\emscripten\em++.bat")
+        archiver(r"C:\emsdk-4.0.22\upstream\emscripten\emar.bat")
+
+    usetoolchain("emscripten")
+
+    with project("WebCanvas"):
+        windowedapp()
+        language("C++")
+        files(["src/**.cpp"])
+
+        # Configuration plein écran
+        emscriptenshellfile("emscripten_fullscreen.html")
+        emscriptencanvasid("canvas")
+        emscripteninitialmemory(16)
+        emscriptenstacksize(5)

@@ -1,0 +1,22 @@
+from Jenga import *
+
+with workspace("WebDemo"):
+    configurations(["Release"])
+    targetoses([TargetOS.WEB])
+    targetarchs([TargetArch.WASM32])
+
+    # Utiliser le toolchain Emscripten global configuré dans GlobalToolchains.py
+    # Ou définir le toolchain avec les chemins complets:
+    with toolchain("emscripten", "emscripten"):
+        settarget("Web", "wasm32")
+        ccompiler(r"C:\emsdk-4.0.22\upstream\emscripten\emcc.bat")
+        cppcompiler(r"C:\emsdk-4.0.22\upstream\emscripten\em++.bat")
+        archiver(r"C:\emsdk-4.0.22\upstream\emscripten\emar.bat")
+
+    usetoolchain("emscripten")
+
+    with project("WasmApp"):
+        consoleapp()
+        language("C++")
+        files(["src/**.cpp"])
+        embedresources(["assets/**"])

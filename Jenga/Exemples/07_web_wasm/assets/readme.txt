@@ -1,0 +1,1 @@
+Embedded asset placeholder.
