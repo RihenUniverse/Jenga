@@ -20,6 +20,7 @@ from enum import Enum
 import os
 import sys
 import re
+import fnmatch
 import json
 import shutil
 import subprocess
@@ -69,6 +70,8 @@ class TargetOS(Enum):
     IOS       = "iOS"
     TVOS      = "tvOS"
     WATCHOS   = "watchOS"
+    IPADOS     = "iPadOS"
+    VISIONOS   = "visionOS"
     WEB       = "Web"
     PS4       = "PS4"
     PS5       = "PS5"
@@ -82,6 +85,7 @@ class TargetOS(Enum):
 class TargetArch(Enum):
     X86       = "x86"
     X86_64    = "x86_64"
+    X64       = "x86_64"   # alias
     ARM       = "arm"
     ARM64     = "arm64"
     WASM32    = "wasm32"
@@ -236,6 +240,7 @@ class Project:
 
     # Dependencies
     links: List[str] = field(default_factory=list)
+    frameworks: List[str] = field(default_factory=list)
     dependsOn: List[str] = field(default_factory=list)
 
     # File dependencies (copy after build)
@@ -282,15 +287,42 @@ class Project:
     androidKeystore: str = ""
     androidKeystorePass: str = ""
     androidKeyAlias: str = ""
+    androidJavaFiles: List[str] = field(default_factory=list)
+    androidJavaLibs: List[str] = field(default_factory=list)
 
     # iOS specifics (extended)
     iosBundleId: str = ""
     iosVersion: str = "1.0"
-    iosMinSdk: str = "11.0"
-    iosSigningIdentity: str = ""        # identity string for codesign
-    iosEntitlements: str = ""           # path to .entitlements file
-    iosAppIcon: str = ""               # path to app icon (.png, .icns)
-    iosBuildNumber: str = "1"          # CFBundleVersion (integer as string)
+    iosMinSdk: str = ""
+    iosTargetSdk: str = ""  # éventuellement
+    iosBuildNumber: str = "1"
+    iosSigningIdentity: str = ""
+    iosEntitlements: str = ""
+    iosAppIcon: str = ""
+    iosBuildSystem: str = "direct"   # "direct" ou "xcode"
+    iosDistributionType: str = "development"
+    iosTeamId: str = ""
+    iosProvisioningProfile: str = ""
+
+    # Ressources spécifiques iOS (à copier dans le bundle)
+    iosResources: List[str] = field(default_factory=list)
+
+    # Pour tvOS, watchOS, iPadOS, visionOS on peut avoir des champs similaires
+    tvosMinSdk: str = ""
+    watchosMinSdk: str = ""
+    ipadosMinSdk: str = ""
+    visionosMinSdk: str = ""
+
+    # Frameworks à embarquer (optionnel)
+    iosEmbedFrameworks: List[str] = field(default_factory=list)
+
+    # Xbox specifics
+    xboxSigningMode: str = "test"      # test, random, stable
+    xboxPackageName: str = ""
+    xboxPublisher: str = "Jenga"
+    xboxVersion: str = "1.0.0.0"
+    xboxLEKBPath: str = ""
+    xboxAssetChunks: List[str] = field(default_factory=list)
 
     # Emscripten specifics
     emscriptenShellFile: str = ""      # Custom HTML template (shell file)
@@ -299,6 +331,9 @@ class Project:
     emscriptenStackSize: int = 5        # Stack size in MB
     emscriptenExportName: str = "Module" # Global export name
     emscriptenExtraFlags: List[str] = field(default_factory=list)  # Extra emcc flags
+
+    # HarmonyOs
+    harmonyMinSdk: str = ""
 
     # Test settings
     isTest: bool = False
@@ -324,8 +359,24 @@ class Project:
     _filteredPchHeader: Dict[str, str] = field(default_factory=dict)
     _filteredPchSource: Dict[str, str] = field(default_factory=dict)
     _filteredDependsOn: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredDependFiles: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredEmbedResources: Dict[str, List[str]] = field(default_factory=dict)
     _filteredDefines: Dict[str, List[str]] = field(default_factory=dict)
     _filteredLinks: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredCFlags: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredCxxFlags: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredLdFlags: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredPreBuildCommands: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredPostBuildCommands: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredPreLinkCommands: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredPostLinkCommands: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredRemoveIncludeDirs: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredRemoveLibDirs: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredRemoveLinks: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredRemoveDependsOn: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredRemoveDefines: Dict[str, List[str]] = field(default_factory=dict)
+    _filteredKind: Dict[str, 'ProjectKind'] = field(default_factory=dict)
+    _filteredToolchain: Dict[str, str] = field(default_factory=dict)
     _filteredOptimize: Dict[str, Optimization] = field(default_factory=dict)
     _filteredSymbols: Dict[str, bool] = field(default_factory=dict)
     _filteredWarnings: Dict[str, WarningLevel] = field(default_factory=dict)
@@ -349,6 +400,7 @@ class Workspace:
     targetOses: List[TargetOS] = field(default_factory=list)
     targetArchs: List[TargetArch] = field(default_factory=list)
     startProject: str = ""
+    options: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     projects: Dict[str, Project] = field(default_factory=dict)
     toolchains: Dict[str, Toolchain] = field(default_factory=dict)
     defaultToolchain: Optional[str] = None
@@ -364,6 +416,11 @@ class Workspace:
     # iOS SDK paths (auto‑detected)
     iosSdkPath: str = ""
 
+    # Xbox SDK/configuration
+    gdkPath: str = ""
+    xboxPlatform: str = ""      # XboxOne, Scarlett, Desktop
+    xboxMode: str = "gdk"       # gdk (GameCore) or uwp (Dev Mode)
+
     # Current context
     _currentProject: Optional[Project] = None
     _currentToolchain: Optional[Toolchain] = None
@@ -377,6 +434,48 @@ _currentWorkspace: Optional[Workspace] = None
 _currentProject: Optional[Project] = None
 _currentToolchain: Optional[Toolchain] = None
 _currentFilter: Optional[str] = None
+
+
+def _NormalizeFilterExpression(expr: Any) -> str:
+    """Normalize filter expressions to a stable, hashable key."""
+    if expr is None:
+        return ""
+    if isinstance(expr, dict):
+        return ""
+    if isinstance(expr, (list, tuple)):
+        parts = [str(part).strip() for part in expr if str(part).strip()]
+        return " && ".join(parts)
+    if isinstance(expr, set):
+        parts = [str(part).strip() for part in expr if str(part).strip()]
+        return " && ".join(sorted(parts))
+    return str(expr).strip()
+
+
+def _NormalizeOptionTrigger(trigger: str) -> str:
+    value = str(trigger or "").strip()
+    if value.startswith("--"):
+        value = value[2:]
+    return value.strip().lower()
+
+
+def _AppendFilteredValues(mapping: Dict[str, List[str]], filter_key: str, values: List[str]) -> None:
+    if filter_key not in mapping:
+        mapping[filter_key] = []
+    mapping[filter_key].extend(values)
+
+
+def _RemoveValuesInPlace(items: List[str], values: List[str]) -> None:
+    if not items or not values:
+        return
+    patterns = [str(v) for v in values]
+
+    def _should_remove(item: str) -> bool:
+        for pattern in patterns:
+            if pattern == item or fnmatch.fnmatch(item, pattern):
+                return True
+        return False
+
+    items[:] = [item for item in items if not _should_remove(item)]
 
 # ---------------------------------------------------------------------------
 # Context managers – PascalCase
@@ -463,16 +562,16 @@ class toolchain:
 
 class filter:
     """Filter context for conditional settings."""
-    def __init__(self, expr: str):
+    def __init__(self, expr: Any):
         self._expr = expr
         self._previous = None
 
     def __enter__(self):
         global _currentFilter, _currentProject
         self._previous = _currentFilter
-        _currentFilter = self._expr
+        _currentFilter = _NormalizeFilterExpression(self._expr)
         if _currentProject:
-            _currentProject._currentFilter = self._expr
+            _currentProject._currentFilter = _currentFilter
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -948,26 +1047,91 @@ def startproject(name: str) -> None:
     if _currentWorkspace:
         _currentWorkspace.startProject = name
 
-# --- Project kind setters ---
+
+def newoption(option: Optional[Union[Dict[str, Any], str]] = None, **kwargs) -> None:
+    """
+    Register a Premake-like CLI option at workspace scope.
+
+    Examples:
+      newoption({"trigger": "with-sdl", "value": "path", "description": "SDL3 root"})
+      newoption(trigger="asan", description="Enable AddressSanitizer", default=True)
+    """
+    if _currentWorkspace is None:
+        raise RuntimeError("newoption must be used inside a workspace")
+
+    payload: Dict[str, Any] = {}
+    if isinstance(option, dict):
+        payload.update(option)
+    elif isinstance(option, str):
+        payload["trigger"] = option
+    elif option is not None:
+        raise TypeError("newoption expects a dict, a trigger string, or keyword arguments")
+    payload.update(kwargs)
+
+    trigger = _NormalizeOptionTrigger(payload.get("trigger", ""))
+    if not trigger:
+        raise ValueError("newoption requires a non-empty 'trigger'")
+
+    value_name = str(payload.get("value", "") or "").strip()
+    description = str(payload.get("description", "") or "").strip()
+    category = str(payload.get("category", "") or "").strip()
+    default_value = payload.get("default", None)
+
+    allowed_raw = payload.get("allowed", payload.get("values", []))
+    allowed_values: List[str] = []
+    if isinstance(allowed_raw, dict):
+        allowed_values = [str(k).strip() for k in allowed_raw.keys() if str(k).strip()]
+    elif isinstance(allowed_raw, (list, tuple, set)):
+        for entry in allowed_raw:
+            if isinstance(entry, (list, tuple)) and entry:
+                token = str(entry[0]).strip()
+                if token:
+                    allowed_values.append(token)
+            else:
+                token = str(entry).strip()
+                if token:
+                    allowed_values.append(token)
+
+    existing = dict((_currentWorkspace.options or {}).get(trigger, {}))
+    existing.update({
+        "trigger": trigger,
+        "value": value_name,
+        "description": description,
+        "category": category,
+        "allowed": allowed_values,
+    })
+    if "default" in payload:
+        existing["default"] = default_value
+    elif "default" not in existing:
+        existing["default"] = None
+
+    _currentWorkspace.options[trigger] = existing
+
+# --- Project kind setters (filter-aware) ---
+def _SetProjectKind(k: ProjectKind) -> None:
+    """Internal: set project kind, respecting active filter context."""
+    if not _currentProject:
+        return
+    if _currentFilter:
+        _currentProject._filteredKind[_currentFilter] = k
+    else:
+        _currentProject.kind = k
+
 def consoleapp() -> None:
-    if _currentProject:
-        _currentProject.kind = ProjectKind.CONSOLE_APP
+    _SetProjectKind(ProjectKind.CONSOLE_APP)
 
 def windowedapp() -> None:
-    if _currentProject:
-        _currentProject.kind = ProjectKind.WINDOWED_APP
+    _SetProjectKind(ProjectKind.WINDOWED_APP)
 
 def staticlib() -> None:
-    if _currentProject:
-        _currentProject.kind = ProjectKind.STATIC_LIB
+    _SetProjectKind(ProjectKind.STATIC_LIB)
 
 def sharedlib() -> None:
-    if _currentProject:
-        _currentProject.kind = ProjectKind.SHARED_LIB
+    _SetProjectKind(ProjectKind.SHARED_LIB)
 
 def testsuite() -> None:
-    if _currentProject:
-        _currentProject.kind = ProjectKind.TEST_SUITE
+    _SetProjectKind(ProjectKind.TEST_SUITE)
+    if _currentProject and not _currentFilter:
         _currentProject.isTest = True
 
 def kind(k: Union[str, ProjectKind]) -> None:
@@ -975,8 +1139,8 @@ def kind(k: Union[str, ProjectKind]) -> None:
     if _currentProject:
         if isinstance(k, str):
             k = ProjectKind[k.upper()]
-        _currentProject.kind = k
-        if k == ProjectKind.TEST_SUITE:
+        _SetProjectKind(k)
+        if k == ProjectKind.TEST_SUITE and not _currentFilter:
             _currentProject.isTest = True
 
 # --- Language and dialect ---
@@ -1030,18 +1194,14 @@ def location(path: str) -> None:
 def files(patterns: List[str]) -> None:
     if _currentProject:
         if _currentFilter:
-            if _currentFilter not in _currentProject._filteredFiles:
-                _currentProject._filteredFiles[_currentFilter] = []
-            _currentProject._filteredFiles[_currentFilter].extend(patterns)
+            _AppendFilteredValues(_currentProject._filteredFiles, _currentFilter, patterns)
         else:
             _currentProject.files.extend(patterns)
 
 def excludefiles(patterns: List[str]) -> None:
     if _currentProject:
         if _currentFilter:
-            if _currentFilter not in _currentProject._filteredExcludeFiles:
-                _currentProject._filteredExcludeFiles[_currentFilter] = []
-            _currentProject._filteredExcludeFiles[_currentFilter].extend(patterns)
+            _AppendFilteredValues(_currentProject._filteredExcludeFiles, _currentFilter, patterns)
         else:
             _currentProject.excludeFiles.extend(patterns)
 
@@ -1050,9 +1210,7 @@ removefiles = excludefiles
 def excludemainfiles(patterns: List[str]) -> None:
     if _currentProject:
         if _currentFilter:
-            if _currentFilter not in _currentProject._filteredExcludeMainFiles:
-                _currentProject._filteredExcludeMainFiles[_currentFilter] = []
-            _currentProject._filteredExcludeMainFiles[_currentFilter].extend(patterns)
+            _AppendFilteredValues(_currentProject._filteredExcludeMainFiles, _currentFilter, patterns)
         else:
             _currentProject.excludeMainFiles.extend(patterns)
 
@@ -1061,20 +1219,45 @@ removemainfiles = excludemainfiles
 def includedirs(dirs: List[str]) -> None:
     if _currentProject:
         if _currentFilter:
-            if _currentFilter not in _currentProject._filteredIncludeDirs:
-                _currentProject._filteredIncludeDirs[_currentFilter] = []
-            _currentProject._filteredIncludeDirs[_currentFilter].extend(dirs)
+            _AppendFilteredValues(_currentProject._filteredIncludeDirs, _currentFilter, dirs)
         else:
             _currentProject.includeDirs.extend(dirs)
+
+def externalincludedirs(dirs: List[str]) -> None:
+    """
+    Premake-compatible alias.
+    Jenga currently treats external include dirs the same as regular include dirs.
+    """
+    includedirs(dirs)
+
+def sysincludedirs(dirs: List[str]) -> None:
+    """Premake-compatible alias for system include directories."""
+    includedirs(dirs)
+
+def removeincludedirs(dirs: List[str]) -> None:
+    if _currentProject:
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredRemoveIncludeDirs, _currentFilter, dirs)
+        else:
+            _RemoveValuesInPlace(_currentProject.includeDirs, dirs)
 
 def libdirs(dirs: List[str]) -> None:
     if _currentProject:
         if _currentFilter:
-            if _currentFilter not in _currentProject._filteredLibDirs:
-                _currentProject._filteredLibDirs[_currentFilter] = []
-            _currentProject._filteredLibDirs[_currentFilter].extend(dirs)
+            _AppendFilteredValues(_currentProject._filteredLibDirs, _currentFilter, dirs)
         else:
             _currentProject.libDirs.extend(dirs)
+
+def syslibdirs(dirs: List[str]) -> None:
+    """Premake-compatible alias for system library directories."""
+    libdirs(dirs)
+
+def removelibdirs(dirs: List[str]) -> None:
+    if _currentProject:
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredRemoveLibDirs, _currentFilter, dirs)
+        else:
+            _RemoveValuesInPlace(_currentProject.libDirs, dirs)
 
 def objdir(path: str) -> None:
     if _currentProject:
@@ -1101,9 +1284,7 @@ def targetname(name: str) -> None:
 def links(libs: List[str]) -> None:
     if _currentProject:
         if _currentFilter:
-            if _currentFilter not in _currentProject._filteredLinks:
-                _currentProject._filteredLinks[_currentFilter] = []
-            _currentProject._filteredLinks[_currentFilter].extend(libs)
+            _AppendFilteredValues(_currentProject._filteredLinks, _currentFilter, libs)
 
             # Keep legacy per-system map for compatibility/introspection.
             if _currentFilter.startswith("system:"):
@@ -1114,22 +1295,40 @@ def links(libs: List[str]) -> None:
         else:
             _currentProject.links.extend(libs)
 
+def removelinks(libs: List[str]) -> None:
+    if _currentProject:
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredRemoveLinks, _currentFilter, libs)
+        else:
+            _RemoveValuesInPlace(_currentProject.links, libs)
+
 def dependson(deps: List[str]) -> None:
     if _currentProject:
         if _currentFilter:
-            if _currentFilter not in _currentProject._filteredDependsOn:
-                _currentProject._filteredDependsOn[_currentFilter] = []
-            _currentProject._filteredDependsOn[_currentFilter].extend(deps)
+            _AppendFilteredValues(_currentProject._filteredDependsOn, _currentFilter, deps)
         else:
             _currentProject.dependsOn.extend(deps)
 
+def removedependson(deps: List[str]) -> None:
+    if _currentProject:
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredRemoveDependsOn, _currentFilter, deps)
+        else:
+            _RemoveValuesInPlace(_currentProject.dependsOn, deps)
+
 def dependfiles(patterns: List[str]) -> None:
     if _currentProject:
-        _currentProject.dependFiles.extend(patterns)
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredDependFiles, _currentFilter, patterns)
+        else:
+            _currentProject.dependFiles.extend(patterns)
 
 def embedresources(resources: List[str]) -> None:
     if _currentProject:
-        _currentProject.embedResources.extend(resources)
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredEmbedResources, _currentFilter, resources)
+        else:
+            _currentProject.embedResources.extend(resources)
 
 # --- Compiler settings ---
 def defines(defs: List[str]) -> None:
@@ -1137,11 +1336,18 @@ def defines(defs: List[str]) -> None:
         _currentToolchain.defines.extend(defs)
     elif _currentProject:
         if _currentFilter:
-            if _currentFilter not in _currentProject._filteredDefines:
-                _currentProject._filteredDefines[_currentFilter] = []
-            _currentProject._filteredDefines[_currentFilter].extend(defs)
+            _AppendFilteredValues(_currentProject._filteredDefines, _currentFilter, defs)
         else:
             _currentProject.defines.extend(defs)
+
+def removedefines(defs: List[str]) -> None:
+    if _currentProject:
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredRemoveDefines, _currentFilter, defs)
+        else:
+            _RemoveValuesInPlace(_currentProject.defines, defs)
+
+undefines = removedefines
 
 def optimize(level: Union[str, Optimization]) -> None:
     if _currentProject:
@@ -1196,28 +1402,44 @@ def pchsource(source: str) -> None:
 # --- Build hooks ---
 def prebuild(cmds: List[str]) -> None:
     if _currentProject:
-        _currentProject.preBuildCommands.extend(cmds)
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredPreBuildCommands, _currentFilter, cmds)
+        else:
+            _currentProject.preBuildCommands.extend(cmds)
 
 def postbuild(cmds: List[str]) -> None:
     if _currentProject:
-        _currentProject.postBuildCommands.extend(cmds)
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredPostBuildCommands, _currentFilter, cmds)
+        else:
+            _currentProject.postBuildCommands.extend(cmds)
 
 def prelink(cmds: List[str]) -> None:
     if _currentProject:
-        _currentProject.preLinkCommands.extend(cmds)
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredPreLinkCommands, _currentFilter, cmds)
+        else:
+            _currentProject.preLinkCommands.extend(cmds)
 
 def postlink(cmds: List[str]) -> None:
     if _currentProject:
-        _currentProject.postLinkCommands.extend(cmds)
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredPostLinkCommands, _currentFilter, cmds)
+        else:
+            _currentProject.postLinkCommands.extend(cmds)
 
 # --- Toolchain selection ---
 def usetoolchain(name: str) -> None:
-    global _currentProject, _currentWorkspace
+    global _currentProject, _currentWorkspace, _currentFilter
     if _currentProject:
-        if _currentWorkspace and name not in _currentWorkspace.toolchains:
-            raise ValueError(f"Toolchain '{name}' not defined")
-        _currentProject.toolchain = name
-        _currentProject._explicitToolchain = True
+        if _currentFilter:
+            # Deferred validation: toolchain will be checked at build time
+            _currentProject._filteredToolchain[_currentFilter] = name
+        else:
+            if _currentWorkspace and name not in _currentWorkspace.toolchains:
+                raise ValueError(f"Toolchain '{name}' not defined")
+            _currentProject.toolchain = name
+            _currentProject._explicitToolchain = True
     elif _currentWorkspace:
         if name not in _currentWorkspace.toolchains:
             raise ValueError(f"Toolchain '{name}' not defined")
@@ -1315,6 +1537,20 @@ def androidkeyalias(alias: str) -> None:
     if _currentProject:
         _currentProject.androidKeyAlias = alias
 
+def androidjavafiles(patterns: List[str]) -> None:
+    """Définit les patterns des fichiers sources Java."""
+    if _currentProject:
+        if not hasattr(_currentProject, 'androidJavaFiles'):
+            _currentProject.androidJavaFiles = []
+        _currentProject.androidJavaFiles.extend(patterns)
+
+def androidjavalibs(patterns: List[str]) -> None:
+    """Définit les patterns des bibliothèques Java (.jar)."""
+    if _currentProject:
+        if not hasattr(_currentProject, 'androidJavaLibs'):
+            _currentProject.androidJavaLibs = []
+        _currentProject.androidJavaLibs.extend(patterns)
+
 # --- Emscripten specific ---
 def emscriptenshellfile(path: str) -> None:
     """Set custom HTML template (shell file) for Emscripten output."""
@@ -1380,6 +1616,143 @@ def iosbuildnumber(number: Union[str, int]) -> None:
     """Set the build number (CFBundleVersion) for iOS bundles."""
     if _currentProject:
         _currentProject.iosBuildNumber = str(number)
+
+def iosbuildsystem(mode: str) -> None:
+    """Select Apple mobile build backend: 1/direct or 2/xcode/xbuilder."""
+    if not _currentProject:
+        return
+    value = str(mode or "").strip().lower()
+    if value in ("2", "xcode", "xbuilder"):
+        _currentProject.iosBuildSystem = "xcode"
+    elif value in ("1", "direct"):
+        _currentProject.iosBuildSystem = "direct"
+    else:
+        raise ValueError("iosbuildsystem(mode) expects: 1/direct or 2/xcode/xbuilder")
+
+def iosdistributiontype(kind: str) -> None:
+    """Set iOS distribution type: development, app-store, ad-hoc, enterprise."""
+    if not _currentProject:
+        return
+    value = str(kind or "").strip().lower()
+    if value not in ("development", "app-store", "ad-hoc", "enterprise"):
+        raise ValueError("iosdistributiontype(kind) expects: development, app-store, ad-hoc, enterprise")
+    _currentProject.iosDistributionType = value
+
+def iosteamid(team_id: str) -> None:
+    """Set Apple Team ID used for xcode export options."""
+    if _currentProject:
+        _currentProject.iosTeamId = str(team_id or "").strip()
+
+def iosprovisioningprofile(profile: str) -> None:
+    """Set provisioning profile specifier used for xcode export options."""
+    if _currentProject:
+        _currentProject.iosProvisioningProfile = str(profile or "").strip()
+
+def iosresources(patterns: List[str]) -> None:
+    """Définit les ressources à copier dans le bundle iOS."""
+    if _currentProject:
+        if not hasattr(_currentProject, 'iosResources'):
+            _currentProject.iosResources = []
+        _currentProject.iosResources.extend(patterns)
+
+def iosminsdk(sdk: str) -> None:
+    """Définit la version minimale iOS (ex: '13.0')."""
+    if _currentProject:
+        _currentProject.iosMinSdk = sdk
+
+def tvosminsdk(sdk: str) -> None:
+    """Définit la version minimale tvOS (ex: '13.0')."""
+    if _currentProject:
+        _currentProject.tvosMinSdk = sdk
+
+def watchosminsdk(sdk: str) -> None:
+    """Définit la version minimale watchOS (ex: '7.0')."""
+    if _currentProject:
+        _currentProject.watchosMinSdk = sdk
+
+def ipadosminsdk(sdk: str) -> None:
+    if _currentProject:
+        _currentProject.ipadosMinSdk = sdk
+
+def visionosminsdk(sdk: str) -> None:
+    if _currentProject:
+        _currentProject.visionosMinSdk = sdk
+        
+
+def gdkpath(path: str) -> None:
+    """Set the Microsoft GDK root path (workspace-level)."""
+    if _currentWorkspace:
+        _currentWorkspace.gdkPath = str(path or "").strip()
+
+
+def xboxmode(mode: str) -> None:
+    """Set Xbox build mode: 'gdk' (default) or 'uwp'."""
+    if not _currentWorkspace:
+        return
+    value = str(mode or "").strip().lower()
+    if value not in ("gdk", "uwp"):
+        raise ValueError("xboxmode(mode) expects: 'gdk' or 'uwp'")
+    _currentWorkspace.xboxMode = value
+
+
+def xboxplatform(platform_name: str) -> None:
+    """Set Xbox platform flavor: XboxOne, Scarlett, Desktop or UWP."""
+    if not _currentWorkspace:
+        return
+    raw = str(platform_name or "").strip()
+    key = raw.lower().replace(" ", "").replace("-", "").replace("_", "")
+    mapping = {
+        "xboxone": "XboxOne",
+        "xbone": "XboxOne",
+        "xboxseries": "Scarlett",
+        "scarlett": "Scarlett",
+        "xbox": "Scarlett",
+        "desktop": "Desktop",
+        "pc": "Desktop",
+        "uwp": "UWP",
+        "xboxuwp": "UWP",
+    }
+    _currentWorkspace.xboxPlatform = mapping.get(key, raw)
+
+
+def xboxsigningmode(mode: str) -> None:
+    """Set Xbox package signing mode: test, random, stable."""
+    if not _currentProject:
+        return
+    value = str(mode or "").strip().lower()
+    if value not in ("test", "random", "stable"):
+        raise ValueError("xboxsigningmode(mode) expects: test, random or stable")
+    _currentProject.xboxSigningMode = value
+
+
+def xboxpackagename(name: str) -> None:
+    """Set Xbox package identity name."""
+    if _currentProject:
+        _currentProject.xboxPackageName = str(name or "").strip()
+
+
+def xboxpublisher(name: str) -> None:
+    """Set Xbox package publisher."""
+    if _currentProject:
+        _currentProject.xboxPublisher = str(name or "").strip()
+
+
+def xboxversion(version: str) -> None:
+    """Set Xbox package version (e.g. 1.0.0.0)."""
+    if _currentProject:
+        _currentProject.xboxVersion = str(version or "").strip()
+
+
+def xboxlekbpath(path: str) -> None:
+    """Set Xbox LEKB path for stable signing mode."""
+    if _currentProject:
+        _currentProject.xboxLEKBPath = str(path or "").strip()
+
+
+def xboxassetchunks(patterns: List[str]) -> None:
+    """Set additional Xbox asset chunk patterns for packaging."""
+    if _currentProject:
+        _currentProject.xboxAssetChunks = list(patterns or [])
 
 # --- Test settings (only inside test context) ---
 def testoptions(opts: List[str]) -> None:
@@ -1487,59 +1860,80 @@ OS_ALIASES = {
     "win": "WINDOWS",
     "win32": "WINDOWS",
     "win64": "WINDOWS",
-    
+    "winnt": "WINDOWS",
+
     # Linux variants
     "linux": "LINUX",
-    
+
     # macOS variants
     "macos": "MACOS",
     "darwin": "MACOS",
     "osx": "MACOS",
     "mac": "MACOS",
-    
+    "macosx": "MACOS",
+    "maccatalyst": "MACOS",
+    "mac_catalyst": "MACOS",
+    "catalyst": "MACOS",
+
     # Android variants
     "android": "ANDROID",
-    
+
     # iOS variants
     "ios": "IOS",
     "iphoneos": "IOS",
-    
+    "iphonesimulator": "IOS",
+    "iossimulator": "IOS",
+    "ipados": "IOS",
+    "ipadsimulator": "IOS",
+    "visionos": "IOS",
+    "xros": "IOS",
+    "xrsimulator": "IOS",
+
     # tvOS variants
     "tvos": "TVOS",
     "appletv": "TVOS",
-    
+    "apple_tv": "TVOS",
+    "appletvos": "TVOS",
+    "appletvsimulator": "TVOS",
+
     # watchOS variants
     "watchos": "WATCHOS",
     "applewatch": "WATCHOS",
-    
+    "apple_watch": "WATCHOS",
+    "watchsimulator": "WATCHOS",
+
     # Web variants
     "web": "WEB",
     "wasm": "WEB",
     "emscripten": "WEB",
-    
+
     # Console variants
     "ps4": "PS4",
     "playstation4": "PS4",
-    
+
     "ps5": "PS5",
     "playstation5": "PS5",
-    
+
+    "xbox": "XBOX_SERIES",
     "xboxone": "XBOX_ONE",
-    "xbox-one": "XBOX_ONE",
+    "xbox_one": "XBOX_ONE",
     "xbone": "XBOX_ONE",
-    
+
     "xboxseries": "XBOX_SERIES",
-    "xbox-series": "XBOX_SERIES",
+    "xbox_series": "XBOX_SERIES",
     "xsx": "XBOX_SERIES",
     "xss": "XBOX_SERIES",
-    
+    "xboxuwp": "XBOX_SERIES",
+    "xbox_uwp": "XBOX_SERIES",
+
     "switch": "SWITCH",
-    "nintendo-switch": "SWITCH",
-    
+    "nintendoswitch": "SWITCH",
+    "nintendo_switch": "SWITCH",
+
     # Other OS
     "harmonyos": "HARMONYOS",
     "harmony": "HARMONYOS",
-    
+
     "freebsd": "FREEBSD",
     "openbsd": "OPENBSD",
 }
@@ -1727,15 +2121,30 @@ def addldflag(flag: str) -> None:
         _currentToolchain.ldflags.append(flag)
 
 def cflags(flags: List[str]) -> None:
-    if _currentToolchain:
+    if _currentProject:
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredCFlags, _currentFilter, flags)
+        else:
+            _currentProject.cflags.extend(flags)
+    elif _currentToolchain:
         _currentToolchain.cflags.extend(flags)
 
 def cxxflags(flags: List[str]) -> None:
-    if _currentToolchain:
+    if _currentProject:
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredCxxFlags, _currentFilter, flags)
+        else:
+            _currentProject.cxxflags.extend(flags)
+    elif _currentToolchain:
         _currentToolchain.cxxflags.extend(flags)
 
 def ldflags(flags: List[str]) -> None:
-    if _currentToolchain:
+    if _currentProject:
+        if _currentFilter:
+            _AppendFilteredValues(_currentProject._filteredLdFlags, _currentFilter, flags)
+        else:
+            _currentProject.ldflags.extend(flags)
+    elif _currentToolchain:
         _currentToolchain.ldflags.extend(flags)
 
 def asmflags(flags: List[str]) -> None:
@@ -1746,7 +2155,7 @@ def arflags(flags: List[str]) -> None:
     if _currentToolchain:
         _currentToolchain.arflags.extend(flags)
 
-def framework(name: str) -> None:
+def frameworks(name: str) -> None:
     if _currentToolchain:
         _currentToolchain.frameworks.append(name)
 
@@ -1855,8 +2264,14 @@ def buildoption(option: str, values: List[str]) -> None:
             _currentProject.buildOptions[option] = []
         _currentProject.buildOptions[option].extend(values)
 
-def buildoptions(opts: Dict[str, Union[str, List[str]]]) -> None:
+def buildoptions(opts: Union[Dict[str, Union[str, List[str]]], List[str], Tuple[str, ...]]) -> None:
     if _currentProject:
+        # Premake-style shorthand: buildoptions(["-fno-rtti", ...])
+        if isinstance(opts, (list, tuple)):
+            cflags(list(opts))
+            cxxflags(list(opts))
+            return
+
         if not hasattr(_currentProject, 'buildOptions'):
             _currentProject.buildOptions = {}
         for k, v in opts.items():
@@ -1864,6 +2279,10 @@ def buildoptions(opts: Dict[str, Union[str, List[str]]]) -> None:
                 _currentProject.buildOptions.setdefault(k, []).extend(v)
             else:
                 _currentProject.buildOptions.setdefault(k, []).append(v)
+
+def linkoptions(flags: List[str]) -> None:
+    """Premake-compatible alias for linker options."""
+    ldflags(flags)
 
 # --- Project properties introspection (from original) ---
 def useproject(projectname: str, copyincludes: bool = True, copydefines: bool = True) -> None:
@@ -2803,13 +3222,14 @@ __all__ = [
     # Context managers
     'workspace', 'project', 'toolchain', 'filter', 'unitest', 'test', 'include', 'batchinclude', 'addtools',
     # User functions (lowercase)
-    'configurations', 'platforms', 'targetoses', 'targetarchs', 'targetos', 'targetarch', 'platform', 'architecture', 'startproject',
+    'configurations', 'platforms', 'targetoses', 'targetarchs', 'targetos', 'targetarch', 'platform', 'architecture', 'startproject', 'newoption',
     'consoleapp', 'windowedapp', 'staticlib', 'sharedlib', 'testsuite', 'kind',
     'language', 'cppdialect', 'cdialect',
     'location', 'files', 'excludefiles', 'removefiles', 'excludemainfiles', 'removemainfiles',
-    'includedirs', 'libdirs', 'objdir', 'targetdir', 'targetname',
-    'links', 'dependson', 'dependfiles', 'embedresources',
-    'defines', 'optimize', 'symbols', 'warnings',
+    'includedirs', 'externalincludedirs', 'sysincludedirs', 'removeincludedirs',
+    'libdirs', 'syslibdirs', 'removelibdirs', 'objdir', 'targetdir', 'targetname',
+    'links', 'removelinks', 'dependson', 'removedependson', 'dependfiles', 'embedresources',
+    'defines', 'removedefines', 'undefines', 'optimize', 'symbols', 'warnings',
     'pchheader', 'pchsource',
     'prebuild', 'postbuild', 'prelink', 'postlink',
     'usetoolchain',
@@ -2817,19 +3237,20 @@ __all__ = [
     'androidapplicationid', 'androidversioncode', 'androidversionname',
     'androidminsdk', 'androidtargetsdk', 'androidcompilesdk',
     'androidabis', 'androidproguard', 'androidproguardrules',
-    'androidassets', 'androidpermissions', 'androidnativeactivity',
+    'androidassets', 'androidpermissions', 'androidnativeactivity', 'androidjavafiles', 'androidjavalibs',
     'ndkversion', 'androidsign', 'androidkeystore', 'androidkeystorepass', 'androidkeyalias',
     'emscriptenshellfile', 'emscriptencanvasid', 'emscripteninitialmemory',
     'emscriptenstacksize', 'emscriptenexportname', 'emscriptenextraflags',
-    'iosbundleid', 'iosversion', 'iosminsdk',
+    'iosbundleid', 'iosversion', 'iosminsdk', 'tvosminsdk', 'watchosminsdk', 'ipadosminsdk', 'visionosminsdk',
     'iossigningidentity', 'iosentitlements', 'iosappicon', 'iosbuildnumber',
+    'iosbuildsystem', 'iosdistributiontype', 'iosteamid', 'iosprovisioningprofile',
     'testoptions', 'testfiles', 'testmainfile', 'testmaintemplate',
     'settarget', 'sysroot', 'targettriple', 'ccompiler', 'cppcompiler',
     'linker', 'archiver', 'addcflag', 'addcxxflag', 'addldflag',
     'cflags', 'cxxflags', 'ldflags', 'asmflags', 'arflags',
-    'framework', 'frameworkpath', 'librarypath', 'library', 'rpath',
+    'frameworks', 'frameworkpath', 'librarypath', 'library', 'rpath',
     'sanitize', 'nostdlib', 'nostdinc', 'pic', 'pie',
-    'buildoption', 'buildoptions',
+    'buildoption', 'buildoptions', 'linkoptions',
     'useproject', 'getprojectproperties',
     'includefromdirectory', 'listincludes', 'getincludeinfo', 'validateincludes',
     'lip', 'vip', 'getincludedprojects', 'generatedependencyreport', 'listallprojects',
