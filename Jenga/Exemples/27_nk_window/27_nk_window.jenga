@@ -66,15 +66,15 @@ with workspace("NKWindow", location="."):
 
         # Répertoires d'inclusion
         includedirs([
-            "NKWindow/src",
-            "Externals",
+            "src",
+            "../Externals",
         ])
 
         # Fichiers C++ communs (tous systèmes)
         files([
-            "NKWindow/src/NKWindow/Core/**.cpp",
-            "NKWindow/src/NKWindow/Core/**.h",
-            "NKWindow/src/NKWindow/Core/**.hpp",
+            "src/NKWindow/Core/**.cpp",
+            "src/NKWindow/Core/**.h",
+            "src/NKWindow/Core/**.hpp",
         ])
 
         # Chemins de sortie
@@ -92,8 +92,8 @@ with workspace("NKWindow", location="."):
                 "UNICODE",
             ])
             files([
-                "NKWindow/src/NKWindow/Platform/Win32/**.cpp",
-                "NKWindow/src/NKWindow/Platform/Win32/**.h",
+                "src/NKWindow/Platform/Win32/**.cpp",
+                "src/NKWindow/Platform/Win32/**.h",
             ])
             links(["user32", "gdi32", "opengl32", "dwmapi", "shell32"])
 
@@ -105,10 +105,10 @@ with workspace("NKWindow", location="."):
                 "NKENTSEU_FAMILY_LINUX=1",
             ])
             files([
-                "NKWindow/src/NKWindow/Platform/Linux/**.cpp",
-                "NKWindow/src/NKWindow/Platform/Linux/**.h",
-                "NKWindow/src/NKWindow/Platform/XCB/**.cpp",
-                "NKWindow/src/NKWindow/Platform/XCB/**.h",
+                "src/NKWindow/Platform/Linux/**.cpp",
+                "src/NKWindow/Platform/Linux/**.h",
+                "src/NKWindow/Platform/XCB/**.cpp",
+                "src/NKWindow/Platform/XCB/**.h",
                 # Alternative: XLib si défini
                 # "NKWindow/src/NKWindow/Platform/XLib/**.cpp",
             ])
@@ -122,9 +122,9 @@ with workspace("NKWindow", location="."):
                 "NKENTSEU_FAMILY_APPLE=1",
             ])
             files([
-                "NKWindow/src/NKWindow/Platform/Cocoa/**.cpp",
-                "NKWindow/src/NKWindow/Platform/Cocoa/**.mm",
-                "NKWindow/src/NKWindow/Platform/Cocoa/**.h",
+                "src/NKWindow/Platform/Cocoa/**.cpp",
+                "src/NKWindow/Platform/Cocoa/**.mm",
+                "src/NKWindow/Platform/Cocoa/**.h",
             ])
             frameworks(["Cocoa", "QuartzCore", "OpenGL", "Metal"])
 
@@ -136,8 +136,8 @@ with workspace("NKWindow", location="."):
                 "__ANDROID_API__=24",
             ])
             files([
-                "NKWindow/src/NKWindow/Platform/Android/**.cpp",
-                "NKWindow/src/NKWindow/Platform/Android/**.h",
+                "src/NKWindow/Platform/Android/**.cpp",
+                "src/NKWindow/Platform/Android/**.h",
             ])
             links(["android", "log", "EGL", "GLESv3", "camera2ndk", "mediandk"])
             # Configuration Android (pour app finale)
@@ -156,9 +156,9 @@ with workspace("NKWindow", location="."):
                 "NKENTSEU_FAMILY_APPLE=1",
             ])
             files([
-                "NKWindow/src/NKWindow/Platform/UIKit/**.cpp",
-                "NKWindow/src/NKWindow/Platform/UIKit/**.mm",
-                "NKWindow/src/NKWindow/Platform/UIKit/**.h",
+                "src/NKWindow/Platform/UIKit/**.cpp",
+                "src/NKWindow/Platform/UIKit/**.mm",
+                "src/NKWindow/Platform/UIKit/**.h",
             ])
             frameworks(["UIKit", "QuartzCore", "OpenGLES", "AVFoundation"])
             # Configuration iOS
@@ -175,8 +175,8 @@ with workspace("NKWindow", location="."):
                 "__EMSCRIPTEN__=1",
             ])
             files([
-                "NKWindow/src/NKWindow/Platform/WASM/**.cpp",
-                "NKWindow/src/NKWindow/Platform/WASM/**.h",
+                "src/NKWindow/Platform/WASM/**.cpp",
+                "src/NKWindow/Platform/WASM/**.h",
             ])
             # Pas de links spécifiques (gérés par Emscripten)
             emscripteninitialmemory(32)  # 32 MB
@@ -189,8 +189,8 @@ with workspace("NKWindow", location="."):
                 "__HARMONY__=1",
             ])
             files([
-                "NKWindow/src/NKWindow/Platform/Noop/**.cpp",  # Fallback si pas implémenté
-                "NKWindow/src/NKWindow/Platform/Noop/**.h",
+                "src/NKWindow/Platform/Noop/**.cpp",  # Fallback si pas implémenté
+                "src/NKWindow/Platform/Noop/**.h",
             ])
             # TODO: Ajouter backend HarmonyOS réel quand disponible
             # files(["NKWindow/src/NKWindow/Platform/HarmonyOS/**.cpp"])
@@ -226,8 +226,8 @@ with workspace("NKWindow", location="."):
 
         # Inclure NKWindow headers
         includedirs([
-            "NKWindow/src",
-            "Externals",
+            "../NKWindow/src",
+            "../Externals",
         ])
 
         # Lien avec la bibliothèque NKWindow
