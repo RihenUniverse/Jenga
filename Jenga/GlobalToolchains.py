@@ -493,22 +493,30 @@ def RegisterJengaGlobalToolchains(config: Optional[Dict[str, str]] = None) -> No
     """
     config = config or {}
 
+    # Helper to safely register toolchains (ignore if not available)
+    def safe_register(func, *args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except (EnvironmentError, FileNotFoundError, Exception) as e:
+            # Silently ignore toolchains that can't be registered
+            pass
+
     # Platform‑specific toolchains
-    ToolchainAndroidNDK(ndk_root=config.get("ndk_root"))
-    ToolchainEmscripten(emsdk_root=config.get("emsdk_root"))
-    ToolchainZigLinuxX64(zig_root=config.get("zig_root"))
+    safe_register(ToolchainAndroidNDK, ndk_root=config.get("ndk_root"))
+    safe_register(ToolchainEmscripten, emsdk_root=config.get("emsdk_root"))
+    safe_register(ToolchainZigLinuxX64, zig_root=config.get("zig_root"))
 
     # Clang native (always register, but target depends on host)
-    ToolchainClangNative(clang_base=config.get("clang_base"))
+    safe_register(ToolchainClangNative, clang_base=config.get("clang_base"))
 
     # Windows‑specific toolchains
     if Platform.IsWindows():
-        ToolchainClangCl(msvc_base=config.get("msvc_base"))
-        ToolchainClangMinGW(mingw_root=config.get("mingw_root"))
-        ToolchainMinGW(mingw_root=config.get("mingw_root"))
+        safe_register(ToolchainClangCl, msvc_base=config.get("msvc_base"))
+        safe_register(ToolchainClangMinGW, mingw_root=config.get("mingw_root"))
+        safe_register(ToolchainMinGW, mingw_root=config.get("mingw_root"))
 
     # Cross toolchains (useful on any host)
-    ToolchainClangCrossLinux(clang_base=config.get("clang_base"))
+    safe_register(ToolchainClangCrossLinux, clang_base=config.get("clang_base"))
 
 
 # # example_usage.
