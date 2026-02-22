@@ -116,7 +116,7 @@ with workspace("NKWindow", location="."):
 
         # ── macOS (Cocoa backend) ────────────────────────────────────────
         with filter("system:macOS"):
-            usetoolchain("macos-clang")  # Direct par défaut
+            usetoolchain("clang-native")  # Direct par défaut
             defines([
                 "NKENTSEU_PLATFORM_COCOA=1",
                 "NKENTSEU_FAMILY_APPLE=1",
@@ -150,7 +150,7 @@ with workspace("NKWindow", location="."):
 
         # ── iOS (UIKit backend) ──────────────────────────────────────────
         with filter("system:iOS"):
-            usetoolchain("ios-clang")  # Direct par défaut
+            # usetoolchain("ios-clang")  # TODO: Créer toolchain iOS
             defines([
                 "NKENTSEU_PLATFORM_UIKIT=1",
                 "NKENTSEU_FAMILY_APPLE=1",
@@ -183,7 +183,7 @@ with workspace("NKWindow", location="."):
 
         # ── HarmonyOS (ArkUI Native) ─────────────────────────────────────
         with filter("system:HarmonyOS"):
-            usetoolchain("harmonyos-ndk")
+            # usetoolchain("harmonyos-ndk")  # TODO: Créer toolchain HarmonyOS
             defines([
                 "NKENTSEU_PLATFORM_HARMONYOS=1",
                 "__HARMONY__=1",
@@ -255,7 +255,7 @@ with workspace("NKWindow", location="."):
         # ── macOS ────────────────────────────────────────────────────────
         with filter("system:macOS"):
             windowedapp()
-            usetoolchain("macos-clang")
+            usetoolchain("clang-native")
             defines(["NKENTSEU_PLATFORM_COCOA=1"])
             frameworks(["Cocoa", "QuartzCore", "OpenGL"])
 
@@ -275,7 +275,7 @@ with workspace("NKWindow", location="."):
         # ── iOS ──────────────────────────────────────────────────────────
         with filter("system:iOS"):
             windowedapp()
-            usetoolchain("ios-clang")
+            # usetoolchain("ios-clang")  # TODO: Créer toolchain iOS
             defines(["NKENTSEU_PLATFORM_UIKIT=1"])
             frameworks(["UIKit", "QuartzCore", "OpenGLES"])
             iosbundleid("com.nkentseu.sandbox")
@@ -293,7 +293,7 @@ with workspace("NKWindow", location="."):
         # ── HarmonyOS ────────────────────────────────────────────────────
         with filter("system:HarmonyOS"):
             windowedapp()
-            usetoolchain("harmonyos-ndk")
+            # usetoolchain("harmonyos-ndk")  # TODO: Créer toolchain HarmonyOS
             defines(["NKENTSEU_PLATFORM_HARMONYOS=1"])
             links(["log", "EGL", "GLESv3"])
 
