@@ -155,17 +155,17 @@ def ToolchainAndroidNDK(ndk_root: Optional[str] = None) -> None:
     toolchain_bin = ndk_root / "toolchains" / "llvm" / "prebuilt" / host_tag / "bin"
 
     # Required tools
-    c_compiler = Platform.ResolveTool(toolchain_bin.parent, ["clang", "clang.exe"], subdir="bin")
-    cpp_compiler = Platform.ResolveTool(toolchain_bin.parent, ["clang++", "clang++.exe"], subdir="bin")
-    linker = Platform.ResolveTool(toolchain_bin.parent, ["ld", "ld.exe"], subdir="bin")
-    archiver = Platform.ResolveTool(toolchain_bin.parent, ["llvm-ar", "llvm-ar.exe"], subdir="bin")
+    c_compiler_path = Platform.ResolveTool(toolchain_bin.parent, ["clang", "clang.exe"], subdir="bin")
+    cpp_compiler_path = Platform.ResolveTool(toolchain_bin.parent, ["clang++", "clang++.exe"], subdir="bin")
+    linker_path = Platform.ResolveTool(toolchain_bin.parent, ["ld", "ld.exe"], subdir="bin")
+    archiver_path = Platform.ResolveTool(toolchain_bin.parent, ["llvm-ar", "llvm-ar.exe"], subdir="bin")
 
     with toolchain("android-ndk", "android-ndk"):
         settarget("Android", "arm64", "android")
-        ccompiler(c_compiler)
-        cppcompiler(cpp_compiler)
-        linker(linker)
-        archiver(archiver)
+        ccompiler(c_compiler_path)
+        cppcompiler(cpp_compiler_path)
+        linker(linker_path)
+        archiver(archiver_path)
 
 
 def ToolchainClangCl(msvc_base: Optional[str] = None) -> None:
@@ -196,17 +196,17 @@ def ToolchainClangCl(msvc_base: Optional[str] = None) -> None:
     base_dir = Path(msvc_base)
     bin_dir = base_dir / "bin"
 
-    c_compiler = Platform.ResolveTool(base_dir, ["clang-cl", "clang-cl.exe"], subdir="bin")
+    c_compiler_path = Platform.ResolveTool(base_dir, ["clang-cl", "clang-cl.exe"], subdir="bin")
     cpp_compiler = c_compiler  # same executable
     linker = c_compiler
-    archiver = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
+    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
 
     with toolchain("clang-cl", "clang"):
         settarget("Windows", "x86_64", "msvc")
-        ccompiler(c_compiler)
-        cppcompiler(cpp_compiler)
-        linker(linker)
-        archiver(archiver)
+        ccompiler(c_compiler_path)
+        cppcompiler(cpp_compiler_path)
+        linker(linker_path)
+        archiver(archiver_path)
 
 
 def ToolchainClangNative(clang_base: Optional[str] = None) -> None:
@@ -231,10 +231,10 @@ def ToolchainClangNative(clang_base: Optional[str] = None) -> None:
     base_dir = Path(clang_base)
     bin_dir = base_dir / "bin"
 
-    c_compiler = Platform.ResolveTool(base_dir, ["clang", "clang.exe"], subdir="bin")
-    cpp_compiler = Platform.ResolveTool(base_dir, ["clang++", "clang++.exe"], subdir="bin")
+    c_compiler_path = Platform.ResolveTool(base_dir, ["clang", "clang.exe"], subdir="bin")
+    cpp_compiler_path = Platform.ResolveTool(base_dir, ["clang++", "clang++.exe"], subdir="bin")
     linker = cpp_compiler  # usually clang++ as linker driver
-    archiver = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
+    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
 
     # Determine target triple based on host platform
     if Platform.IsWindows():
@@ -261,10 +261,10 @@ def ToolchainClangNative(clang_base: Optional[str] = None) -> None:
     with toolchain("clang-native", "clang"):
         settarget(target_os, target_arch, target_env)
         targettriple(triple)
-        ccompiler(c_compiler)
-        cppcompiler(cpp_compiler)
-        linker(linker)
-        archiver(archiver)
+        ccompiler(c_compiler_path)
+        cppcompiler(cpp_compiler_path)
+        linker(linker_path)
+        archiver(archiver_path)
         # Add target flags if needed (Clang usually defaults to host, but we can be explicit)
         cflags([f"--target={triple}"])
         cxxflags([f"--target={triple}"])
@@ -293,18 +293,18 @@ def ToolchainClangCrossLinux(clang_base: Optional[str] = None) -> None:
     base_dir = Path(clang_base)
     bin_dir = base_dir / "bin"
 
-    c_compiler = Platform.ResolveTool(base_dir, ["clang", "clang.exe"], subdir="bin")
-    cpp_compiler = Platform.ResolveTool(base_dir, ["clang++", "clang++.exe"], subdir="bin")
+    c_compiler_path = Platform.ResolveTool(base_dir, ["clang", "clang.exe"], subdir="bin")
+    cpp_compiler_path = Platform.ResolveTool(base_dir, ["clang++", "clang++.exe"], subdir="bin")
     linker = cpp_compiler
-    archiver = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
+    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
 
     with toolchain("clang-cross-linux", "clang"):
         settarget("Linux", "x86_64", "gnu")
         targettriple("x86_64-unknown-linux-gnu")
-        ccompiler(c_compiler)
-        cppcompiler(cpp_compiler)
-        linker(linker)
-        archiver(archiver)
+        ccompiler(c_compiler_path)
+        cppcompiler(cpp_compiler_path)
+        linker(linker_path)
+        archiver(archiver_path)
         cflags(["--target=x86_64-unknown-linux-gnu"])
         cxxflags(["--target=x86_64-unknown-linux-gnu"])
         ldflags(["--target=x86_64-unknown-linux-gnu"])
@@ -336,17 +336,17 @@ def ToolchainClangMinGW(mingw_root: Optional[str] = None) -> None:
     base_dir = Path(mingw_root)
     bin_dir = base_dir / "bin"
 
-    c_compiler = Platform.ResolveTool(base_dir, ["clang", "clang.exe"], subdir="bin")
-    cpp_compiler = Platform.ResolveTool(base_dir, ["clang++", "clang++.exe"], subdir="bin")
-    linker = Platform.ResolveTool(base_dir, ["ld", "ld.exe"], subdir="bin")
-    archiver = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
+    c_compiler_path = Platform.ResolveTool(base_dir, ["clang", "clang.exe"], subdir="bin")
+    cpp_compiler_path = Platform.ResolveTool(base_dir, ["clang++", "clang++.exe"], subdir="bin")
+    linker_path = Platform.ResolveTool(base_dir, ["ld", "ld.exe"], subdir="bin")
+    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
 
     with toolchain("clang-mingw", "clang"):
         settarget("Windows", "x86_64", "mingw")
-        ccompiler(c_compiler)
-        cppcompiler(cpp_compiler)
-        linker(linker)
-        archiver(archiver)
+        ccompiler(c_compiler_path)
+        cppcompiler(cpp_compiler_path)
+        linker(linker_path)
+        archiver(archiver_path)
 
 
 def ToolchainEmscripten(emsdk_root: Optional[str] = None) -> None:
@@ -372,15 +372,15 @@ def ToolchainEmscripten(emsdk_root: Optional[str] = None) -> None:
     # emscripten executables are in upstream/emscripten/
     emcc_dir = base_dir / "upstream" / "emscripten"
 
-    c_compiler = Platform.ResolveTool(emcc_dir, ["emcc", "emcc.bat"], subdir=".")
-    cpp_compiler = Platform.ResolveTool(emcc_dir, ["em++", "em++.bat"], subdir=".")
-    archiver = Platform.ResolveTool(emcc_dir, ["emar", "emar.bat"], subdir=".")
+    c_compiler_path = Platform.ResolveTool(emcc_dir, ["emcc", "emcc.bat"], subdir=".")
+    cpp_compiler_path = Platform.ResolveTool(emcc_dir, ["em++", "em++.bat"], subdir=".")
+    archiver_path = Platform.ResolveTool(emcc_dir, ["emar", "emar.bat"], subdir=".")
 
     with toolchain("emscripten", "emscripten"):
         settarget("Web", "wasm32")
-        ccompiler(c_compiler)
-        cppcompiler(cpp_compiler)
-        archiver(archiver)
+        ccompiler(c_compiler_path)
+        cppcompiler(cpp_compiler_path)
+        archiver(archiver_path)
 
 
 def ToolchainMinGW(mingw_root: Optional[str] = None) -> None:
@@ -404,17 +404,17 @@ def ToolchainMinGW(mingw_root: Optional[str] = None) -> None:
     base_dir = Path(mingw_root)
     bin_dir = base_dir / "bin"
 
-    c_compiler = Platform.ResolveTool(base_dir, ["x86_64-w64-mingw32-gcc", "x86_64-w64-mingw32-gcc.exe"], subdir="bin")
-    cpp_compiler = Platform.ResolveTool(base_dir, ["x86_64-w64-mingw32-g++", "x86_64-w64-mingw32-g++.exe"], subdir="bin")
-    linker = Platform.ResolveTool(base_dir, ["ld", "ld.exe"], subdir="bin")
-    archiver = Platform.ResolveTool(base_dir, ["ar", "ar.exe"], subdir="bin")
+    c_compiler_path = Platform.ResolveTool(base_dir, ["x86_64-w64-mingw32-gcc", "x86_64-w64-mingw32-gcc.exe"], subdir="bin")
+    cpp_compiler_path = Platform.ResolveTool(base_dir, ["x86_64-w64-mingw32-g++", "x86_64-w64-mingw32-g++.exe"], subdir="bin")
+    linker_path = Platform.ResolveTool(base_dir, ["ld", "ld.exe"], subdir="bin")
+    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe"], subdir="bin")
 
     with toolchain("mingw", "gcc"):
         settarget("Windows", "x86_64", "mingw")
-        ccompiler(c_compiler)
-        cppcompiler(cpp_compiler)
-        linker(linker)
-        archiver(archiver)
+        ccompiler(c_compiler_path)
+        cppcompiler(cpp_compiler_path)
+        linker(linker_path)
+        archiver(archiver_path)
 
 
 def ToolchainZigLinuxX64(zig_root: Optional[str] = None) -> None:
