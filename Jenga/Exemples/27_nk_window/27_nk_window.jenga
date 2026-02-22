@@ -201,13 +201,13 @@ with workspace("NKWindow", location="."):
             defines(["_DEBUG", "DEBUG"])
             optimize("Off")
             symbols(True)
-            runtime("Debug")
+            # runtime("Debug")  # TODO: Ajouter support runtime() dans API
 
         with filter("config:Release"):
             defines(["NDEBUG", "RELEASE"])
             optimize("Speed")
             symbols(False)
-            runtime("Release")
+            # runtime("Release")  # TODO: Ajouter support runtime() dans API
 
     # =========================================================================
     # Sandbox — Application de démonstration
