@@ -2155,9 +2155,14 @@ def arflags(flags: List[str]) -> None:
     if _currentToolchain:
         _currentToolchain.arflags.extend(flags)
 
-def frameworks(name: str) -> None:
-    if _currentToolchain:
-        _currentToolchain.frameworks.append(name)
+def frameworks(names: Union[str, List[str]]) -> None:
+    """Add one or more frameworks (macOS/iOS). Can accept single name or list."""
+    if not _currentToolchain:
+        return
+    if isinstance(names, str):
+        _currentToolchain.frameworks.append(names)
+    else:
+        _currentToolchain.frameworks.extend(names)
 
 def frameworkpath(path: str) -> None:
     if _currentToolchain:
