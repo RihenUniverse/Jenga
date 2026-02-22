@@ -116,7 +116,7 @@ __all__ = [
     'Commands', 'Core', 'Unitest', 'Utils',
     # Toolchain
     'ToolchainAndroidNDK', 'ToolchainClangCl', 'ToolchainClangCrossLinux', 'ToolchainClangMinGW',
-    'ToolchainEmscripten', 'ToolchainHostClang', 'ToolchainMinGW', 'ToolchainZigLinuxX64',
+    'ToolchainClangNative', 'ToolchainEmscripten', 'ToolchainMinGW', 'ToolchainZigLinuxX64',
 ]
 
 # Initialisation du système de tools au chargement du package
