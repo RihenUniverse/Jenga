@@ -105,6 +105,31 @@ void Window::Minimize()                     { if (mImpl) mImpl->Minimize();     
 void Window::Maximize()                     { if (mImpl) mImpl->Maximize();           }
 void Window::Restore()                      { if (mImpl) mImpl->Restore();            }
 void Window::SetFullscreen(bool fs)         { if (mImpl) mImpl->SetFullscreen(fs);   }
+bool Window::SupportsOrientationControl() const
+{
+    return mImpl ? mImpl->SupportsOrientationControl() : false;
+}
+void Window::SetScreenOrientation(NkScreenOrientation orientation)
+{
+    mConfig.screenOrientation = orientation;
+    if (mImpl)
+        mImpl->SetScreenOrientation(orientation);
+}
+NkScreenOrientation Window::GetScreenOrientation() const
+{
+    return mImpl ? mImpl->GetScreenOrientation() : mConfig.screenOrientation;
+}
+void Window::SetAutoRotateEnabled(bool enabled)
+{
+    if (mImpl)
+        mImpl->SetAutoRotateEnabled(enabled);
+    mConfig.screenOrientation = GetScreenOrientation();
+}
+bool Window::IsAutoRotateEnabled() const
+{
+    return mImpl ? mImpl->IsAutoRotateEnabled()
+                 : (mConfig.screenOrientation == NkScreenOrientation::NK_SCREEN_ORIENTATION_AUTO);
+}
 
 // ---------------------------------------------------------------------------
 // Souris
@@ -113,6 +138,18 @@ void Window::SetFullscreen(bool fs)         { if (mImpl) mImpl->SetFullscreen(fs
 void Window::SetMousePosition(NkU32 x, NkU32 y) { if (mImpl) mImpl->SetMousePosition(x, y); }
 void Window::ShowMouse(bool show)                 { if (mImpl) mImpl->ShowMouse(show);         }
 void Window::CaptureMouse(bool cap)               { if (mImpl) mImpl->CaptureMouse(cap);       }
+
+void Window::SetWebInputOptions(const NkWebInputOptions& options)
+{
+    mConfig.webInput = options;
+    if (mImpl)
+        mImpl->SetWebInputOptions(options);
+}
+
+NkWebInputOptions Window::GetWebInputOptions() const
+{
+    return mConfig.webInput;
+}
 
 // ---------------------------------------------------------------------------
 // OS extras
@@ -132,11 +169,6 @@ NkSafeAreaInsets Window::GetSafeAreaInsets() const
 // ---------------------------------------------------------------------------
 // Surface (pour Renderer)
 // ---------------------------------------------------------------------------
-
-NkSafeAreaInsets Window::GetSafeAreaInsets() const
-{
-    return mImpl ? mImpl->GetSafeAreaInsets() : NkSafeAreaInsets{};
-}
 
 NkSurfaceDesc Window::GetSurfaceDesc() const
 {
@@ -161,7 +193,7 @@ void Window::SetEventCallback(NkEventCallback cb)
         ev->SetWindowCallback(reinterpret_cast<void*>(
             static_cast<uintptr_t>(sd.window)), std::move(cb));
 #else
-        ev->SetWindowCallback(sd.view, std::move(cb));
+        ev->SetWindowCallback(nullptr, std::move(cb));
 #endif
     }
 }

@@ -1,6 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
 
 with workspace("Win32WindowDemo"):
+    RegisterJengaGlobalToolchains()
     configurations(["Debug", "Release"])
     targetoses([TargetOS.WINDOWS])
     targetarchs([TargetArch.X86_64])
@@ -8,5 +13,8 @@ with workspace("Win32WindowDemo"):
     with project("Win32Window"):
         windowedapp()
         language("C++")
+        cppdialect("C++17")
         files(["src/**.cpp"])
         links(["user32", "gdi32"])
+
+        usetoolchain("clang-mingw")

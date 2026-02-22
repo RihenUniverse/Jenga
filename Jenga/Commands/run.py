@@ -14,7 +14,7 @@ from ..Core.Cache import Cache
 from ..Core.Builder import Builder
 from ..Core import Api
 from ..Utils import Colored, Process, FileSystem
-from .Build import BuildCommand
+from .build import BuildCommand
 
 
 class RunCommand:
@@ -103,6 +103,7 @@ class RunCommand:
         if not parsed.no_build:
             Colored.PrintInfo(f"Building {project_name}...")
             build_args = ["--config", parsed.config]
+            build_args += ["--action", "run"]
             if parsed.platform:
                 build_args += ["--platform", parsed.platform]
             if parsed.jenga_file:
@@ -120,7 +121,17 @@ class RunCommand:
                 config=parsed.config,
                 platform=parsed.platform or (workspace.targetOses[0].value if workspace.targetOses else "Windows"),
                 target=project_name,
-                verbose=False
+                verbose=False,
+                action="run",
+                options=BuildCommand.CollectFilterOptions(
+                    config=parsed.config,
+                    platform=parsed.platform,
+                    target=project_name,
+                    verbose=False,
+                    no_cache=False,
+                    no_daemon=parsed.no_daemon,
+                    extra=["action:run"]
+                )
             )
         except Exception as e:
             Colored.PrintError(f"Cannot create builder: {e}")

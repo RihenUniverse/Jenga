@@ -252,6 +252,7 @@ class WindowsBuilder(Builder):
         if not lib_path.exists():
             lib_path = self.toolchain.arPath
         args = [str(lib_path), f"/OUT:{output}", "/nologo"]
+        args.extend(self.toolchain.arflags)   # après "/nologo"
         args.extend(objectFiles)
         # Les flags d'archiveur peuvent être ajoutés ici si nécessaire
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)

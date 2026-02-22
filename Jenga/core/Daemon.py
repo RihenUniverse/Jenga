@@ -232,8 +232,32 @@ class Daemon:
         platform = args.get('platform', 'Windows')
         target = args.get('target')
         verbose = args.get('verbose', False)
-
         from ..Commands.Build import BuildCommand
+        action = args.get('action', 'build')
+        cli_custom_options = args.get('custom_options') or {}
+        options = args.get('options')
+        try:
+            resolved_custom_options = BuildCommand.ResolveWorkspaceOptions(self.workspace, cli_custom_options)
+        except ValueError as e:
+            return {'status': 'error', 'message': str(e), 'return_code': 1}
+
+        if options is None:
+            options = BuildCommand.CollectFilterOptions(
+                config=config,
+                platform=platform,
+                target=target,
+                verbose=verbose,
+                no_cache=bool(args.get('no_cache', False)),
+                no_daemon=False,
+                extra=[f"action:{action}"],
+                custom_option_values=resolved_custom_options
+            )
+        elif resolved_custom_options:
+            # Ensure daemon and direct mode expose the same option tokens.
+            merged = set(options)
+            merged.update(BuildCommand.OptionValuesToTokens(resolved_custom_options))
+            options = sorted({str(opt).strip().lower() for opt in merged if str(opt).strip()})
+
         if BuildCommand.IsAllPlatformsRequest(platform):
             platforms = BuildCommand.GetAllDeclaredPlatforms(self.workspace)
             return_code = BuildCommand.BuildAcrossPlatforms(
@@ -241,11 +265,15 @@ class Daemon:
                 config=config,
                 platforms=platforms,
                 target=target,
-                verbose=verbose
+                verbose=verbose,
+                action=action,
+                options=options
             )
         else:
             builder = BuildCommand.CreateBuilder(
-                self.workspace, config, platform, target, verbose
+                self.workspace, config, platform, target, verbose,
+                action=action,
+                options=options
             )
             return_code = builder.Build(target)
         return {

@@ -227,6 +227,72 @@ class ToolchainManager:
         return tc
 
     @staticmethod
+    def DetectCrossWindows() -> Optional[Toolchain]:
+        """
+        Détecte une toolchain de cross-compilation Windows depuis un hôte non-Windows.
+        Priorité :
+          1) MinGW-w64 GCC (x86_64-w64-mingw32-*)
+          2) Clang avec --target=x86_64-w64-windows-gnu
+        """
+        if sys.platform == "win32":
+            return None
+
+        # 1) GNU MinGW cross toolchain (le plus fiable pour link/runtime).
+        gcc_path = Process.Which("x86_64-w64-mingw32-gcc")
+        gpp_path = Process.Which("x86_64-w64-mingw32-g++")
+        if gcc_path and gpp_path:
+            tc = Toolchain(
+                name="mingw",
+                compilerFamily=CompilerFamily.GCC,
+                ccPath=gcc_path,
+                cxxPath=gpp_path,
+                arPath=Process.Which("x86_64-w64-mingw32-ar") or Process.Which("ar"),
+                ldPath=gpp_path,
+            )
+            tc.targetOs = TargetOS.WINDOWS
+            tc.targetArch = TargetArch.X86_64
+            tc.targetEnv = TargetEnv.MINGW
+            tc.targetTriple = "x86_64-w64-mingw32"
+            return tc
+
+        # 2) Clang cross (si le target GNU Windows est supporté).
+        clang_path = Process.Which("clang")
+        clangxx_path = Process.Which("clang++")
+        if clang_path and clangxx_path:
+            for triple in ("x86_64-w64-windows-gnu", "x86_64-pc-windows-gnu"):
+                test_cmd = [clang_path, f"--target={triple}", "-c", "-x", "c", "-", "-o", os.devnull]
+                try:
+                    result = Process.ExecuteCommand(
+                        test_cmd,
+                        captureOutput=True,
+                        input="int main(){return 0;}\n",
+                        silent=True,
+                    )
+                except Exception:
+                    continue
+                if result.returnCode != 0:
+                    continue
+
+                tc = Toolchain(
+                    name="clang-mingw",
+                    compilerFamily=CompilerFamily.CLANG,
+                    ccPath=clang_path,
+                    cxxPath=clangxx_path,
+                    arPath=Process.Which("llvm-ar") or Process.Which("x86_64-w64-mingw32-ar") or Process.Which("ar"),
+                    ldPath=clangxx_path,
+                )
+                tc.targetOs = TargetOS.WINDOWS
+                tc.targetArch = TargetArch.X86_64
+                tc.targetEnv = TargetEnv.MINGW
+                tc.targetTriple = triple
+                tc.cflags.append(f"--target={triple}")
+                tc.cxxflags.append(f"--target={triple}")
+                tc.ldflags.append(f"--target={triple}")
+                return tc
+
+        return None
+
+    @staticmethod
     def _DetectCompilerFamily(compiler_path: str) -> CompilerFamily:
         """Détermine la famille du compilateur à partir de --version."""
         try:
@@ -464,6 +530,10 @@ class ToolchainManager:
                 mingw = self.DetectMinGW()
                 if mingw and mingw.name not in toolchains:
                     toolchains[mingw.name] = mingw
+            else:
+                cross_windows = self.DetectCrossWindows()
+                if cross_windows and cross_windows.name not in toolchains:
+                    toolchains[cross_windows.name] = cross_windows
             # 5. Cross Linux on Windows
             if sys.platform == "win32":
                 cross_linux = self.DetectCrossLinuxOnWindows()
@@ -491,30 +561,40 @@ class ToolchainManager:
                          targetOs: TargetOS,
                          targetArch: TargetArch,
                          targetEnv: Optional[TargetEnv] = None,
-                         prefer: Optional[List[str]] = None) -> Optional[str]:
+                         prefer: Optional[List[str]] = None,
+                         exclude: Optional[List[str]] = None) -> Optional[str]:
         """Trouve la meilleure toolchain pour une cible donnée."""
+        exclude_set = {str(name).strip().lower() for name in (exclude or []) if str(name).strip()}
+        use_cache = not exclude_set
         cache_key = (targetOs, targetArch, targetEnv)
-        if cache_key in self._cache:
+        if use_cache and cache_key in self._cache:
             return self._cache[cache_key]
         candidates = []
         for name, tc in self._detected.items():
+            if str(name).strip().lower() in exclude_set:
+                continue
             if tc.targetOs == targetOs and tc.targetArch == targetArch:
                 if targetEnv is None or tc.targetEnv == targetEnv:
                     candidates.append(name)
         if not candidates:
             for name, tc in self._detected.items():
+                if str(name).strip().lower() in exclude_set:
+                    continue
                 if tc.targetOs == targetOs:
                     candidates.append(name)
         if not candidates:
-            self._cache[cache_key] = None
+            if use_cache:
+                self._cache[cache_key] = None
             return None
         if prefer:
             for pref in prefer:
                 if pref in candidates:
-                    self._cache[cache_key] = pref
+                    if use_cache:
+                        self._cache[cache_key] = pref
                     return pref
         selected = candidates[0]
-        self._cache[cache_key] = selected
+        if use_cache:
+            self._cache[cache_key] = selected
         return selected
 
     def GetToolchain(self, name: str) -> Optional[Toolchain]:

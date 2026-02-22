@@ -26,12 +26,25 @@
 #include "NkTypes.h"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nkentseu
 {
 
 class Window;
 class INkRendererImpl;
+
+// ---------------------------------------------------------------------------
+// NkRenderTexture - cible de rendu CPU offscreen (RGBA8)
+// ---------------------------------------------------------------------------
+
+struct NkRenderTexture
+{
+    NkU32              width  = 0;
+    NkU32              height = 0;
+    NkU32              pitch  = 0; // bytes per row
+    std::vector<NkU8>  pixels;
+};
 
 // ---------------------------------------------------------------------------
 // NkRenderer
@@ -73,6 +86,23 @@ public:
     void EndFrame();
     void Present();
     void Resize(NkU32 width, NkU32 height);
+
+    // --- Sortie ---
+
+    /**
+     * @brief Active/désactive la présentation vers la fenêtre.
+     *        Si désactivé, le renderer peut fonctionner en offscreen.
+     */
+    void SetWindowPresentEnabled(bool enabled);
+    bool IsWindowPresentEnabled() const;
+
+    /**
+     * @brief Cible offscreen optionnelle (copie du framebuffer CPU à chaque Present()).
+     *        Utile pour préparer un pipeline "render-to-texture".
+     */
+    void SetExternalRenderTarget(NkRenderTexture* target);
+    NkRenderTexture* GetExternalRenderTarget() const;
+    bool ResolveToExternalRenderTarget();
 
     // --- Utilitaires couleur ---
 
@@ -117,8 +147,13 @@ public:
 private:
     std::unique_ptr<INkRendererImpl> mImpl;
     Window*                        mWindow     = nullptr;
+    NkRenderTexture*               mExternalTarget = nullptr;
+    bool                           mWindowPresentEnabled = true;
     NkTransform2D                  mTransform;
     bool                           mUseTransform = false;
 };
+
+// Backward-compatible alias kept for existing examples.
+using Renderer = NkRenderer;
 
 } // namespace nkentseu

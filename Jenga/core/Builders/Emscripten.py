@@ -135,6 +135,61 @@ class EmscriptenBuilder(Builder):
         p = Path(lib)
         return p.suffix in (".a", ".bc", ".o", ".so", ".dylib", ".lib") or "/" in lib or "\\" in lib or p.is_absolute()
 
+    def _ResolveOptionBool(self, *names: str):
+        """
+        Resolve a boolean custom option from builder option tokens.
+        Supports:
+          - token          -> true  (e.g. emscripten-fullscreen-shell)
+          - token=true     -> true
+          - token=false    -> false
+        Returns:
+          True / False / None (not provided)
+        """
+        tokens = [str(opt).strip().lower() for opt in getattr(self, "options", []) if str(opt).strip()]
+        for raw_name in names:
+            name = str(raw_name).strip().lower()
+            if not name:
+                continue
+            for token in tokens:
+                if token == name:
+                    return True
+                prefix = f"{name}="
+                if token.startswith(prefix):
+                    value = token[len(prefix):].strip().lower()
+                    if value in ("", "1", "true", "yes", "on"):
+                        return True
+                    if value in ("0", "false", "no", "off"):
+                        return False
+                    return True
+        return None
+
+    def _ResolveShellFile(self, project: Project) -> str:
+        """
+        Resolve the Emscripten shell file with this precedence:
+          1) project.emscriptenShellFile (explicit)
+          2) CLI custom option
+             --emscripten-fullscreen-shell / --no-emscripten-fullscreen-shell
+          3) project.emscriptenUseFullscreenShell
+          4) workspace.emscriptenDefaultFullscreenShell
+        """
+        explicit = str(getattr(project, 'emscriptenShellFile', '') or '').strip()
+        if explicit:
+            return explicit
+
+        cli_toggle = self._ResolveOptionBool(
+            "emscripten-fullscreen-shell",
+            "emscripten-fullscreen",
+        )
+        if cli_toggle is not None:
+            return "emscripten_fullscreen.html" if cli_toggle else ""
+
+        project_toggle = getattr(project, 'emscriptenUseFullscreenShell', None)
+        if project_toggle is not None:
+            return "emscripten_fullscreen.html" if bool(project_toggle) else ""
+
+        workspace_toggle = bool(getattr(self.workspace, 'emscriptenDefaultFullscreenShell', True))
+        return "emscripten_fullscreen.html" if workspace_toggle else ""
+
     def _GetCompilerFlags(self, project: Project) -> List[str]:
         flags = []
 
@@ -185,6 +240,9 @@ class EmscriptenBuilder(Builder):
             flags.append(f"-std={project.cdialect.lower()}")
             flags.extend(self.toolchain.cflags)
 
+        # Flags d'importation des modules C++20 précompilés
+        flags.extend(self._GetModuleImportFlags(project))
+
         return flags
 
     def _GetLinkerFlags(self, project: Project) -> List[str]:
@@ -194,8 +252,8 @@ class EmscriptenBuilder(Builder):
         flags.extend(["-s", "WASM=1"])
         flags.extend(["-s", "ALLOW_MEMORY_GROWTH=1"])
 
-        # Custom HTML template (shell file)
-        shell_file = getattr(project, 'emscriptenShellFile', '')
+        # Custom HTML template (shell file) / fullscreen shell option
+        shell_file = self._ResolveShellFile(project)
         if shell_file:
             shell_path = Path(self.ResolveProjectPath(project, shell_file))
             if shell_path.exists():
@@ -241,3 +299,4 @@ class EmscriptenBuilder(Builder):
                 flags.append(str(f))
 
         return flags
+    

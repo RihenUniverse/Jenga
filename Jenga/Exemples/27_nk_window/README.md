@@ -1,5 +1,28 @@
 # 27_nk_window
 
+## Android Guide (NKWindow)
+
+For Android programming details (safe area, rotation policy/runtime control, touch flow, camera notes), see:
+
+- `Jenga/Exemples/27_nk_window/README_ANDROID_NKWINDOW.md`
+
+## Launchers (Windows/Linux/macOS/Web)
+
+After a build, you can generate run scripts for produced binaries/web outputs:
+
+```bash
+python3 scripts/generate_launchers.py --example-dir Jenga/Exemples/27_nk_window
+```
+
+Generated files (inside each `Build/Bin/<Config-Platform>/<Project>/` folder):
+- `run.bat` for Windows native apps
+- `run.sh` for Linux/macOS native apps
+- `run_web.bat` and `run_web.sh` for Web targets
+
+Important for Web/WASM:
+- Do not open `*.html` directly with `file://...`
+- Use `run_web.bat` or `run_web.sh` (they start a local HTTP server) to avoid CORS/WASM fetch errors.
+
 ## Description
 
 Framework complet de **fenêtrage et gestion d'événements multi-plateformes** (7 systèmes d'exploitation) construit avec Jenga. Ce projet démontre une architecture professionnelle pour créer des applications graphiques portables avec :

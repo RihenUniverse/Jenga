@@ -24,6 +24,7 @@
 #include <media/NdkImageReader.h>
 #include <android/log.h>
 #include <android/sensor.h>
+#include <android_native_app_glue.h>
 #include <cmath>
 
 #include <jni.h>
@@ -42,6 +43,8 @@
 
 namespace nkentseu
 {
+
+extern android_app* nk_android_global_app;
 
 class NkAndroidCameraBackend : public INkCameraBackend
 {
@@ -116,7 +119,7 @@ public:
                 // format, width, height, input (0=output)
                 if (configs.data.i32[j+3] != 0) continue; // skip input configs
                 int fmt = configs.data.i32[j];
-                if (fmt != 0x23 && fmt != 0x22) continue; // YUV_420_888=0x23, JPEG=0x100
+                if (fmt != AIMAGE_FORMAT_YUV_420_888) continue;
                 NkCameraDevice::Mode mode;
                 mode.width  = static_cast<NkU32>(configs.data.i32[j+1]);
                 mode.height = static_cast<NkU32>(configs.data.i32[j+2]);
@@ -144,16 +147,62 @@ public:
     // -----------------------------------------------------------------------
     bool StartStreaming(const NkCameraConfig& config) override
     {
-        if (mState != NkCameraState::NK_CAM_STATE_CLOSED) StopStreaming();
+        if (!mCameraManager)
+        {
+            mLastError = "Camera backend not initialized";
+            return false;
+        }
+
+        if (mState != NkCameraState::NK_CAM_STATE_CLOSED)
+            StopStreaming();
+
+        if (!HasCameraPermission())
+        {
+            RequestCameraPermissionOnce();
+            mLastError =
+                "android.permission.CAMERA is not granted. "
+                "Grant camera permission in Android settings and relaunch stream.";
+            return false;
+        }
 
         auto devices = EnumerateDevices();
+        if (devices.empty())
+        {
+            mLastError =
+                "No Camera2 YUV device exposed by platform. "
+                "Some emulators (including MEmu variants) do not expose Camera2 for NDK.";
+            return false;
+        }
         if (config.deviceIndex >= devices.size())
-        { mLastError = "Device index out of range"; return false; }
+        {
+            mLastError = "Device index out of range";
+            return false;
+        }
 
-        mCameraId = devices[config.deviceIndex].id;
+        const auto& dev = devices[config.deviceIndex];
+        mCameraId = dev.id;
         mWidth    = config.width;
         mHeight   = config.height;
         mFPS      = config.fps;
+
+        if (!dev.modes.empty())
+        {
+            bool exact = false;
+            for (const auto& mode : dev.modes)
+            {
+                if (mode.width == mWidth && mode.height == mHeight)
+                {
+                    exact = true;
+                    break;
+                }
+            }
+            if (!exact)
+            {
+                const auto& first = dev.modes.front();
+                mWidth = first.width;
+                mHeight = first.height;
+            }
+        }
 
         // Ouvrir la caméra
         mDeviceCallbacks.context   = this;
@@ -163,46 +212,133 @@ public:
         camera_status_t status = ACameraManager_openCamera(
             mCameraManager, mCameraId.c_str(), &mDeviceCallbacks, &mCameraDevice);
         if (status != ACAMERA_OK)
-        { mLastError = "ACameraManager_openCamera failed: " + std::to_string(status); return false; }
+        {
+            mLastError = std::string("ACameraManager_openCamera failed: ") + CameraStatusToString(status);
+            return false;
+        }
 
-        // Créer AImageReader — format RGBA_8888 pour simplicité
-        AImageReader_new(static_cast<int32_t>(mWidth), static_cast<int32_t>(mHeight),
-                         AIMAGE_FORMAT_YUV_420_888, 4, &mImageReader);
+        media_status_t mstatus = AImageReader_new(
+            static_cast<int32_t>(mWidth),
+            static_cast<int32_t>(mHeight),
+            AIMAGE_FORMAT_YUV_420_888,
+            4,
+            &mImageReader
+        );
+        if (mstatus != AMEDIA_OK || !mImageReader)
+        {
+            mLastError = "AImageReader_new failed: " + std::to_string(static_cast<int>(mstatus));
+            StopStreaming();
+            return false;
+        }
 
         AImageReader_ImageListener listener{};
         listener.context    = this;
         listener.onImageAvailable = OnImageAvailable;
-        AImageReader_setImageListener(mImageReader, &listener);
+        mstatus = AImageReader_setImageListener(mImageReader, &listener);
+        if (mstatus != AMEDIA_OK)
+        {
+            mLastError = "AImageReader_setImageListener failed: " + std::to_string(static_cast<int>(mstatus));
+            StopStreaming();
+            return false;
+        }
 
         // Obtenir la surface de l'ImageReader
         ANativeWindow* window = nullptr;
-        AImageReader_getWindow(mImageReader, &window);
+        mstatus = AImageReader_getWindow(mImageReader, &window);
+        if (mstatus != AMEDIA_OK || !window)
+        {
+            mLastError = "AImageReader_getWindow failed: " + std::to_string(static_cast<int>(mstatus));
+            StopStreaming();
+            return false;
+        }
 
         // Créer la requête de capture
-        ACameraDevice_createCaptureRequest(mCameraDevice,
-            TEMPLATE_PREVIEW, &mCaptureRequest);
+        status = ACameraDevice_createCaptureRequest(mCameraDevice, TEMPLATE_PREVIEW, &mCaptureRequest);
+        if (status != ACAMERA_OK || !mCaptureRequest)
+        {
+            mLastError = std::string("ACameraDevice_createCaptureRequest failed: ") + CameraStatusToString(status);
+            StopStreaming();
+            return false;
+        }
 
         // Sortie → la surface de l'ImageReader
-        ACameraOutputTarget_create(window, &mOutputTarget);
-        ACaptureRequest_addTarget(mCaptureRequest, mOutputTarget);
+        status = ACameraOutputTarget_create(window, &mOutputTarget);
+        if (status != ACAMERA_OK || !mOutputTarget)
+        {
+            mLastError = std::string("ACameraOutputTarget_create failed: ") + CameraStatusToString(status);
+            StopStreaming();
+            return false;
+        }
+        status = ACaptureRequest_addTarget(mCaptureRequest, mOutputTarget);
+        if (status != ACAMERA_OK)
+        {
+            mLastError = std::string("ACaptureRequest_addTarget failed: ") + CameraStatusToString(status);
+            StopStreaming();
+            return false;
+        }
 
         // Session
         mSessionOutputContainer = nullptr;
-        ACaptureSessionOutputContainer_create(&mSessionOutputContainer);
-        ACaptureSessionOutput_create(window, &mSessionOutput);
-        ACaptureSessionOutputContainer_add(mSessionOutputContainer, mSessionOutput);
+        status = ACaptureSessionOutputContainer_create(&mSessionOutputContainer);
+        if (status != ACAMERA_OK || !mSessionOutputContainer)
+        {
+            mLastError = std::string("ACaptureSessionOutputContainer_create failed: ") + CameraStatusToString(status);
+            StopStreaming();
+            return false;
+        }
+
+        status = ACaptureSessionOutput_create(window, &mSessionOutput);
+        if (status != ACAMERA_OK || !mSessionOutput)
+        {
+            mLastError = std::string("ACaptureSessionOutput_create failed: ") + CameraStatusToString(status);
+            StopStreaming();
+            return false;
+        }
+
+        status = ACaptureSessionOutputContainer_add(mSessionOutputContainer, mSessionOutput);
+        if (status != ACAMERA_OK)
+        {
+            mLastError = std::string("ACaptureSessionOutputContainer_add failed: ") + CameraStatusToString(status);
+            StopStreaming();
+            return false;
+        }
 
         mSessionCallbacks.context              = this;
         mSessionCallbacks.onClosed             = OnSessionClosed;
         mSessionCallbacks.onReady              = OnSessionReady;
         mSessionCallbacks.onActive             = OnSessionActive;
 
-        ACameraDevice_createCaptureSession(mCameraDevice,
-            mSessionOutputContainer, &mSessionCallbacks, &mCaptureSession);
+        status = ACameraDevice_createCaptureSession(
+            mCameraDevice,
+            mSessionOutputContainer,
+            &mSessionCallbacks,
+            &mCaptureSession
+        );
+        if (status != ACAMERA_OK || !mCaptureSession)
+        {
+            mLastError = std::string("ACameraDevice_createCaptureSession failed: ") + CameraStatusToString(status);
+            StopStreaming();
+            return false;
+        }
 
-        // Démarrer la capture répétée
-        ACameraCaptureSession_setRepeatingRequest(mCaptureSession,
-            nullptr, 1, &mCaptureRequest, nullptr);
+        status = ACameraCaptureSession_setRepeatingRequest(
+            mCaptureSession,
+            nullptr,
+            1,
+            &mCaptureRequest,
+            nullptr
+        );
+        if (status != ACAMERA_OK)
+        {
+            mLastError = std::string("ACameraCaptureSession_setRepeatingRequest failed: ") + CameraStatusToString(status);
+            StopStreaming();
+            return false;
+        }
+
+        {
+            std::lock_guard<std::mutex> lk(mMutex);
+            mHasFrame = false;
+        }
 
         mState = NkCameraState::NK_CAM_STATE_STREAMING;
         NKCAM_LOGI("Streaming started: %ux%u @%u fps", mWidth, mHeight, mFPS);
@@ -226,6 +362,10 @@ public:
         if (mCameraDevice)    { ACameraDevice_close(mCameraDevice); mCameraDevice = nullptr; }
         if (mImageReader)     { AImageReader_delete(mImageReader); mImageReader = nullptr; }
         StopVideoRecord();
+        {
+            std::lock_guard<std::mutex> lk(mMutex);
+            mHasFrame = false;
+        }
         mState = NkCameraState::NK_CAM_STATE_CLOSED;
     }
 
@@ -267,6 +407,11 @@ public:
     bool StartVideoRecord(const NkVideoRecordConfig& config) override
     {
         if (!sEnv || mRecording) return false;
+        if (config.mode == NkVideoRecordConfig::Mode::IMAGE_SEQUENCE_ONLY)
+        {
+            mLastError = "IMAGE_SEQUENCE_ONLY mode is not implemented on Android backend yet";
+            return false;
+        }
         // Créer MediaCodec + MediaMuxer via JNI helper
         // (implémentation complète nécessiterait un bridge Java dédié)
         // Approche simplifiée : écrire frames YUV brutes + appeler ffmpeg via Runtime.exec
@@ -339,6 +484,113 @@ public:
     std::string   GetLastError() const override { return mLastError; }
 
 private:
+    static const char* CameraStatusToString(camera_status_t status)
+    {
+        switch (status)
+        {
+        case ACAMERA_OK: return "ACAMERA_OK";
+        case ACAMERA_ERROR_INVALID_PARAMETER: return "ACAMERA_ERROR_INVALID_PARAMETER";
+        case ACAMERA_ERROR_CAMERA_DISCONNECTED: return "ACAMERA_ERROR_CAMERA_DISCONNECTED";
+        case ACAMERA_ERROR_NOT_ENOUGH_MEMORY: return "ACAMERA_ERROR_NOT_ENOUGH_MEMORY";
+        case ACAMERA_ERROR_METADATA_NOT_FOUND: return "ACAMERA_ERROR_METADATA_NOT_FOUND";
+        case ACAMERA_ERROR_CAMERA_DEVICE: return "ACAMERA_ERROR_CAMERA_DEVICE";
+        case ACAMERA_ERROR_CAMERA_SERVICE: return "ACAMERA_ERROR_CAMERA_SERVICE";
+        case ACAMERA_ERROR_SESSION_CLOSED: return "ACAMERA_ERROR_SESSION_CLOSED";
+        case ACAMERA_ERROR_INVALID_OPERATION: return "ACAMERA_ERROR_INVALID_OPERATION";
+        case ACAMERA_ERROR_STREAM_CONFIGURE_FAIL: return "ACAMERA_ERROR_STREAM_CONFIGURE_FAIL";
+        case ACAMERA_ERROR_CAMERA_IN_USE: return "ACAMERA_ERROR_CAMERA_IN_USE";
+        case ACAMERA_ERROR_MAX_CAMERA_IN_USE: return "ACAMERA_ERROR_MAX_CAMERA_IN_USE";
+        case ACAMERA_ERROR_CAMERA_DISABLED: return "ACAMERA_ERROR_CAMERA_DISABLED";
+        case ACAMERA_ERROR_PERMISSION_DENIED: return "ACAMERA_ERROR_PERMISSION_DENIED";
+        default: return "ACAMERA_ERROR_UNKNOWN";
+        }
+    }
+
+    static bool GetJNIEnv(JNIEnv*& outEnv, bool& attachedHere)
+    {
+        outEnv = nullptr;
+        attachedHere = false;
+        if (!nk_android_global_app || !nk_android_global_app->activity || !nk_android_global_app->activity->vm)
+            return false;
+        JavaVM* vm = nk_android_global_app->activity->vm;
+        if (vm->GetEnv(reinterpret_cast<void**>(&outEnv), JNI_VERSION_1_6) != JNI_OK)
+        {
+            if (vm->AttachCurrentThread(&outEnv, nullptr) != JNI_OK || !outEnv)
+                return false;
+            attachedHere = true;
+        }
+        return true;
+    }
+
+    bool HasCameraPermission() const
+    {
+        JNIEnv* env = nullptr;
+        bool attachedHere = false;
+        if (!GetJNIEnv(env, attachedHere))
+            return true; // fallback permissif si JNI indisponible
+
+        bool granted = true;
+        jobject activity = nk_android_global_app->activity->clazz;
+        jclass actClass = activity ? env->GetObjectClass(activity) : nullptr;
+        if (actClass)
+        {
+            jmethodID checkPerm = env->GetMethodID(actClass, "checkSelfPermission", "(Ljava/lang/String;)I");
+            if (checkPerm)
+            {
+                jstring perm = env->NewStringUTF("android.permission.CAMERA");
+                jint result = env->CallIntMethod(activity, checkPerm, perm);
+                env->DeleteLocalRef(perm);
+                granted = (result == 0); // PackageManager.PERMISSION_GRANTED
+                if (env->ExceptionCheck())
+                {
+                    env->ExceptionClear();
+                    granted = false;
+                }
+            }
+            env->DeleteLocalRef(actClass);
+        }
+
+        if (attachedHere)
+            nk_android_global_app->activity->vm->DetachCurrentThread();
+        return granted;
+    }
+
+    void RequestCameraPermissionOnce()
+    {
+        if (mRequestedPermissionPrompt)
+            return;
+        mRequestedPermissionPrompt = true;
+
+        JNIEnv* env = nullptr;
+        bool attachedHere = false;
+        if (!GetJNIEnv(env, attachedHere))
+            return;
+
+        jobject activity = nk_android_global_app->activity->clazz;
+        jclass actClass = activity ? env->GetObjectClass(activity) : nullptr;
+        if (actClass)
+        {
+            jmethodID reqPerm = env->GetMethodID(actClass, "requestPermissions", "([Ljava/lang/String;I)V");
+            if (reqPerm)
+            {
+                jclass strClass = env->FindClass("java/lang/String");
+                jobjectArray perms = env->NewObjectArray(1, strClass, nullptr);
+                jstring cameraPerm = env->NewStringUTF("android.permission.CAMERA");
+                env->SetObjectArrayElement(perms, 0, cameraPerm);
+                env->CallVoidMethod(activity, reqPerm, perms, 1001);
+                if (env->ExceptionCheck())
+                    env->ExceptionClear();
+                env->DeleteLocalRef(cameraPerm);
+                env->DeleteLocalRef(perms);
+                env->DeleteLocalRef(strClass);
+            }
+            env->DeleteLocalRef(actClass);
+        }
+
+        if (attachedHere)
+            nk_android_global_app->activity->vm->DetachCurrentThread();
+    }
+
 
     // Sensors IMU
     ASensorManager*   mSensorManager = nullptr;
@@ -439,7 +691,8 @@ private:
     // Appeler depuis un thread dédié avec un Looper
     void InitSensors()
     {
-        mSensorManager = ASensorManager_getInstanceForPackage(nullptr);
+        // Use getInstance() for API 24+ compatibility (getInstanceForPackage requires API 26+)
+        mSensorManager = ASensorManager_getInstance();
         if (!mSensorManager) return;
 
         mAccel = ASensorManager_getDefaultSensor(mSensorManager,
@@ -506,15 +759,12 @@ private:
     bool          mRecording = false;
     std::string   mVideoRecordPath;
     std::chrono::steady_clock::time_point mRecordStart;
+    bool          mRequestedPermissionPrompt = false;
 
     static JNIEnv*  sEnv;
     static jobject  sActivity;
-};
 
-inline JNIEnv*  NkAndroidCameraBackend::sEnv      = nullptr;
-inline jobject  NkAndroidCameraBackend::sActivity  = nullptr;
-
-
+    // Sensor thread functions
     static int SensorCallback(int fd, int events, void* data)
     {
         auto* self = static_cast<NkAndroidCameraBackend*>(data);
@@ -565,5 +815,9 @@ inline jobject  NkAndroidCameraBackend::sActivity  = nullptr;
             }
         }
     }
+};
+
+inline JNIEnv*  NkAndroidCameraBackend::sEnv      = nullptr;
+inline jobject  NkAndroidCameraBackend::sActivity  = nullptr;
 
 } // namespace nkentseu

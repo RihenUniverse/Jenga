@@ -179,12 +179,14 @@ namespace nkentseu
                                         const std::string& path,
                                         int quality = 90);
 
+            /// Génère un chemin automatique pour sauvegarder une photo
+            static std::string GenerateAutoPath(const std::string& prefix,
+                                                const std::string& ext);
+
         private:
             NkCameraSystem() = default;
 
             void OnFrame(const NkCameraFrame& frame);
-            static std::string GenerateAutoPath(const std::string& prefix,
-                                                const std::string& ext);
 
             // Backend
             std::unique_ptr<INkCameraBackend> mBackend;

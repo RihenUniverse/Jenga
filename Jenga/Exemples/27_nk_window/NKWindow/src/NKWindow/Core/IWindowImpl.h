@@ -77,12 +77,39 @@ public:
     virtual void SetFullscreen(bool fullscreen)       = 0;
 
     // -----------------------------------------------------------------------
+    // Orientation écran (mobile)
+    // -----------------------------------------------------------------------
+
+    virtual bool SupportsOrientationControl() const { return false; }
+    virtual void SetScreenOrientation(NkScreenOrientation) {}
+    virtual NkScreenOrientation GetScreenOrientation() const
+    {
+        return NkScreenOrientation::NK_SCREEN_ORIENTATION_AUTO;
+    }
+    virtual void SetAutoRotateEnabled(bool enabled)
+    {
+        if (enabled)
+            SetScreenOrientation(NkScreenOrientation::NK_SCREEN_ORIENTATION_AUTO);
+    }
+    virtual bool IsAutoRotateEnabled() const
+    {
+        return GetScreenOrientation() == NkScreenOrientation::NK_SCREEN_ORIENTATION_AUTO;
+    }
+
+    // -----------------------------------------------------------------------
     // Souris
     // -----------------------------------------------------------------------
 
     virtual void SetMousePosition(NkU32 x, NkU32 y) = 0;
     virtual void ShowMouse(bool show)                = 0;
     virtual void CaptureMouse(bool capture)          = 0;
+
+    // -----------------------------------------------------------------------
+    // Web input routing (WASM) — no-op par défaut
+    // -----------------------------------------------------------------------
+
+    virtual void SetWebInputOptions(const NkWebInputOptions&) {}
+    virtual NkWebInputOptions GetWebInputOptions() const { return {}; }
 
     // -----------------------------------------------------------------------
     // Divers
@@ -107,20 +134,6 @@ public:
      * Sur Android : lit WindowInsets système.
      */
     virtual NkSafeAreaInsets GetSafeAreaInsets() const { return {}; }
-
-    // -----------------------------------------------------------------------
-    // Safe Area (mobile) — desktop retourne des insets nuls
-    // -----------------------------------------------------------------------
-
-    /**
-     * @brief Retourne les insets de la zone sécurisée (notch, home indicator…).
-     * Sur desktop / Noop : retourne NkSafeAreaInsets{} (tout à zéro).
-     * Sur Android / iOS  : retourne les valeurs système en pixels physiques.
-     */
-    virtual NkSafeAreaInsets GetSafeAreaInsets() const
-    {
-        return NkSafeAreaInsets{};  // default desktop : pas de safe area
-    }
 
 protected:
     NkWindowConfig mConfig;

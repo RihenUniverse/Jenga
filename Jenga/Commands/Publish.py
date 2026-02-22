@@ -48,18 +48,13 @@ class PublishCommand:
     @staticmethod
     def _PublishNuGet(parsed):
         """Publie un package .nupkg sur nuget.org ou serveur privé."""
-        if not parsed.package:
-            Colored.PrintError("--package required for NuGet.")
-            return 1
+        package_path = parsed.package or "<package.nupkg>"
         nuget = FileSystem.FindExecutable("nuget") or FileSystem.FindExecutable("dotnet")
-        if not nuget:
-            Colored.PrintError("NuGet or dotnet not found.")
-            return 1
         cmd = []
-        if "dotnet" in nuget:
-            cmd = ["dotnet", "nuget", "push", parsed.package]
+        if nuget and "dotnet" in nuget:
+            cmd = ["dotnet", "nuget", "push", package_path]
         else:
-            cmd = ["nuget", "push", parsed.package]
+            cmd = ["nuget", "push", package_path]
         if parsed.api_key:
             cmd += ["-ApiKey", parsed.api_key]
         if parsed.repo:
@@ -67,30 +62,52 @@ class PublishCommand:
         if parsed.dry_run:
             Colored.PrintInfo(f"[DRY RUN] {' '.join(cmd)}")
             return 0
+        if not parsed.package:
+            Colored.PrintError("--package required for NuGet.")
+            return 1
+        if not nuget:
+            Colored.PrintError("NuGet or dotnet not found.")
+            return 1
         result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
         return 0 if result.returnCode == 0 else 1
 
     @staticmethod
     def _PublishVcpkg(parsed):
+        if parsed.dry_run:
+            Colored.PrintInfo("[DRY RUN] vcpkg publish <package>")
+            return 0
         Colored.PrintWarning("vcpkg publishing not yet implemented.")
         return 1
 
     @staticmethod
     def _PublishConan(parsed):
+        if parsed.dry_run:
+            Colored.PrintInfo("[DRY RUN] conan upload <package>")
+            return 0
         Colored.PrintWarning("Conan publishing not yet implemented.")
         return 1
 
     @staticmethod
     def _PublishNpm(parsed):
+        if parsed.dry_run:
+            Colored.PrintInfo("[DRY RUN] npm publish <package>")
+            return 0
         Colored.PrintWarning("npm publishing not yet implemented.")
         return 1
 
     @staticmethod
     def _PublishPyPi(parsed):
+        if parsed.dry_run:
+            Colored.PrintInfo("[DRY RUN] twine upload <package>")
+            return 0
         Colored.PrintWarning("PyPI publishing not yet implemented.")
         return 1
 
     @staticmethod
     def _PublishCustom(parsed):
+        if parsed.dry_run:
+            target = parsed.repo or "<custom-registry>"
+            Colored.PrintInfo(f"[DRY RUN] custom publish to {target}")
+            return 0
         Colored.PrintWarning("Custom registry publishing not yet implemented.")
         return 1

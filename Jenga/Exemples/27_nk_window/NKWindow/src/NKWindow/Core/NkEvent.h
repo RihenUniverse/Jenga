@@ -30,6 +30,8 @@
 #include <cstring>
 #include <string>
 #include <chrono>
+#include <memory>
+#include <utility>
 
 namespace nkentseu
 {
@@ -102,7 +104,7 @@ union NkEventData
     // --- Personnalisé ---
     NkCustomData            custom;
 
-    NkEventData()  { std::memset(this, 0, sizeof(*this)); }
+    NkEventData()  { std::memset(static_cast<void*>(this), 0, sizeof(*this)); }
     ~NkEventData() {}
 };
 
@@ -127,6 +129,32 @@ public:
 
     // --- Constructeur de base ---
     NkEvent() = default;
+
+    NkEvent(const NkEvent& other)
+    {
+        CopyFrom(other);
+    }
+
+    NkEvent& operator=(const NkEvent& other)
+    {
+        if (this != &other)
+            CopyFrom(other);
+        return *this;
+    }
+
+    NkEvent(NkEvent&& other) noexcept
+    {
+        MoveFrom(std::move(other));
+    }
+
+    NkEvent& operator=(NkEvent&& other) noexcept
+    {
+        if (this != &other)
+            MoveFrom(std::move(other));
+        return *this;
+    }
+
+    ~NkEvent() = default;
 
     explicit NkEvent(NkEventType t, Window* w = nullptr)
         : type(t), category(NkGetEventCategory(t)), window(w)
@@ -187,6 +215,10 @@ public:
         , category(NkEventCategory::NK_CAT_KEYBOARD), window(w), timestamp(CurrentTimestamp())
     { data.key = d; }
 
+    explicit NkEvent(NkEventType t, const NkKeyData& d, Window* w = nullptr)
+        : type(t), category(NkEventCategory::NK_CAT_KEYBOARD), window(w), timestamp(CurrentTimestamp())
+    { data.key = d; }
+
     explicit NkEvent(const NkTextInputData& d, Window* w = nullptr)
         : type(d.TYPE), category(NkEventCategory::NK_CAT_KEYBOARD), window(w), timestamp(CurrentTimestamp())
     { data.textInput = d; }
@@ -207,10 +239,18 @@ public:
         , category(NkEventCategory::NK_CAT_MOUSE), window(w), timestamp(CurrentTimestamp())
     { data.mouseButton = d; }
 
+    explicit NkEvent(NkEventType t, const NkMouseButtonData& d, Window* w = nullptr)
+        : type(t), category(NkEventCategory::NK_CAT_MOUSE), window(w), timestamp(CurrentTimestamp())
+    { data.mouseButton = d; }
+
     explicit NkEvent(const NkMouseWheelData& d, Window* w = nullptr)
         : type(d.deltaX != 0.0 ? NkEventType::NK_MOUSE_WHEEL_HORIZONTAL
                                 : NkEventType::NK_MOUSE_WHEEL_VERTICAL)
         , category(NkEventCategory::NK_CAT_MOUSE), window(w), timestamp(CurrentTimestamp())
+    { data.mouseWheel = d; }
+
+    explicit NkEvent(NkEventType t, const NkMouseWheelData& d, Window* w = nullptr)
+        : type(t), category(NkEventCategory::NK_CAT_MOUSE), window(w), timestamp(CurrentTimestamp())
     { data.mouseWheel = d; }
 
     explicit NkEvent(const NkMouseCrossData& d, Window* w = nullptr)
@@ -286,17 +326,62 @@ public:
         : type(d.TYPE), category(NkEventCategory::NK_CAT_DROP), window(w), timestamp(CurrentTimestamp())
     { data.dropLeave = d; }
 
+    explicit NkEvent(const NkDropFileData& d, Window* w = nullptr)
+        : type(NkEventType::NK_DROP_FILE), category(NkEventCategory::NK_CAT_DROP)
+        , window(w), timestamp(CurrentTimestamp())
+    {
+        mOwnedDropFile = std::make_unique<NkDropFileData>(d);
+        dropFile = mOwnedDropFile.get();
+    }
+
     explicit NkEvent(NkDropFileData* d, Window* w = nullptr)
         : type(NkEventType::NK_DROP_FILE), category(NkEventCategory::NK_CAT_DROP)
-        , window(w), timestamp(CurrentTimestamp()), dropFile(d) {}
+        , window(w), timestamp(CurrentTimestamp())
+    {
+        if (d)
+        {
+            mOwnedDropFile = std::make_unique<NkDropFileData>(*d);
+            dropFile = mOwnedDropFile.get();
+        }
+    }
+
+    explicit NkEvent(const NkDropTextData& d, Window* w = nullptr)
+        : type(NkEventType::NK_DROP_TEXT), category(NkEventCategory::NK_CAT_DROP)
+        , window(w), timestamp(CurrentTimestamp())
+    {
+        mOwnedDropText = std::make_unique<NkDropTextData>(d);
+        dropText = mOwnedDropText.get();
+    }
 
     explicit NkEvent(NkDropTextData* d, Window* w = nullptr)
         : type(NkEventType::NK_DROP_TEXT), category(NkEventCategory::NK_CAT_DROP)
-        , window(w), timestamp(CurrentTimestamp()), dropText(d) {}
+        , window(w), timestamp(CurrentTimestamp())
+    {
+        if (d)
+        {
+            mOwnedDropText = std::make_unique<NkDropTextData>(*d);
+            dropText = mOwnedDropText.get();
+        }
+    }
+
+    explicit NkEvent(const NkDropImageData& d, Window* w = nullptr)
+        : type(NkEventType::NK_DROP_IMAGE), category(NkEventCategory::NK_CAT_DROP)
+        , window(w), timestamp(CurrentTimestamp())
+    {
+        mOwnedDropImage = std::make_unique<NkDropImageData>(d);
+        dropImage = mOwnedDropImage.get();
+    }
 
     explicit NkEvent(NkDropImageData* d, Window* w = nullptr)
         : type(NkEventType::NK_DROP_IMAGE), category(NkEventCategory::NK_CAT_DROP)
-        , window(w), timestamp(CurrentTimestamp()), dropImage(d) {}
+        , window(w), timestamp(CurrentTimestamp())
+    {
+        if (d)
+        {
+            mOwnedDropImage = std::make_unique<NkDropImageData>(*d);
+            dropImage = mOwnedDropImage.get();
+        }
+    }
 
     // --- Système ---
     explicit NkEvent(const NkSystemPowerData& d, Window* w = nullptr)
@@ -356,6 +441,71 @@ public:
     }
 
 private:
+    std::unique_ptr<NkDropFileData>  mOwnedDropFile;
+    std::unique_ptr<NkDropTextData>  mOwnedDropText;
+    std::unique_ptr<NkDropImageData> mOwnedDropImage;
+
+    void ResetDropOwnership()
+    {
+        mOwnedDropFile.reset();
+        mOwnedDropText.reset();
+        mOwnedDropImage.reset();
+        dropFile  = nullptr;
+        dropText  = nullptr;
+        dropImage = nullptr;
+    }
+
+    void CopyFrom(const NkEvent& other)
+    {
+        type      = other.type;
+        category  = other.category;
+        window    = other.window;
+        timestamp = other.timestamp;
+        handled   = other.handled;
+        data      = other.data;
+
+        ResetDropOwnership();
+
+        if (other.dropFile)
+        {
+            mOwnedDropFile = std::make_unique<NkDropFileData>(*other.dropFile);
+            dropFile = mOwnedDropFile.get();
+        }
+        if (other.dropText)
+        {
+            mOwnedDropText = std::make_unique<NkDropTextData>(*other.dropText);
+            dropText = mOwnedDropText.get();
+        }
+        if (other.dropImage)
+        {
+            mOwnedDropImage = std::make_unique<NkDropImageData>(*other.dropImage);
+            dropImage = mOwnedDropImage.get();
+        }
+    }
+
+    void MoveFrom(NkEvent&& other)
+    {
+        type      = other.type;
+        category  = other.category;
+        window    = other.window;
+        timestamp = other.timestamp;
+        handled   = other.handled;
+        data      = other.data;
+
+        ResetDropOwnership();
+        mOwnedDropFile  = std::move(other.mOwnedDropFile);
+        mOwnedDropText  = std::move(other.mOwnedDropText);
+        mOwnedDropImage = std::move(other.mOwnedDropImage);
+
+        dropFile  = mOwnedDropFile  ? mOwnedDropFile.get()  : other.dropFile;
+        dropText  = mOwnedDropText  ? mOwnedDropText.get()  : other.dropText;
+        dropImage = mOwnedDropImage ? mOwnedDropImage.get() : other.dropImage;
+
+        other.dropFile  = nullptr;
+        other.dropText  = nullptr;
+        other.dropImage = nullptr;
+    }
+
     static NkEventType StateToType(NkWindowStateData::State s)
     {
         switch (s)

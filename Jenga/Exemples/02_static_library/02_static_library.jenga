@@ -1,25 +1,62 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
 
 with workspace("StaticLibraryExample"):
+    RegisterJengaGlobalToolchains()
     configurations(["Debug", "Release"])
-    targetoses([TargetOS.WINDOWS, TargetOS.LINUX, TargetOS.MACOS])
-    targetarchs([TargetArch.X86_64])
+    targetoses([
+        TargetOS.WINDOWS,
+        TargetOS.LINUX,
+        TargetOS.ANDROID,
+        TargetOS.WEB,
+    ])
+    targetarchs([TargetArch.X86_64, TargetArch.ARM64, TargetArch.WASM32])
 
+    # Android SDK/NDK paths
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
+
+    # MathLib - Static Library
     with project("MathLib"):
         staticlib()
         language("C++")
+        cppdialect("C++17")
         location("mathlib")
         files(["src/**.cpp"])
         includedirs(["include"])
 
+    # App - Console Application
     with project("App"):
         consoleapp()
         language("C++")
+        cppdialect("C++17")
         location("app")
         files(["main.cpp"])
         includedirs(["%{wks.location}/mathlib/include"])
         links(["MathLib"])
         dependson(["MathLib"])
+
+        # Windows
+        with filter("system:Windows"):
+            usetoolchain("clang-mingw")
+
+        # Linux
+        with filter("system:Linux"):
+            usetoolchain("zig-linux-x64")
+
+        # Android
+        with filter("system:Android"):
+            usetoolchain("android-ndk")
+            androidapplicationid("com.jenga.staticlib")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidabis(["arm64-v8a", "x86_64"])
+
+        # Web
+        with filter("system:Web"):
+            usetoolchain("emscripten")
+            emscripteninitialmemory(16)

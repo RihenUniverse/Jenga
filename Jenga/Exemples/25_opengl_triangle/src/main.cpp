@@ -378,31 +378,65 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
 #include <X11/Xlib.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
+#include <GL/glext.h>  // For GL function pointer typedefs
 #include <cstdio>
 #include <cstdlib>
 
-// GL 2.0 types & constants
+// GL 2.0 types & constants (if not already defined by glext.h)
+#ifndef GLchar
 typedef char GLchar;
+#endif
 #ifndef GL_FRAGMENT_SHADER
 #define GL_FRAGMENT_SHADER  0x8B30
 #define GL_VERTEX_SHADER    0x8B31
 #define GL_COMPILE_STATUS   0x8B81
 #endif
 
+// GL function pointer typedefs - use glext.h definitions on Linux
+#if 0  // Disabled - use glext.h typedefs instead
+#ifndef PFNGLCREATESHADERPROC
 typedef GLuint (*PFNGLCREATESHADERPROC)(GLenum);
+#endif
+#ifndef PFNGLSHADERSOURCEPROC
 typedef void   (*PFNGLSHADERSOURCEPROC)(GLuint, GLsizei, const GLchar**, const GLint*);
+#endif
+#ifndef PFNGLCOMPILESHADERPROC
 typedef void   (*PFNGLCOMPILESHADERPROC)(GLuint);
+#endif
+#ifndef PFNGLGETSHADERIVPROC
 typedef void   (*PFNGLGETSHADERIVPROC)(GLuint, GLenum, GLint*);
+#endif
+#ifndef PFNGLGETSHADERINFOLOGPROC
 typedef void   (*PFNGLGETSHADERINFOLOGPROC)(GLuint, GLsizei, GLsizei*, GLchar*);
+#endif
+#ifndef PFNGLCREATEPROGRAMPROC
 typedef GLuint (*PFNGLCREATEPROGRAMPROC)();
+#endif
+#ifndef PFNGLATTACHSHADERPROC
 typedef void   (*PFNGLATTACHSHADERPROC)(GLuint, GLuint);
+#endif
+#ifndef PFNGLLINKPROGRAMPROC
 typedef void   (*PFNGLLINKPROGRAMPROC)(GLuint);
+#endif
+#ifndef PFNGLUSEPROGRAMPROC
 typedef void   (*PFNGLUSEPROGRAMPROC)(GLuint);
+#endif
+#ifndef PFNGLGETATTRIBLOCATIONPROC
 typedef GLint  (*PFNGLGETATTRIBLOCATIONPROC)(GLuint, const GLchar*);
+#endif
+#ifndef PFNGLENABLEVERTEXATTRIBARRAYPROC
 typedef void   (*PFNGLENABLEVERTEXATTRIBARRAYPROC)(GLuint);
+#endif
+#ifndef PFNGLVERTEXATTRIBPOINTERPROC
 typedef void   (*PFNGLVERTEXATTRIBPOINTERPROC)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*);
+#endif
+#ifndef PFNGLDELETESHADERPROC
 typedef void   (*PFNGLDELETESHADERPROC)(GLuint);
+#endif
+#ifndef PFNGLDELETEPROGRAMPROC
 typedef void   (*PFNGLDELETEPROGRAMPROC)(GLuint);
+#endif
+#endif  // End of disabled custom typedefs - use glext.h instead
 
 static PFNGLCREATESHADERPROC            pglCreateShader;
 static PFNGLSHADERSOURCEPROC            pglShaderSource;

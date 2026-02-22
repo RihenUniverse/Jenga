@@ -1,14 +1,27 @@
+import os
 from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
 
 with workspace("MultiProjects"):
+    RegisterJengaGlobalToolchains()
     configurations(["Debug", "Release"])
-    targetoses([TargetOS.WINDOWS, TargetOS.LINUX])
-    targetarchs([TargetArch.X86_64])
+    targetoses([
+        TargetOS.WINDOWS,
+        TargetOS.LINUX,
+        TargetOS.ANDROID,
+        TargetOS.WEB,
+    ])
+    targetarchs([TargetArch.X86_64, TargetArch.ARM64, TargetArch.WASM32])
     startproject("Game")
+
+    # Android SDK/NDK paths
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
 
     with project("Engine"):
         staticlib()
         language("C++")
+        cppdialect("C++17")
         location("engine")
         files(["src/**.cpp"])
         includedirs(["include"])
@@ -16,14 +29,58 @@ with workspace("MultiProjects"):
     with project("Tools"):
         consoleapp()
         language("C++")
+        cppdialect("C++17")
         location("tools")
         files(["src/**.cpp"])
+
+        # Windows
+        with filter("system:Windows"):
+            usetoolchain("clang-mingw")
+
+        # Linux
+        with filter("system:Linux"):
+            usetoolchain("zig-linux-x64")
+
+        # Android
+        with filter("system:Android"):
+            usetoolchain("android-ndk")
+            androidapplicationid("com.jenga.tools")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidabis(["arm64-v8a", "x86_64"])
+
+        # Web
+        with filter("system:Web"):
+            usetoolchain("emscripten")
+            emscripteninitialmemory(16)
 
     with project("Game"):
         consoleapp()
         language("C++")
+        cppdialect("C++17")
         location("game")
         files(["src/**.cpp"])
         includedirs(["../engine/include"])
         links(["Engine"])
         dependson(["Engine"])
+
+        # Windows
+        with filter("system:Windows"):
+            usetoolchain("clang-mingw")
+
+        # Linux
+        with filter("system:Linux"):
+            usetoolchain("zig-linux-x64")
+
+        # Android
+        with filter("system:Android"):
+            usetoolchain("android-ndk")
+            androidapplicationid("com.jenga.game")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidabis(["arm64-v8a", "x86_64"])
+
+        # Web
+        with filter("system:Web"):
+            usetoolchain("emscripten")
+            emscripteninitialmemory(16)

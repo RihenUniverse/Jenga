@@ -6,7 +6,6 @@
 #include "../../Core/NkSystem.h"
 #include "NkXLibEventImpl.h"
 #include <X11/Xatom.h>
-#include <vector>
 #include <cstring>
 
 namespace nkentseu
@@ -20,7 +19,6 @@ bool NkXLibWindowImpl::Create(const NkWindowConfig& config)
 {
     mConfig      = config;
     mBgColor     = config.bgColor;
-    mEventImpl   = &eventImpl;
     mData.width  = config.width;
     mData.height = config.height;
     mData.display = nk_xlib_global_display;
@@ -53,6 +51,7 @@ bool NkXLibWindowImpl::Create(const NkWindowConfig& config)
 
     XStoreName(mData.display,mData.window,config.title.c_str());
 
+    mData.wmProtocols=XInternAtom(mData.display,"WM_PROTOCOLS",False);
     mData.wmDelete=XInternAtom(mData.display,"WM_DELETE_WINDOW",False);
     XSetWMProtocols(mData.display,mData.window,&mData.wmDelete,1);
 
@@ -74,14 +73,16 @@ bool NkXLibWindowImpl::Create(const NkWindowConfig& config)
     mData.isOpen=true;
 
     // Enregistre dans l'EventImpl
-    eventImpl.Initialize(this, &mData.window);
+    if (auto* ev = static_cast<NkXLibEventImpl*>(NkGetEventImpl()))
+        ev->Initialize(this, &mData.window);
     return true;
 }
 
 void NkXLibWindowImpl::Close()
 {
     if (!mData.isOpen) return;
-    if (mEventImpl) mEventImpl->Shutdown(&mData.window);
+    if (auto* ev = static_cast<NkXLibEventImpl*>(NkGetEventImpl()))
+        ev->Shutdown(&mData.window);
 
     if (mData.blankCursor) { XFreeCursor(mData.display,mData.blankCursor); mData.blankCursor=0; }
     if (mData.gc)          { XFreeGC(mData.display,mData.gc); mData.gc=nullptr; }
@@ -107,7 +108,6 @@ NkVec2u NkXLibWindowImpl::GetDisplaySize() const {
     return {static_cast<NkU32>(DisplayWidth(mData.display,mData.screen)),
             static_cast<NkU32>(DisplayHeight(mData.display,mData.screen))};
 }
-NkVec2u NkXLibWindowImpl::GetDisplayPosition() const { return {}; }
 
 NkVec2u NkXLibWindowImpl::GetPosition() const {
     ::Window root,child; int x=0,y=0; unsigned w,h,bw,d;
@@ -151,21 +151,6 @@ void NkXLibWindowImpl::CaptureMouse(bool cap) {
 NkSurfaceDesc NkXLibWindowImpl::GetSurfaceDesc() const {
     NkSurfaceDesc sd; sd.width=mData.width; sd.height=mData.height;
     sd.display=mData.display; sd.window=mData.window; return sd;
-}
-
-void NkXLibWindowImpl::BlitSoftwareFramebuffer(const NkU8* rgba8,NkU32 w,NkU32 h) {
-    if (!mData.display||!mData.window||!rgba8) return;
-    std::vector<NkU8> bgrx(static_cast<size_t>(w)*h*4);
-    for(NkU32 i=0;i<w*h;++i){
-        bgrx[i*4+0]=rgba8[i*4+2]; bgrx[i*4+1]=rgba8[i*4+1];
-        bgrx[i*4+2]=rgba8[i*4+0]; bgrx[i*4+3]=0xFF;
-    }
-    XImage* img=XCreateImage(mData.display,DefaultVisual(mData.display,mData.screen),
-        DefaultDepth(mData.display,mData.screen),ZPixmap,0,
-        (char*)bgrx.data(),w,h,32,0);
-    if(img){ XPutImage(mData.display,mData.window,mData.gc,img,0,0,0,0,w,h);
-             img->data=nullptr; XDestroyImage(img); }
-    XFlush(mData.display);
 }
 
 } // namespace nkentseu

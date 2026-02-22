@@ -38,6 +38,11 @@ class JengaConfig:
     @staticmethod
     def _GetConfigDir() -> Path:
         """Retourne le répertoire de configuration Jenga."""
+        # Optional override for CI/sandboxed environments.
+        override = os.environ.get("JENGA_CONFIG_DIR") or os.environ.get("JENGA_HOME")
+        if override:
+            return Path(override).expanduser().resolve()
+
         if platform.system() == "Windows":
             # Windows: %USERPROFILE%/.jenga
             base = Path(os.environ.get("USERPROFILE", os.path.expanduser("~")))

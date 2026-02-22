@@ -15,7 +15,7 @@ from ..Core.Loader import Loader
 from ..Core.Cache import Cache
 from ..Core.Builder import Builder
 from ..Utils import Colored, Reporter, Process, FileSystem
-from .Build import BuildCommand
+from .build import BuildCommand
 
 
 class TestCommand:
@@ -97,6 +97,7 @@ class TestCommand:
             for name, _ in test_projects:
                 Colored.PrintInfo(f"Building {name}...")
                 build_args = ["--config", parsed.config]
+                build_args += ["--action", "test"]
                 if parsed.platform:
                     build_args += ["--platform", parsed.platform]
                 if parsed.jenga_file:
@@ -120,7 +121,17 @@ class TestCommand:
                     # when --platform is omitted, CreateBuilder picks host OS/arch.
                     platform=parsed.platform,
                     target=name,
-                    verbose=False
+                    verbose=False,
+                    action="test",
+                    options=BuildCommand.CollectFilterOptions(
+                        config=parsed.config,
+                        platform=parsed.platform,
+                        target=name,
+                        verbose=parsed.verbose,
+                        no_cache=False,
+                        no_daemon=parsed.no_daemon,
+                        extra=["action:test"]
+                    )
                 )
             except Exception as e:
                 Colored.PrintError(f"Cannot create builder: {e}")

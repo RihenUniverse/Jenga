@@ -41,6 +41,7 @@ private:
 
     struct WindowEntry { NkAndroidWindowImpl* window = nullptr; NkEventCallback callback; };
     android_app* mApp = nullptr;
+    NkEventCallback mGlobalCallback;
     std::unordered_map<void*, WindowEntry> mWindowMap;
     static NkAndroidEventImpl* sInstance;
 };

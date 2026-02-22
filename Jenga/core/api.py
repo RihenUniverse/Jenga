@@ -254,6 +254,7 @@ class Project:
     optimize: Optimization = Optimization.OFF
     symbols: bool = True
     warnings: WarningLevel = WarningLevel.DEFAULT
+    runtime: Optional[str] = None  # MSVC runtime library: "Debug"/"Release" or "MD"/"MDd"/"MT"/"MTd"
 
     # Toolchain
     toolchain: Optional[str] = None
@@ -282,6 +283,8 @@ class Project:
     androidAssets: List[str] = field(default_factory=list)
     androidPermissions: List[str] = field(default_factory=list)
     androidNativeActivity: bool = True
+    androidAllowRotation: bool = True
+    androidScreenOrientation: str = ""
     ndkVersion: str = ""
     androidSign: bool = False
     androidKeystore: str = ""
@@ -326,6 +329,7 @@ class Project:
 
     # Emscripten specifics
     emscriptenShellFile: str = ""      # Custom HTML template (shell file)
+    emscriptenUseFullscreenShell: Optional[bool] = None  # Override workspace fullscreen shell default
     emscriptenCanvasId: str = "canvas"  # HTML canvas element ID
     emscriptenInitialMemory: int = 16   # Initial memory in MB
     emscriptenStackSize: int = 5        # Stack size in MB
@@ -380,6 +384,7 @@ class Project:
     _filteredOptimize: Dict[str, Optimization] = field(default_factory=dict)
     _filteredSymbols: Dict[str, bool] = field(default_factory=dict)
     _filteredWarnings: Dict[str, WarningLevel] = field(default_factory=dict)
+    _filteredRuntime: Dict[str, str] = field(default_factory=dict)
 
     # Inclusion metadata
     _external: bool = False
@@ -412,6 +417,11 @@ class Workspace:
     androidSdkPath: str = ""
     androidNdkPath: str = ""
     javaJdkPath: str = ""
+
+    # Emscripten workspace defaults
+    # Enabled by default for a cleaner fullscreen Web shell.
+    # Can be disabled per workspace/project with emscriptenfullscreenshell(False).
+    emscriptenDefaultFullscreenShell: bool = True
 
     # iOS SDK paths (auto‑detected)
     iosSdkPath: str = ""
@@ -1371,6 +1381,21 @@ def symbols(enable: Union[bool, str]) -> None:
         else:
             _currentProject.symbols = sym
 
+def runtime(lib: str) -> None:
+    """
+    Set MSVC runtime library type (Windows/MSVC specific).
+    Common values:
+      - "Debug" or "MDd": Multi-threaded DLL Debug
+      - "Release" or "MD": Multi-threaded DLL Release
+      - "MT": Multi-threaded static
+      - "MTd": Multi-threaded static Debug
+    """
+    if _currentProject:
+        if _currentFilter:
+            _currentProject._filteredRuntime[_currentFilter] = lib
+        else:
+            _currentProject.runtime = lib
+
 def warnings(level: Union[str, WarningLevel]) -> None:
     if _currentToolchain:
         _warningsTc(level)
@@ -1517,6 +1542,40 @@ def androidnativeactivity(enable: bool = True) -> None:
     if _currentProject:
         _currentProject.androidNativeActivity = enable
 
+def androidallowrotation(enable: bool = True) -> None:
+    if _currentProject:
+        _currentProject.androidAllowRotation = enable
+
+def androidscreenorientation(value: str) -> None:
+    if not _currentProject:
+        return
+    val = (value or "").strip()
+    allowed = {
+        "",
+        "unspecified",
+        "behind",
+        "landscape",
+        "portrait",
+        "reverseLandscape",
+        "reversePortrait",
+        "sensorLandscape",
+        "sensorPortrait",
+        "userLandscape",
+        "userPortrait",
+        "sensor",
+        "fullSensor",
+        "nosensor",
+        "user",
+        "fullUser",
+        "locked",
+    }
+    if val not in allowed:
+        raise ValueError(
+            f"Invalid Android screenOrientation '{value}'. "
+            f"Allowed values: {sorted(allowed)}"
+        )
+    _currentProject.androidScreenOrientation = val
+
 def ndkversion(ver: str) -> None:
     if _currentProject:
         _currentProject.ndkVersion = ver
@@ -1556,6 +1615,20 @@ def emscriptenshellfile(path: str) -> None:
     """Set custom HTML template (shell file) for Emscripten output."""
     if _currentProject:
         _currentProject.emscriptenShellFile = path
+
+def emscriptenfullscreenshell(enable: bool = True) -> None:
+    """
+    Enable/disable fullscreen Emscripten shell template (`emscripten_fullscreen.html`).
+    Default workspace behavior is enabled.
+
+    Scope:
+      - inside `workspace`: default applied to all Emscripten projects
+      - inside `project`: override for current project only
+    """
+    if _currentProject:
+        _currentProject.emscriptenUseFullscreenShell = bool(enable)
+    elif _currentWorkspace:
+        _currentWorkspace.emscriptenDefaultFullscreenShell = bool(enable)
 
 def emscriptencanvasid(canvas_id: str) -> None:
     """Set HTML canvas element ID."""
@@ -3234,7 +3307,7 @@ __all__ = [
     'includedirs', 'externalincludedirs', 'sysincludedirs', 'removeincludedirs',
     'libdirs', 'syslibdirs', 'removelibdirs', 'objdir', 'targetdir', 'targetname',
     'links', 'removelinks', 'dependson', 'removedependson', 'dependfiles', 'embedresources',
-    'defines', 'removedefines', 'undefines', 'optimize', 'symbols', 'warnings',
+    'defines', 'removedefines', 'undefines', 'optimize', 'symbols', 'warnings', 'runtime',
     'pchheader', 'pchsource',
     'prebuild', 'postbuild', 'prelink', 'postlink',
     'usetoolchain',
@@ -3242,9 +3315,11 @@ __all__ = [
     'androidapplicationid', 'androidversioncode', 'androidversionname',
     'androidminsdk', 'androidtargetsdk', 'androidcompilesdk',
     'androidabis', 'androidproguard', 'androidproguardrules',
-    'androidassets', 'androidpermissions', 'androidnativeactivity', 'androidjavafiles', 'androidjavalibs',
+    'androidassets', 'androidpermissions', 'androidnativeactivity',
+    'androidallowrotation', 'androidscreenorientation',
+    'androidjavafiles', 'androidjavalibs',
     'ndkversion', 'androidsign', 'androidkeystore', 'androidkeystorepass', 'androidkeyalias',
-    'emscriptenshellfile', 'emscriptencanvasid', 'emscripteninitialmemory',
+    'emscriptenshellfile', 'emscriptenfullscreenshell', 'emscriptencanvasid', 'emscripteninitialmemory',
     'emscriptenstacksize', 'emscriptenexportname', 'emscriptenextraflags',
     'iosbundleid', 'iosversion', 'iosminsdk', 'tvosminsdk', 'watchosminsdk', 'ipadosminsdk', 'visionosminsdk',
     'iossigningidentity', 'iosentitlements', 'iosappicon', 'iosbuildnumber',

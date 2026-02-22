@@ -22,6 +22,8 @@ _BUILDERS: Dict[str, Tuple[str, str]] = {
     'macOS': ('Jenga.Core.Builders.Macos', 'MacOSBuilder'),
     'Android': ('Jenga.Core.Builders.Android', 'AndroidBuilder'),
     'iOS': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
+    'tvOS': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
+    'watchOS': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
     'Web': ('Jenga.Core.Builders.Emscripten', 'EmscriptenBuilder'),
     'HarmonyOS': ('Jenga.Core.Builders.HarmonyOs', 'HarmonyOsBuilder'),
     'XboxOne': ('Jenga.Core.Builders.Xbox', 'XboxBuilder'),
@@ -30,16 +32,45 @@ _BUILDERS: Dict[str, Tuple[str, str]] = {
     # aliases
     'Macos': ('Jenga.Core.Builders.Macos', 'MacOSBuilder'),
     'IOS': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
+    'TVOS': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
+    'WATCHOS': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
+    'iPadOS': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
+    'visionOS': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
+    'xrOS': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
+    'AppleTV': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
+    'AppleWatch': ('Jenga.Core.Builders.Ios', 'IOSBuilder'),
     'Emscripten': ('Jenga.Core.Builders.Emscripten', 'EmscriptenBuilder'),
 }
 
+_APPLE_MOBILE_XCODE_BUILDERS: Dict[str, Tuple[str, str]] = {
+    'iOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'tvOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'watchOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'macOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'MacOSBuilder'),
+    # aliases
+    'IOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'TVOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'WATCHOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'Macos': ('Jenga.Core.Builders.MacosXcodeBuilder', 'MacOSBuilder'),
+    'iPadOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'visionOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'xrOS': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'AppleTV': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+    'AppleWatch': ('Jenga.Core.Builders.MacosXcodeBuilder', 'IOSBuilder'),
+}
 
-def get_builder_class(os_name: str) -> Optional[Type[Builder]]:
+
+def get_builder_class(os_name: str, apple_mobile_mode: str = "direct") -> Optional[Type[Builder]]:
     """
     Retourne la classe du builder pour un système d'exploitation donné.
     Le chargement du module est effectué uniquement lors du premier appel.
     """
-    entry = _BUILDERS.get(os_name)
+    mode = str(apple_mobile_mode or "direct").strip().lower()
+    entry = None
+    if mode in ("xcode", "xbuilder"):
+        entry = _APPLE_MOBILE_XCODE_BUILDERS.get(os_name)
+    if entry is None:
+        entry = _BUILDERS.get(os_name)
     if not entry:
         return None
     module_path, class_name = entry

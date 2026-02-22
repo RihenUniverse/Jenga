@@ -78,7 +78,7 @@ struct NkKeyData
         s += NkScancodeToString(scancode);
         s += "], ";
         s += NkButtonStateToString(state);
-        if (!modifiers.None()) { s += ", "; s += modifiers.ToString(); }
+        if (!modifiers.IsNone()) { s += ", "; s += modifiers.ToString(); }
         if (repeat)   s += ", REPEAT";
         if (extended) s += ", EXTENDED";
         s += ")";

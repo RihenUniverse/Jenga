@@ -9,6 +9,11 @@
 
 #include "NKWindow/NkWindow.h"
 #include "NKWindow/Core/NkMain.h"
+#include <cstdio>
+
+#if defined(NKENTSEU_PLATFORM_WASM) && defined(__EMSCRIPTEN__)
+#   include <emscripten.h>
+#endif
 
 // --------------------------------------------------------------------------
 // nkmain — point d'entrée cross-platform
@@ -41,9 +46,12 @@ int nkmain(const nkentseu::NkEntryState& /*state*/)
     cfg.resizable    = true;
     cfg.dropEnabled  = true;  // Activer le drag & drop
 
-    Window window(cfg);
+    nkentseu::Window window(cfg);
     if (!window.IsOpen())
+    {
+        std::fprintf(stderr, "[Sandbox] Window creation failed: %s\n", window.GetLastError().ToString().c_str());
         return -2;
+    }
 
     // Safe area (utile sur mobile)
     NkSafeAreaInsets safeArea = window.GetSafeAreaInsets();
@@ -67,31 +75,6 @@ int nkmain(const nkentseu::NkEntryState& /*state*/)
 
     auto& es = EventSystem::Instance();
     bool  running = true;
-
-    // Fermeture fenêtre
-    es.SetEventCallback<NkWindowCloseEvent>([&](NkWindowCloseEvent*)
-    {
-        window.Close();
-        running = false;
-    });
-
-    // Touche Échap → quitter
-    es.SetEventCallback<NkKeyEvent>([&](NkKeyEvent* ev)
-    {
-        if (ev->IsPress() && ev->GetKey() == NkKey::NK_ESCAPE)
-        {
-            window.Close();
-            running = false;
-        }
-        if (ev->IsPress() && ev->GetKey() == NkKey::NK_F11)
-            window.SetFullscreen(!window.GetConfig().fullscreen);
-    });
-
-    // Redimensionnement
-    es.SetEventCallback<NkWindowResizeEvent>([&](NkWindowResizeEvent* ev)
-    {
-        renderer.Resize(ev->GetWidth(), ev->GetHeight());
-    });
 
     // ========================================================================
     // 5. Système gamepad
@@ -132,14 +115,68 @@ int nkmain(const nkentseu::NkEntryState& /*state*/)
 
     float angle = 0.f; // degrés, incrémenté chaque trame
 
+    // Caméra 2D utilisée pour le view matrix (shake + pan/zoom possibles)
+    NkCamera2D camera(cfg.width, cfg.height);
+    camera.SetPosition(
+        static_cast<float>(cfg.width) * 0.5f,
+        static_cast<float>(cfg.height) * 0.5f
+    );
+
     // ========================================================================
     // 7. Boucle principale
     // ========================================================================
 
+#if defined(NKENTSEU_PLATFORM_NOOP)
+    int headlessFrames = 2;
+#endif
+
     while (running && window.IsOpen())
     {
+#if defined(NKENTSEU_PLATFORM_NOOP)
+        if (--headlessFrames <= 0)
+        {
+            window.Close();
+            running = false;
+        }
+#endif
         // --- Événements ---
-        es.PollEvents();
+        while (NkEvent* event = es.PollEvent())
+        {
+            if (auto* e = event->As<NkWindowCloseEvent>())
+            {
+                (void)e;
+                window.Close();
+                running = false;
+                continue;
+            }
+
+            if (auto* e = event->As<NkWindowResizeEvent>())
+            {
+                renderer.Resize(e->GetWidth(), e->GetHeight());
+                continue;
+            }
+
+            if (auto* e = event->As<NkKeyEvent>())
+            {
+                if (!e->IsPress())
+                    continue;
+
+                if (e->GetKey() == NkKey::NK_ESCAPE)
+                {
+                    window.Close();
+                    running = false;
+                }
+                else if (e->GetKey() == NkKey::NK_F11)
+                {
+                    window.SetFullscreen(!window.GetConfig().fullscreen);
+                }
+            }
+        }
+        if (!window.IsOpen())
+        {
+            running = false;
+            break;
+        }
 
         // --- Gamepad polling ---
         gp.PollGamepads();
@@ -242,6 +279,12 @@ int nkmain(const nkentseu::NkEntryState& /*state*/)
 
         renderer.EndFrame();
         renderer.Present(); // blit vers la fenêtre
+
+#if defined(NKENTSEU_PLATFORM_WASM) && defined(__EMSCRIPTEN__)
+        // Web build uses a desktop-style loop; yield once per frame to let
+        // the browser paint and dispatch callbacks.
+        emscripten_sleep(0);
+#endif
     }
 
     // ========================================================================

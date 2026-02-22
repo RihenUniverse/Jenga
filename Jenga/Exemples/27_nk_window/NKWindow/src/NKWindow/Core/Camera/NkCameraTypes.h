@@ -160,6 +160,12 @@ struct NkPhotoCaptureResult {
 // NkVideoRecordConfig
 // ---------------------------------------------------------------------------
 struct NkVideoRecordConfig {
+    enum class Mode : NkU32 {
+        AUTO = 0,            // Choisit la meilleure voie (vidéo native, puis fallback)
+        VIDEO_ONLY,          // Force un enregistrement vidéo (échec si indisponible)
+        IMAGE_SEQUENCE_ONLY, // Force un enregistrement image par image
+    };
+
     std::string outputPath;
     NkU32       bitrateBps      = 4000000;
     NkU32       audioSampleRate = 44100;
@@ -167,6 +173,7 @@ struct NkVideoRecordConfig {
     std::string videoCodec      = "h264";
     std::string audioCodec      = "aac";
     std::string container       = "mp4";
+    Mode        mode            = Mode::AUTO;
 };
 
 // ---------------------------------------------------------------------------

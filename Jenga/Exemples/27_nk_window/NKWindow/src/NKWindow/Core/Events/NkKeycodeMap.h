@@ -52,126 +52,12 @@
 //
 // =============================================================================
 
-#include "NkTypes.h"
-#include "Events/NkEventTypes.h"
+#include "../NkTypes.h"
+#include "NkEventTypes.h"
+#include "NkScancode.h"
 
 namespace nkentseu
 {
-
-// ===========================================================================
-// NkScancode - scancodes USB HID (independants du layout)
-//
-// Valeurs conformes a USB HID Usage Table 1.3 (Consumer Page / Keyboard Page).
-// Prefixe NK_SC_ pour eviter les conflits avec les macros SDL / SFML.
-// ===========================================================================
-
-enum class NkScancode : NkU32
-{
-    NK_SC_UNKNOWN = 0,
-
-    // --- Lettres (position US-QWERTY) ---
-    NK_SC_A = 4,  NK_SC_B = 5,  NK_SC_C = 6,  NK_SC_D = 7,
-    NK_SC_E = 8,  NK_SC_F = 9,  NK_SC_G = 10, NK_SC_H = 11,
-    NK_SC_I = 12, NK_SC_J = 13, NK_SC_K = 14, NK_SC_L = 15,
-    NK_SC_M = 16, NK_SC_N = 17, NK_SC_O = 18, NK_SC_P = 19,
-    NK_SC_Q = 20, NK_SC_R = 21, NK_SC_S = 22, NK_SC_T = 23,
-    NK_SC_U = 24, NK_SC_V = 25, NK_SC_W = 26, NK_SC_X = 27,
-    NK_SC_Y = 28, NK_SC_Z = 29,
-
-    // --- Chiffres ---
-    NK_SC_1 = 30, NK_SC_2 = 31, NK_SC_3 = 32, NK_SC_4 = 33,
-    NK_SC_5 = 34, NK_SC_6 = 35, NK_SC_7 = 36, NK_SC_8 = 37,
-    NK_SC_9 = 38, NK_SC_0 = 39,
-
-    // --- Touches speciales ---
-    NK_SC_ENTER      = 40,
-    NK_SC_ESCAPE     = 41,
-    NK_SC_BACKSPACE  = 42,
-    NK_SC_TAB        = 43,
-    NK_SC_SPACE      = 44,
-    NK_SC_MINUS      = 45, // -_
-    NK_SC_EQUALS     = 46, // =+
-    NK_SC_LBRACKET   = 47, // [{
-    NK_SC_RBRACKET   = 48, // ]}
-    NK_SC_BACKSLASH  = 49, // \|
-    NK_SC_NONUS_HASH = 50, // # (ISO)
-    NK_SC_SEMICOLON  = 51, // ;:
-    NK_SC_APOSTROPHE = 52, // '"
-    NK_SC_GRAVE      = 53, // `~
-    NK_SC_COMMA      = 54, // ,<
-    NK_SC_PERIOD     = 55, // .>
-    NK_SC_SLASH      = 56, // /?
-    NK_SC_CAPSLOCK   = 57,
-
-    // --- Touches de fonction ---
-    NK_SC_F1  = 58, NK_SC_F2  = 59, NK_SC_F3  = 60, NK_SC_F4  = 61,
-    NK_SC_F5  = 62, NK_SC_F6  = 63, NK_SC_F7  = 64, NK_SC_F8  = 65,
-    NK_SC_F9  = 66, NK_SC_F10 = 67, NK_SC_F11 = 68, NK_SC_F12 = 69,
-
-    // --- Bloc navigation ---
-    NK_SC_PRINT_SCREEN = 70,
-    NK_SC_SCROLL_LOCK  = 71,
-    NK_SC_PAUSE        = 72,
-    NK_SC_INSERT       = 73,
-    NK_SC_HOME         = 74,
-    NK_SC_PAGE_UP      = 75,
-    NK_SC_DELETE       = 76,
-    NK_SC_END          = 77,
-    NK_SC_PAGE_DOWN    = 78,
-    NK_SC_RIGHT        = 79,
-    NK_SC_LEFT         = 80,
-    NK_SC_DOWN         = 81,
-    NK_SC_UP           = 82,
-
-    // --- Pavé numerique ---
-    NK_SC_NUM_LOCK        = 83,
-    NK_SC_NUMPAD_DIV      = 84,
-    NK_SC_NUMPAD_MUL      = 85,
-    NK_SC_NUMPAD_MINUS    = 86,
-    NK_SC_NUMPAD_PLUS     = 87,
-    NK_SC_NUMPAD_ENTER    = 88,
-    NK_SC_NUMPAD_1        = 89,
-    NK_SC_NUMPAD_2        = 90,
-    NK_SC_NUMPAD_3        = 91,
-    NK_SC_NUMPAD_4        = 92,
-    NK_SC_NUMPAD_5        = 93,
-    NK_SC_NUMPAD_6        = 94,
-    NK_SC_NUMPAD_7        = 95,
-    NK_SC_NUMPAD_8        = 96,
-    NK_SC_NUMPAD_9        = 97,
-    NK_SC_NUMPAD_0        = 98,
-    NK_SC_NUMPAD_PERIOD   = 99,
-    NK_SC_NONUS_BACKSLASH = 100, // \ (ISO, gauche de Z sur AZERTY)
-    NK_SC_APPLICATION     = 101, // Menu context
-    NK_SC_NUMPAD_EQUALS   = 103, // Mac
-
-    // --- Touches etendues F13-F24 ---
-    NK_SC_F13 = 104, NK_SC_F14 = 105, NK_SC_F15 = 106, NK_SC_F16 = 107,
-    NK_SC_F17 = 108, NK_SC_F18 = 109, NK_SC_F19 = 110, NK_SC_F20 = 111,
-    NK_SC_F21 = 112, NK_SC_F22 = 113, NK_SC_F23 = 114, NK_SC_F24 = 115,
-
-    // --- Modificateurs (cote gauche) ---
-    NK_SC_LCTRL  = 224,
-    NK_SC_LSHIFT = 225,
-    NK_SC_LALT   = 226,
-    NK_SC_LSUPER = 227, // Win / Cmd / Meta
-    // --- Modificateurs (cote droit) ---
-    NK_SC_RCTRL  = 228,
-    NK_SC_RSHIFT = 229,
-    NK_SC_RALT   = 230, // AltGr
-    NK_SC_RSUPER = 231,
-
-    // --- Medias (usage Consumer Device) ---
-    NK_SC_MEDIA_PLAY       = 0xE0CD,
-    NK_SC_MEDIA_STOP       = 0xE0B7,
-    NK_SC_MEDIA_NEXT       = 0xE0B5,
-    NK_SC_MEDIA_PREV       = 0xE0B6,
-    NK_SC_MEDIA_MUTE       = 0xE020,
-    NK_SC_MEDIA_VOL_UP     = 0xE030,
-    NK_SC_MEDIA_VOL_DOWN   = 0xE02E,
-
-    NK_SC_MAX = 0xFFFF
-};
 
 // ===========================================================================
 // NkKeycodeMap - table de conversion cross-platform
@@ -771,9 +657,9 @@ inline NkKey NkKeycodeMap::NkKeyFromX11KeySym(NkU32 ks)
 // Evdev keycode = X11 keycode - 8
 inline NkKey NkKeycodeMap::NkKeyFromX11Keycode(NkU32 keycode)
 {
-    // Convertir evdev -> HID USB (offset de 8)
-    NkU32 hid = (keycode >= 8) ? keycode - 8 : 0;
-    return ScancodeToNkKey(static_cast<NkScancode>(hid));
+    // keycode X11/XCB -> evdev -> HID via table Linux dédiée.
+    // Une soustraction simple (-8) ne suffit pas pour obtenir le bon HID.
+    return NkScancodeToKey(NkScancodeFromXKeycode(keycode));
 }
 
 // ===========================================================================

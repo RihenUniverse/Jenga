@@ -16,11 +16,30 @@
 #define NK_APP_NAME "android_app"
 #endif
 
-namespace nkentseu { NkEntryState* gState = nullptr; }
+namespace nkentseu {
+inline NkEntryState* gState = nullptr;
+extern android_app* nk_android_global_app;
+}
 
-void android_main(android_app* app)
+extern "C" void android_main(android_app* app)
 {
-    nk_android_global_app = app;
+    app_dummy();
+    nkentseu::nk_android_global_app = app;
+
+    // NativeActivity peut fournir la fenêtre un peu après le démarrage.
+    // Attendre explicitement APP_CMD_INIT_WINDOW évite un démarrage "blank".
+    while (!app->window)
+    {
+        int events = 0;
+        android_poll_source* source = nullptr;
+        if (ALooper_pollOnce(-1, nullptr, &events, reinterpret_cast<void**>(&source)) >= 0)
+        {
+            if (source)
+                source->process(app, source);
+            if (app->destroyRequested)
+                return;
+        }
+    }
 
     // Récupérer les infos via JNI
     JNIEnv* env = nullptr;
@@ -57,6 +76,6 @@ void android_main(android_app* app)
 
     nkmain(state);
 
-    nkentseu::gState       = nullptr;
-    nk_android_global_app = nullptr;
+    nkentseu::gState = nullptr;
+    nkentseu::nk_android_global_app = nullptr;
 }

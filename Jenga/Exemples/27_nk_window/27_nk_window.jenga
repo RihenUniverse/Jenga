@@ -55,6 +55,12 @@ with workspace("NKWindow", location="."):
         TargetArch.WASM32,
     ])
 
+    # Emscripten shell fullscreen (workspace default for all Web projects).
+    # Toggle globally:
+    #   emscriptenfullscreenshell(True)   -> use templates/emscripten_fullscreen.html
+    #   emscriptenfullscreenshell(False)  -> keep Emscripten default shell
+    emscriptenfullscreenshell(True)
+
     with unitest() as u:
         u.Compile()
 
@@ -105,7 +111,20 @@ with workspace("NKWindow", location="."):
                 "src/NKWindow/Platform/Win32/**.cpp",
                 "src/NKWindow/Platform/Win32/**.h",
             ])
-            links(["user32", "gdi32", "opengl32", "dwmapi", "shell32", "xinput", "mfplat", "mfreadwrite", "mfuuid", "ole32"])
+            links([
+                "user32",
+                "gdi32",
+                "opengl32",
+                "dwmapi",
+                "shell32",
+                "xinput",
+                "mf",
+                "mfplat",
+                "mfreadwrite",
+                "mfuuid",
+                "uuid",
+                "ole32",
+            ])
 
         # ── Linux headless (NOOP backend) ─────────────────────────────────
         with filter("system:Linux && options:headless"):
@@ -156,7 +175,6 @@ with workspace("NKWindow", location="."):
             usetoolchain("android-ndk")
             defines([
                 "NKENTSEU_PLATFORM_ANDROID=1",
-                "__ANDROID_API__=24",
             ])
             files([
                 "src/NKWindow/Platform/Android/**.cpp",
@@ -168,8 +186,16 @@ with workspace("NKWindow", location="."):
             androidminsdk(24)
             androidtargetsdk(34)
             androidcompilesdk(34)
-            androidabis(["arm64-v8a", "x86_64"])
+            # Multi-ABI, aligné sur l'exemple 25 (émulateurs + devices physiques)
+            androidabis(["armeabi-v7a", "arm64-v8a", "x86", "x86_64"])
             androidnativeactivity(True)
+            # Rotation Android:
+            # - autoriser la rotation (par défaut) :
+            androidallowrotation(True)
+            # - verrouiller en portrait :
+            # androidallowrotation(False)
+            # - forcer une orientation Android précise :
+            # androidscreenorientation("sensorLandscape")
 
         # ── iOS (UIKit backend) ──────────────────────────────────────────
         with filter("system:iOS"):
@@ -232,8 +258,10 @@ with workspace("NKWindow", location="."):
             symbols(False)
             runtime("Release")
 
-        with test():
-            testfiles(["tests/**.cpp"])
+        # Les tests natifs restent sur desktop; on ne force pas de target test Android/Web.
+        with filter("system:Windows || system:Linux || system:macOS"):
+            with test():
+                testfiles(["tests/**.cpp"])
 
     # =========================================================================
     # Sandbox apps — 3 exécutables séparés
@@ -241,7 +269,7 @@ with workspace("NKWindow", location="."):
 
     startproject("Sandbox")
 
-    def configure_sandbox_app(project_name: str, source_file: str, app_id_suffix: str):
+    def configure_sandbox_app(project_name: str, source_file: str, app_id_suffix: str, needs_camera: bool = False):
         with project(project_name):
             windowedapp()
             language("C++")
@@ -265,7 +293,20 @@ with workspace("NKWindow", location="."):
                 windowedapp()
                 usetoolchain("clang-mingw")
                 defines(["NKENTSEU_PLATFORM_WIN32=1"])
-                links(["user32", "gdi32", "opengl32", "xinput", "mfplat", "mfreadwrite", "mfuuid", "ole32"])
+                links([
+                    "user32",
+                    "gdi32",
+                    "opengl32",
+                    "dwmapi",
+                    "shell32",
+                    "xinput",
+                    "mf",
+                    "mfplat",
+                    "mfreadwrite",
+                    "mfuuid",
+                    "uuid",
+                    "ole32",
+                ])
 
             with filter("system:Linux && options:headless"):
                 windowedapp()
@@ -297,8 +338,15 @@ with workspace("NKWindow", location="."):
                 androidminsdk(24)
                 androidtargetsdk(34)
                 androidcompilesdk(34)
-                androidabis(["arm64-v8a", "x86_64"])
+                # Multi-ABI, aligné sur l'exemple 25.
+                androidabis(["armeabi-v7a", "arm64-v8a", "x86", "x86_64"])
                 androidnativeactivity(True)
+                # Autoriser la rotation (mettre False pour verrouiller en portrait)
+                androidallowrotation(True)
+                if needs_camera:
+                    androidpermissions([
+                        "android.permission.CAMERA",
+                    ])
 
             with filter("system:iOS"):
                 windowedapp()
@@ -314,7 +362,10 @@ with workspace("NKWindow", location="."):
                 consoleapp()
                 usetoolchain("emscripten")
                 defines(["NKENTSEU_PLATFORM_WASM=1"])
+                emscriptencanvasid("canvas")
                 emscripteninitialmemory(32)
+                # Required for synchronous desktop-style loops on Web.
+                emscriptenextraflags(["-s", "ASYNCIFY"])
 
             with filter("system:HarmonyOS"):
                 windowedapp()
@@ -333,5 +384,5 @@ with workspace("NKWindow", location="."):
                 symbols(False)
 
     configure_sandbox_app("Sandbox", "src/main.cpp", "sandbox")
-    configure_sandbox_app("SandboxCamera", "src/camera_example.cpp", "sandbox.camera")
-    configure_sandbox_app("SandboxCameraFull", "src/camera_full_example.cpp", "sandbox.camerafull")
+    configure_sandbox_app("SandboxCamera", "src/camera_example.cpp", "sandbox.camera", True)
+    configure_sandbox_app("SandboxCameraFull", "src/camera_full_example.cpp", "sandbox.camerafull", True)

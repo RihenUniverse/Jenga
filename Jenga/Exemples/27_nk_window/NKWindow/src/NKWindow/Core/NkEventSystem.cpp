@@ -5,6 +5,10 @@
 
 #include "NkEventSystem.h"
 
+#if defined(NKENTSEU_PLATFORM_WASM) && defined(__EMSCRIPTEN__)
+#   include <emscripten.h>
+#endif
+
 namespace nkentseu
 {
 
@@ -34,10 +38,10 @@ void EventSystem::DetachImpl(IEventImpl* impl)
 }
 
 // ---------------------------------------------------------------------------
-// PollEvents
+// PumpEventsOnce
 // ---------------------------------------------------------------------------
 
-void EventSystem::PollEvents()
+void EventSystem::PumpEventsOnce(bool queueEvents)
 {
     // 1. Pomper les messages OS depuis chaque impl
     for (auto* impl : mImpls)
@@ -61,10 +65,27 @@ void EventSystem::PollEvents()
 
             FireTypedCallback(&ev);
 
-            // Mise en buffer FIFO pour PollEvent()
-            mEventBuffer.push_back(std::move(ev));
+            // Mise en buffer FIFO uniquement pour le mode PollEvent().
+            if (queueEvents)
+                mEventBuffer.push_back(std::move(ev));
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// PollEvents
+// ---------------------------------------------------------------------------
+
+void EventSystem::PollEvents()
+{
+    // Mode callbacks-only: aucun batch lisible par PollEvent().
+    PumpEventsOnce(false);
+    mAutoBatchActive = false;
+#if defined(NKENTSEU_PLATFORM_WASM) && defined(__EMSCRIPTEN__)
+    // On Web, cooperative yield is required so the browser can paint frames
+    // and dispatch input events between polling iterations.
+    emscripten_sleep(0);
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -73,9 +94,41 @@ void EventSystem::PollEvents()
 
 NkEvent* EventSystem::PollEvent()
 {
-    if (mReadHead >= mEventBuffer.size())
+    if (mReadHead < mEventBuffer.size())
+        return &mEventBuffer[mReadHead++];
+
+    // Fin d'une batch auto: on rend nullptr une fois avant la prochaine pompe.
+    if (mAutoBatchActive)
+    {
+        mAutoBatchActive = false;
+#if defined(NKENTSEU_PLATFORM_WASM) && defined(__EMSCRIPTEN__)
+        emscripten_sleep(0);
+#endif
         return nullptr;
+    }
+
+    // Mode auto : PollEvent() se suffit à lui-même et pompe si nécessaire.
+    PumpEventsOnce(true);
+    mAutoBatchActive = true;
+
+    if (mReadHead >= mEventBuffer.size())
+    {
+        mAutoBatchActive = false;
+#if defined(NKENTSEU_PLATFORM_WASM) && defined(__EMSCRIPTEN__)
+        emscripten_sleep(0);
+#endif
+        return nullptr;
+    }
+
     return &mEventBuffer[mReadHead++];
+}
+
+bool EventSystem::PollEvent(NkEvent& event)
+{
+    NkEvent* ev = PollEvent();
+    if (!ev) return false;
+    event = *ev;
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,11 +204,17 @@ void EventSystem::FireTypedCallback(NkEvent* ev)
 
     // Clavier
     case NkEventType::NK_KEY_PRESS:
-        tryFire(std::type_index(typeid(NkKeyPressEvent))); break;
+        tryFire(std::type_index(typeid(NkKeyPressEvent)));
+        tryFire(std::type_index(typeid(NkKeyEvent)));
+        break;
     case NkEventType::NK_KEY_REPEAT:
-        tryFire(std::type_index(typeid(NkKeyRepeatEvent))); break;
+        tryFire(std::type_index(typeid(NkKeyRepeatEvent)));
+        tryFire(std::type_index(typeid(NkKeyEvent)));
+        break;
     case NkEventType::NK_KEY_RELEASE:
-        tryFire(std::type_index(typeid(NkKeyReleaseEvent))); break;
+        tryFire(std::type_index(typeid(NkKeyReleaseEvent)));
+        tryFire(std::type_index(typeid(NkKeyEvent)));
+        break;
     case NkEventType::NK_TEXT_INPUT:
         tryFire(std::type_index(typeid(NkTextInputEvent))); break;
 
@@ -165,11 +224,17 @@ void EventSystem::FireTypedCallback(NkEvent* ev)
     case NkEventType::NK_MOUSE_RAW:
         tryFire(std::type_index(typeid(NkMouseRawEvent))); break;
     case NkEventType::NK_MOUSE_BUTTON_PRESS:
-        tryFire(std::type_index(typeid(NkMouseButtonPressEvent))); break;
+        tryFire(std::type_index(typeid(NkMouseButtonPressEvent)));
+        tryFire(std::type_index(typeid(NkMouseButtonEvent)));
+        break;
     case NkEventType::NK_MOUSE_BUTTON_RELEASE:
-        tryFire(std::type_index(typeid(NkMouseButtonReleaseEvent))); break;
+        tryFire(std::type_index(typeid(NkMouseButtonReleaseEvent)));
+        tryFire(std::type_index(typeid(NkMouseButtonEvent)));
+        break;
     case NkEventType::NK_MOUSE_DOUBLE_CLICK:
-        tryFire(std::type_index(typeid(NkMouseDoubleClickEvent))); break;
+        tryFire(std::type_index(typeid(NkMouseDoubleClickEvent)));
+        tryFire(std::type_index(typeid(NkMouseButtonEvent)));
+        break;
     case NkEventType::NK_MOUSE_WHEEL_VERTICAL:
         tryFire(std::type_index(typeid(NkMouseWheelVerticalEvent))); break;
     case NkEventType::NK_MOUSE_WHEEL_HORIZONTAL:

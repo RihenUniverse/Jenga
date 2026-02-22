@@ -30,9 +30,9 @@ class HarmonyOsBuilder(Builder):
 
     def _ResolveHarmonySDK(self) -> Optional[Path]:
         """Trouve le SDK HarmonyOS."""
-        # 1. Variable d'environnement
-        if "HARMONY_OS_SDK" in os.environ:
-            return Path(os.environ["HARMONY_OS_SDK"])
+        for env in ["OHOS_SDK", "HARMONY_OS_SDK", "HARMONY_SDK"]:
+            if env in os.environ:
+                return Path(os.environ[env])
         # 2. Workspace
         if hasattr(self.workspace, 'harmonySdkPath') and self.workspace.harmonySdkPath:
             return Path(self.workspace.harmonySdkPath)
@@ -49,13 +49,23 @@ class HarmonyOsBuilder(Builder):
         return None
 
     def _ResolveHarmonyNDK(self) -> Optional[Path]:
-        """Trouve le NDK HarmonyOS (dans le SDK)."""
         if not self.sdk_path:
             return None
-        # Le NDK se trouve dans sdk/openharmony/{version}/native
-        native_dirs = list(self.sdk_path.glob("openharmony/*/native"))
-        if native_dirs:
-            return native_dirs[0]
+        # Chercher dans les emplacements typiques
+        candidates = [
+            self.sdk_path / "native",
+            self.sdk_path / "ohos-sdk" / "native",
+            self.sdk_path / "openharmony" / "native",
+        ]
+        # Chercher aussi dans les sous-dossiers de version
+        for base in [self.sdk_path / "openharmony", self.sdk_path / "ohos-sdk"]:
+            if base.exists():
+                for version in base.iterdir():
+                    if (version / "native").exists():
+                        return version / "native"
+        for cand in candidates:
+            if cand.exists():
+                return cand
         return None
 
     def _PrepareToolchain(self):
@@ -74,11 +84,13 @@ class HarmonyOsBuilder(Builder):
                 raise RuntimeError(f"LLVM toolchain not found in NDK: {self.ndk_path}")
 
         arch_map = {
-            TargetArch.ARM: "arm-linux-ohos",
+            TargetArch.ARM: "armv7a-linux-ohos",
             TargetArch.ARM64: "aarch64-linux-ohos",
             TargetArch.X86_64: "x86_64-linux-ohos",
         }
         triple = arch_map.get(self.targetArch, "aarch64-linux-ohos")
+        if self.targetArch == TargetArch.ARM:
+            flags += ["-march=armv7-a", "-mfloat-abi=softfp", "-mfpu=vfpv3-d16"]
 
         # Créer ou mettre à jour la toolchain
         if self.toolchain:
@@ -128,14 +140,23 @@ class HarmonyOsBuilder(Builder):
             args = [linker, "-o", str(out)]
             args.extend(self._GetLinkerFlags(project))
             for libdir in project.libDirs:
-                args.append(f"-L{libdir}")
+                args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
             for lib in project.links:
-                args.append(f"-l{lib}")
+                if self._IsDirectLibPath(lib):
+                    args.append(self.ResolveProjectPath(project, lib))
+                else:
+                    args.append(f"-l{lib}")
             args.extend(objectFiles)
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
         return result.returnCode == 0
+
+    def GetModuleFlags(self, project: Project, sourceFile: str) -> List[str]:
+        if not self.IsModuleFile(sourceFile):
+            return []
+        # Clang supporte les modules
+        return ["-fmodules", "-fbuiltin-module-map", "-std=c++20"]
 
     def _GetCompilerFlags(self, project: Project) -> List[str]:
         flags = []
@@ -147,7 +168,7 @@ class HarmonyOsBuilder(Builder):
 
         # Includes
         for inc in project.includeDirs:
-            flags.append(f"-I{inc}")
+            flags.append(f"-I{self.ResolveProjectPath(project, inc)}")
 
         # Définitions
         for define in project.defines:
@@ -181,6 +202,9 @@ class HarmonyOsBuilder(Builder):
             flags.append(f"-std={project.cppdialect.lower()}")
         else:
             flags.append(f"-std={project.cdialect.lower()}")
+
+        # PIC
+        flags.append(f"-D__OHOS_API__={project.harmonyMinSdk}")
 
         # PIC
         flags.append("-fPIC")

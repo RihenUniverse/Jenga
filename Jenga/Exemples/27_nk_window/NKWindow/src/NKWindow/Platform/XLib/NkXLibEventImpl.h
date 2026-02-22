@@ -50,6 +50,7 @@ private:
     };
 
     Display* mDisplay = nullptr;
+    NkEventCallback mGlobalCallback;
     std::unordered_map<::Window, WindowEntry> mWindowMap;
 };
 

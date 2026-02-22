@@ -14,13 +14,24 @@ public:
     void Shutdown() override {}
     void Poll() override {
 #ifdef __EMSCRIPTEN__
+        // Emscripten requires a successful sampling call before any read.
+        // If this fails (unsupported API / browser policy), keep gamepads disabled.
+        const EMSCRIPTEN_RESULT sampleRes = emscripten_sample_gamepad_data();
+        if (sampleRes != EMSCRIPTEN_RESULT_SUCCESS) {
+            for (auto& s : mStates) s = {};
+            return;
+        }
+
         int n = emscripten_get_num_gamepads();
+        if (n < 0) n = 0;
         for (int i=0; i<n && (NkU32)i<NK_MAX_GAMEPADS; ++i) {
+            mStates[i] = {};
+            mStates[i].gamepadIndex = static_cast<NkU32>(i);
+
             EmscriptenGamepadEvent ev{};
             if (emscripten_get_gamepad_status(i,&ev) != EMSCRIPTEN_RESULT_SUCCESS)
-            { mStates[i].connected=false; continue; }
+            { continue; }
             mStates[i].connected    = ev.connected;
-            mStates[i].gamepadIndex = static_cast<NkU32>(i);
             if (!ev.connected) continue;
             using B = NkGamepadButton; using A = NkGamepadAxis;
             auto sb=[&](B b,int j){ if(j<ev.numButtons) mStates[i].buttons[static_cast<NkU32>(b)]=ev.digitalButton[j]||ev.analogButton[j]>0.5; };
@@ -41,7 +52,7 @@ public:
             mInfos[i].numAxes=(NkU32)ev.numAxes;
             std::snprintf(mInfos[i].id,sizeof(mInfos[i].id),"%s",ev.id);
         }
-        for (int i=n; (NkU32)i<NK_MAX_GAMEPADS; ++i) mStates[i].connected=false;
+        for (int i=n; (NkU32)i<NK_MAX_GAMEPADS; ++i) mStates[i] = {};
 #endif
     }
     NkU32 GetConnectedCount() const override

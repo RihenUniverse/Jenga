@@ -10,11 +10,13 @@
 //   es.SetEventCallback<nkentseu::NkWindowCloseEvent>([&](auto* ev) {
 //       ev->GetWindow()->Close();
 //   });
-//   while (window.IsOpen()) {
-//       es.PollEvents();
-//       while (auto* ev = es.PollEvent()) {
-//           if (auto* kp = ev->As<nkentseu::NkKeyPressedEvent>()) { ... }
-//       }
+//
+//   // Mode callbacks uniquement:
+//   es.PollEvents();
+//
+//   // OU mode file d'événements utilisateur (style SFML):
+//   while (auto* ev = es.PollEvent()) {
+//       if (auto* kp = ev->As<nkentseu::NkKeyPressedEvent>()) { ... }
 //   }
 // =============================================================================
 
@@ -62,8 +64,10 @@ public:
     // --- Pompe d'événements ---
 
     /**
-     * @brief Pompe tous les événements OS et les place dans la queue.
-     *        Appeler une fois en début de trame.
+     * @brief Pompe les événements OS et exécute uniquement les callbacks.
+     *
+     * Ce mode ne fournit pas de batch lisible par PollEvent().
+     * Ne pas combiner avec while(PollEvent()) dans la même trame.
      */
     void PollEvents();
 
@@ -72,8 +76,18 @@ public:
      *
      * Le pointeur est valide jusqu'au prochain appel de PollEvent ou PollEvents.
      * Ne pas stocker ce pointeur.
+     *
+     * Si la queue est vide, PollEvent() pompe automatiquement les événements
+     * (callbacks + queue) en interne.
+     * À utiliser seul (sans PollEvents() juste avant).
      */
     NkEvent* PollEvent();
+
+    /**
+     * @brief Variante style SFML: copie le prochain événement dans @p event.
+     * @return true si un événement a été lu, sinon false.
+     */
+    bool PollEvent(NkEvent& event);
 
     // --- Callbacks global et typés ---
 
@@ -117,6 +131,7 @@ public:
 private:
     EventSystem() = default;
 
+    void PumpEventsOnce(bool queueEvents);
     void FireTypedCallback(NkEvent* ev);
 
     // --- Données membres ---
@@ -126,6 +141,7 @@ private:
     std::unordered_map<std::type_index, NkTypedEventCallback>      mTypedCallbacks;
     std::vector<NkEvent>                                           mEventBuffer;
     std::size_t                                                    mReadHead = 0;
+    bool                                                           mAutoBatchActive = false;
 };
 
 } // namespace nkentseu

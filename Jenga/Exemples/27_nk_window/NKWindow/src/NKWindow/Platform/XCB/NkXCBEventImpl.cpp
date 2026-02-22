@@ -125,7 +125,7 @@ void NkXCBEventImpl::PollEvents()
                 kd.key       = k;
                 kd.state     = st;
                 kd.modifiers = XcbStateMods(ke->state);
-                kd.scancode  = ke->detail - 8;
+                kd.scancode  = NkScancodeFromXKeycode(ke->detail);
                 kd.nativeKey = ke->detail;
                 nkEv = NkEvent(kd);
             }
@@ -186,7 +186,15 @@ void NkXCBEventImpl::PollEvents()
         {
             auto* cm = reinterpret_cast<xcb_client_message_event_t*>(xev);
             srcWindow = cm->window;
-            nkEv = NkEvent(NkWindowCloseData(false));
+            auto it = mWindowMap.find(srcWindow);
+            if (it != mWindowMap.end() && it->second.window)
+            {
+                if (cm->type == it->second.window->GetWmProtocolsAtom() &&
+                    cm->data.data32[0] == it->second.window->GetWmDeleteAtom())
+                {
+                    nkEv = NkEvent(NkWindowCloseData(false));
+                }
+            }
             break;
         }
         default: break;

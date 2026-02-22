@@ -3,7 +3,9 @@
 // =============================================================================
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "../../ThirdParty/stb/stb_image_write.h"
+#include <stb/stb_image_write.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 
 #include "NkCameraSystem.h"
 #include "../NkPlatformDetect.h"
@@ -170,7 +172,18 @@ std::string NkCameraSystem::CapturePhotoToFile(const std::string& path)
 {
     if (!mReady) return "";
     std::string p = path.empty() ? GenerateAutoPath("photo", "png") : path;
-    return mBackend->CapturePhotoToFile(p) ? p : "";
+
+    NkPhotoCaptureResult photo;
+    if (CapturePhoto(photo) && photo.success && photo.frame.IsValid())
+        return SaveFrameToFile(photo.frame, p) ? p : "";
+
+    // Fallback générique: certaines impls peuvent échouer sur CapturePhoto()
+    // alors qu'une dernière frame streamée est disponible.
+    NkCameraFrame last;
+    if (GetLastFrame(last) && last.IsValid())
+        return SaveFrameToFile(last, p) ? p : "";
+
+    return "";
 }
 
 // ===========================================================================
@@ -375,6 +388,25 @@ bool NkCameraSystem::ConvertToRGBA8(NkCameraFrame& frame)
         return true;
     }
 
+    if (frame.format == NkPixelFormat::NK_PIXEL_MJPEG) {
+        int iw = 0, ih = 0, ic = 0;
+        unsigned char* decoded = stbi_load_from_memory(
+            frame.data.data(),
+            static_cast<int>(frame.data.size()),
+            &iw, &ih, &ic, 4
+        );
+        if (!decoded || iw <= 0 || ih <= 0)
+            return false;
+
+        frame.width  = static_cast<NkU32>(iw);
+        frame.height = static_cast<NkU32>(ih);
+        frame.stride = frame.width * 4;
+        frame.format = NkPixelFormat::NK_PIXEL_RGBA8;
+        frame.data.assign(decoded, decoded + static_cast<std::size_t>(iw) * static_cast<std::size_t>(ih) * 4u);
+        stbi_image_free(decoded);
+        return true;
+    }
+
     if (frame.format == NkPixelFormat::NK_PIXEL_NV12 ||
         frame.format == NkPixelFormat::NK_PIXEL_YUV420) {
         const NkU8* Y  = frame.data.data();
@@ -516,7 +548,16 @@ bool NkMultiCamera::Stream::CapturePhotoToFile(const std::string& path)
                   ? NkCameraSystem::GenerateAutoPath("photo_cam"
                     + std::to_string(mDeviceIndex), "png")
                   : path;
-    return mBackend->CapturePhotoToFile(p);
+
+    NkPhotoCaptureResult photo;
+    if (mBackend->CapturePhoto(photo) && photo.success && photo.frame.IsValid())
+        return NkCameraSystem::SaveFrameToFile(photo.frame, p);
+
+    NkCameraFrame last;
+    if (GetLastFrame(last) && last.IsValid())
+        return NkCameraSystem::SaveFrameToFile(last, p);
+
+    return false;
 }
 
 // ===========================================================================

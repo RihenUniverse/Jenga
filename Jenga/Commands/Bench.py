@@ -13,6 +13,7 @@ from typing import List
 from ..Utils import Colored, Display, FileSystem, Process
 from ..Core.Loader import Loader
 from ..Core.Cache import Cache
+from ..Core import Api
 
 
 class BenchCommand:
@@ -23,7 +24,7 @@ class BenchCommand:
         parser = argparse.ArgumentParser(prog="jenga bench", description="Run benchmarks.")
         parser.add_argument("--project", help="Benchmark project to run")
         parser.add_argument("--config", default="Release", help="Build configuration")
-        parser.add_argument("--platform", default="Windows", help="Target platform")
+        parser.add_argument("--platform", default=None, help="Target platform")
         parser.add_argument("--iterations", type=int, default=10, help="Number of iterations")
         parser.add_argument("--output", "-o", default="./bench_results.json", help="Output file for results")
         parser.add_argument("--no-daemon", action="store_true")
@@ -65,12 +66,41 @@ class BenchCommand:
                     project_name = name
                     break
         if not project_name:
+            # Fallback pragmatique: utiliser startProject si exécutable.
+            candidate = workspace.startProject
+            if candidate and candidate in workspace.projects:
+                candidate_proj = workspace.projects[candidate]
+                if candidate_proj.kind in (
+                    Api.ProjectKind.CONSOLE_APP,
+                    Api.ProjectKind.WINDOWED_APP,
+                    Api.ProjectKind.TEST_SUITE,
+                ):
+                    project_name = candidate
+                    Colored.PrintWarning(
+                        f"No dedicated benchmark project found. Falling back to start project '{project_name}'."
+                    )
+        if not project_name:
+            # Dernier fallback: premier exécutable.
+            for name, proj in workspace.projects.items():
+                if proj.kind in (
+                    Api.ProjectKind.CONSOLE_APP,
+                    Api.ProjectKind.WINDOWED_APP,
+                    Api.ProjectKind.TEST_SUITE,
+                ):
+                    project_name = name
+                    Colored.PrintWarning(
+                        f"No dedicated benchmark project found. Falling back to executable project '{project_name}'."
+                    )
+                    break
+        if not project_name:
             Colored.PrintError("No benchmark project found.")
             return 1
 
         # Build le projet
-        from .Build import BuildCommand
-        build_args = ["--config", parsed.config, "--platform", parsed.platform, "--target", project_name]
+        from .build import BuildCommand
+        build_args = ["--config", parsed.config, "--action", "bench", "--target", project_name]
+        if parsed.platform:
+            build_args += ["--platform", parsed.platform]
         if parsed.jenga_file:
             build_args += ["--jenga-file", str(entry_file)]
         if BuildCommand.Execute(build_args) != 0:
@@ -78,7 +108,19 @@ class BenchCommand:
 
         # Exécuter le benchmark
         # On suppose que l'exécutable supporte --benchmark_out=...
-        builder = BuildCommand.CreateBuilder(workspace, parsed.config, parsed.platform, project_name, parsed.verbose)
+        builder = BuildCommand.CreateBuilder(
+            workspace, parsed.config, parsed.platform, project_name, parsed.verbose,
+            action="bench",
+            options=BuildCommand.CollectFilterOptions(
+                config=parsed.config,
+                platform=parsed.platform,
+                target=project_name,
+                verbose=parsed.verbose,
+                no_cache=False,
+                no_daemon=parsed.no_daemon,
+                extra=["action:bench"]
+            )
+        )
         exe_path = builder.GetTargetPath(workspace.projects[project_name])
         if not exe_path.exists():
             # Fallback: locate the newest matching artifact in Build/.

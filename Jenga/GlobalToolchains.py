@@ -458,17 +458,23 @@ def ToolchainZigLinuxX64(zig_root: Optional[str] = None) -> None:
     if not cpp_wrapper:
         cpp_wrapper = cc_wrapper  # fallback
 
+    ar_wrapper = Platform.ResolveTool(wrappers_dir, ["zig-ar.bat", "zig-ar"], subdir=".", required=False)
+    if not ar_wrapper:
+        ar_wrapper = Platform.ResolveTool(base_dir, ["zig-ar.bat", "zig-ar"], subdir=".", required=False)
+    if not ar_wrapper:
+        ar_wrapper = zig_exe  # fallback
+
     with toolchain("zig-linux-x64", "clang"):
         settarget("Linux", "x86_64", "gnu")
         targettriple("x86_64-linux-gnu")
         ccompiler(cc_wrapper)
         cppcompiler(cpp_wrapper)
-        linker(cpp_wrapper)  # same as c++ wrapper
-        archiver(zig_exe)    # zig can act as archiver
+        linker(cpp_wrapper)
+        archiver(str(ar_wrapper))
         cflags(["-target", "x86_64-linux-gnu"])
         cxxflags(["-target", "x86_64-linux-gnu", "-std=c++17"])
         ldflags(["-target", "x86_64-linux-gnu"])
-        arflags(["ar"])
+        arflags([])
 
 
 # ----------------------------------------------------------------------

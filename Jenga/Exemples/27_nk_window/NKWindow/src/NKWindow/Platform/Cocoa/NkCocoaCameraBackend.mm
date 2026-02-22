@@ -188,6 +188,12 @@ bool NkCocoaCameraBackend::CapturePhotoToFile(const std::string& path)
 
 bool NkCocoaCameraBackend::StartVideoRecord(const NkVideoRecordConfig& config)
 {
+    if (config.mode == NkVideoRecordConfig::Mode::IMAGE_SEQUENCE_ONLY)
+    {
+        mLastError = "IMAGE_SEQUENCE_ONLY mode is not implemented on Cocoa backend yet";
+        return false;
+    }
+
     // Utiliser AVAssetWriter pour H.264
     NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:config.outputPath.c_str()]];
     NSError* err = nil;

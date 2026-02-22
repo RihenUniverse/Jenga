@@ -27,7 +27,7 @@ from .Core.Api import (
     includedirs, externalincludedirs, sysincludedirs, removeincludedirs,
     libdirs, syslibdirs, removelibdirs, objdir, targetdir, targetname,
     links, removelinks, dependson, removedependson, dependfiles, embedresources,
-    defines, removedefines, undefines, optimize, symbols, warnings,
+    defines, removedefines, undefines, optimize, symbols, warnings, runtime,
     pchheader, pchsource,
     prebuild, postbuild, prelink, postlink,
     usetoolchain,
@@ -41,7 +41,7 @@ from .Core.Api import (
     iossigningidentity, iosentitlements, iosappicon, iosbuildnumber,
     iosbuildsystem, iosdistributiontype, iosteamid, iosprovisioningprofile,
     gdkpath, xboxmode, xboxplatform, xboxsigningmode, xboxpackagename, xboxpublisher, xboxversion, xboxlekbpath, xboxassetchunks,
-    emscriptenshellfile, emscriptencanvasid, emscripteninitialmemory,
+    emscriptenshellfile, emscriptenfullscreenshell, emscriptencanvasid, emscripteninitialmemory,
     emscriptenstacksize, emscriptenexportname, emscriptenextraflags,
     testoptions, testfiles, testmainfile, testmaintemplate,
     settarget, sysroot, targettriple, ccompiler, cppcompiler,
@@ -65,6 +65,7 @@ from . import Commands
 from . import Core
 from . import Unitest
 from . import Utils
+from . import GlobalToolchains as _GlobalToolchains
 from .GlobalToolchains import *
 
 __all__ = [
@@ -82,7 +83,7 @@ __all__ = [
     'includedirs', 'externalincludedirs', 'sysincludedirs', 'removeincludedirs',
     'libdirs', 'syslibdirs', 'removelibdirs', 'objdir', 'targetdir', 'targetname',
     'links', 'removelinks', 'dependson', 'removedependson', 'dependfiles', 'embedresources',
-    'defines', 'removedefines', 'undefines', 'optimize', 'symbols', 'warnings',
+    'defines', 'removedefines', 'undefines', 'optimize', 'symbols', 'warnings', 'runtime',
     'pchheader', 'pchsource',
     'prebuild', 'postbuild', 'prelink', 'postlink',
     'usetoolchain',
@@ -96,7 +97,7 @@ __all__ = [
     'iossigningidentity', 'iosentitlements', 'iosappicon', 'iosbuildnumber',
     'iosbuildsystem', 'iosdistributiontype', 'iosteamid', 'iosprovisioningprofile',
     'gdkpath', 'xboxmode', 'xboxplatform', 'xboxsigningmode', 'xboxpackagename', 'xboxpublisher', 'xboxversion', 'xboxlekbpath', 'xboxassetchunks',
-    'emscriptenshellfile', 'emscriptencanvasid', 'emscripteninitialmemory',
+    'emscriptenshellfile', 'emscriptenfullscreenshell', 'emscriptencanvasid', 'emscripteninitialmemory',
     'emscriptenstacksize', 'emscriptenexportname', 'emscriptenextraflags',
     'testoptions', 'testfiles', 'testmainfile', 'testmaintemplate',
     'settarget', 'sysroot', 'targettriple', 'ccompiler', 'cppcompiler',
@@ -114,10 +115,19 @@ __all__ = [
     'inittools',
     # Sous-packages
     'Commands', 'Core', 'Unitest', 'Utils',
-    # Toolchain
-    'ToolchainAndroidNDK', 'ToolchainClangCl', 'ToolchainClangCrossLinux', 'ToolchainClangMinGW',
-    'ToolchainClangNative', 'ToolchainEmscripten', 'ToolchainMinGW', 'ToolchainZigLinuxX64',
+    # Global toolchain helper
+    'RegisterJengaGlobalToolchains',
 ]
+
+# Keep optional/generated global toolchain exports backward compatible.
+# Some generated GlobalToolchains.py variants expose Toolchain* symbols,
+# others only expose RegisterJengaGlobalToolchains().
+for _name in dir(_GlobalToolchains):
+    if not _name.startswith("Toolchain"):
+        continue
+    globals()[_name] = getattr(_GlobalToolchains, _name)
+    if _name not in __all__:
+        __all__.append(_name)
 
 # Initialisation du système de tools au chargement du package
 inittools()

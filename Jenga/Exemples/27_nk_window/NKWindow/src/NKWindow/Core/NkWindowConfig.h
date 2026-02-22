@@ -6,39 +6,41 @@
 // =============================================================================
 
 #include "NkTypes.h"
+#include "NkSafeArea.h"
 #include <string>
 
 namespace nkentseu
 {
 
-// ---------------------------------------------------------------------------
-// NkSafeAreaInsets — marges de zone sécurisée (notch, barre système…)
-// Sur desktop : toutes les valeurs sont 0.
-// Sur mobile   : renseignées par la plateforme via ISafeAreaProvider.
-// ---------------------------------------------------------------------------
-
-struct NkSafeAreaInsets
+enum class NkScreenOrientation : NkU32
 {
-    float top    = 0.f;  ///< Notch / Dynamic Island / barre de statut
-    float bottom = 0.f;  ///< Barre de navigation / home indicator
-    float left   = 0.f;  ///< Découpe latérale (rare)
-    float right  = 0.f;  ///< Découpe latérale (rare)
+    NK_SCREEN_ORIENTATION_AUTO = 0,
+    NK_SCREEN_ORIENTATION_PORTRAIT,
+    NK_SCREEN_ORIENTATION_LANDSCAPE,
+};
 
-    /// Applique les marges à un rect {x,y,w,h} et retourne le rect sécurisé.
-    NkRect Apply(NkRect r) const
-    {
-        NkI32 t = static_cast<NkI32>(top);
-        NkI32 b = static_cast<NkI32>(bottom);
-        NkI32 l = static_cast<NkI32>(left);
-        NkI32 ri= static_cast<NkI32>(right);
-        r.x      += l;
-        r.y      += t;
-        r.width   = (r.width  > static_cast<NkU32>(l + ri)) ? r.width  - static_cast<NkU32>(l + ri)  : 0;
-        r.height  = (r.height > static_cast<NkU32>(t + b))  ? r.height - static_cast<NkU32>(t + b) : 0;
-        return r;
-    }
+// ---------------------------------------------------------------------------
+// Options Web (WASM) pour le routage des entrées navigateur/app
+// ---------------------------------------------------------------------------
 
-    bool IsZero() const { return top==0.f && bottom==0.f && left==0.f && right==0.f; }
+struct NkWebInputOptions
+{
+    // Clavier
+    bool captureKeyboard = true;
+    bool allowBrowserShortcuts = true; // F12, Ctrl+Shift+I/J, Ctrl+R, Meta+...
+
+    // Souris
+    bool captureMouseMove   = true;
+    bool captureMouseLeft   = true;
+    bool captureMouseMiddle = true;
+    bool captureMouseRight  = false;
+    bool captureMouseWheel  = true;
+
+    // Tactile
+    bool captureTouch = true;
+
+    // Menu contextuel navigateur sur le canvas
+    bool preventContextMenu = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -68,6 +70,8 @@ struct NkWindowConfig
     bool   fullscreen    = false;
     bool   modal         = false;
     bool   vsync         = true;
+    bool   dropEnabled   = false;
+    NkScreenOrientation screenOrientation = NkScreenOrientation::NK_SCREEN_ORIENTATION_AUTO;
 
     // --- Apparence ---
     bool        frame       = true;
@@ -85,6 +89,10 @@ struct NkWindowConfig
     // Si true : le renderer recevra les insets via Window::GetSafeAreaInsets().
     // Sur desktop : sans effet.
     bool respectSafeArea = true;
+
+    // --- Web / WASM ---
+    // Contrôle fin de la capture des entrées navigateur.
+    NkWebInputOptions webInput;
 };
 
 } // namespace nkentseu

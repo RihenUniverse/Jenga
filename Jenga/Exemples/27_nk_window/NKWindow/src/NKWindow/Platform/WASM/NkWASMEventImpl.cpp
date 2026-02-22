@@ -3,123 +3,411 @@
 // =============================================================================
 
 #include "NkWASMEventImpl.h"
-#include "NkWASMWindowImpl.h"
 #include "../../Core/Events/NkScancode.h"
+#include <cmath>
 
 namespace nkentseu
 {
 
 NkWASMEventImpl* NkWASMEventImpl::sInstance = nullptr;
+static NkWebInputOptions gWebInputOptions{};
 
 NkWASMEventImpl::NkWASMEventImpl()
 {
     sInstance = this;
-    emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, this, 1, OnKeyDown);
-    emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, this, 1, OnKeyUp);
+    emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, this, 1, OnKeyDown);
+    emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, this, 1, OnKeyUp);
     emscripten_set_mousemove_callback("#canvas", this, 1, OnMouseMove);
     emscripten_set_mousedown_callback("#canvas", this, 1, OnMouseDown);
     emscripten_set_mouseup_callback("#canvas", this, 1, OnMouseUp);
     emscripten_set_wheel_callback("#canvas", this, 1, OnWheel);
+    emscripten_set_touchstart_callback("#canvas", this, 1, OnTouchStart);
+    emscripten_set_touchmove_callback("#canvas", this, 1, OnTouchMove);
+    emscripten_set_touchend_callback("#canvas", this, 1, OnTouchEnd);
+    emscripten_set_touchcancel_callback("#canvas", this, 1, OnTouchCancel);
+}
+
+NkWASMEventImpl::~NkWASMEventImpl()
+{
+    emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, nullptr, 1, nullptr);
+    emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_DOCUMENT, nullptr, 1, nullptr);
+    emscripten_set_mousemove_callback("#canvas", nullptr, 1, nullptr);
+    emscripten_set_mousedown_callback("#canvas", nullptr, 1, nullptr);
+    emscripten_set_mouseup_callback("#canvas", nullptr, 1, nullptr);
+    emscripten_set_wheel_callback("#canvas", nullptr, 1, nullptr);
+    emscripten_set_touchstart_callback("#canvas", nullptr, 1, nullptr);
+    emscripten_set_touchmove_callback("#canvas", nullptr, 1, nullptr);
+    emscripten_set_touchend_callback("#canvas", nullptr, 1, nullptr);
+    emscripten_set_touchcancel_callback("#canvas", nullptr, 1, nullptr);
+    sInstance = nullptr;
+}
+
+void NkWASMEventImpl::Initialize(IWindowImpl* owner, void* nativeHandle)
+{
+    void* handle = nativeHandle ? nativeHandle : owner;
+    WindowEntry entry;
+    entry.window = owner;
+    mWindowMap[handle] = std::move(entry);
+    if (!mPrimaryHandle)
+        mPrimaryHandle = handle;
+}
+
+void NkWASMEventImpl::Shutdown(void* nativeHandle)
+{
+    if (mWindowMap.empty())
+    {
+        mPrimaryHandle = nullptr;
+        return;
+    }
+
+    if (nativeHandle)
+    {
+        mWindowMap.erase(nativeHandle);
+    }
+    else if (mPrimaryHandle)
+    {
+        mWindowMap.erase(mPrimaryHandle);
+    }
+    else
+    {
+        mWindowMap.erase(mWindowMap.begin());
+    }
+
+    if (mWindowMap.empty())
+        mPrimaryHandle = nullptr;
+    else if (!mPrimaryHandle || mWindowMap.find(mPrimaryHandle) == mWindowMap.end())
+        mPrimaryHandle = mWindowMap.begin()->first;
 }
 
 const NkEvent& NkWASMEventImpl::Front() const
-{ return mQueue.empty() ? mDummyEvent : mQueue.front(); }
-void        NkWASMEventImpl::Pop()           { if (!mQueue.empty()) mQueue.pop(); }
-bool        NkWASMEventImpl::IsEmpty() const { return mQueue.empty(); }
-std::size_t NkWASMEventImpl::Size()    const { return mQueue.size(); }
-void        NkWASMEventImpl::PushEvent(const NkEvent& e) { mQueue.push(e); }
+{
+    return mQueue.empty() ? mDummyEvent : mQueue.front();
+}
+
+void NkWASMEventImpl::Pop()
+{
+    if (!mQueue.empty())
+        mQueue.pop();
+}
+
+bool NkWASMEventImpl::IsEmpty() const
+{
+    return mQueue.empty();
+}
+
+std::size_t NkWASMEventImpl::Size() const
+{
+    return mQueue.size();
+}
+
+void NkWASMEventImpl::PushEvent(const NkEvent& e)
+{
+    mQueue.push(e);
+}
 
 void NkWASMEventImpl::PollEvents()
 {
-    emscripten_sleep(0);
+    // Emscripten callbacks push events asynchronously; nothing to pull here.
+}
+
+void NkWASMEventImpl::SetEventCallback(NkEventCallback cb)
+{
+    mGlobalCallback = std::move(cb);
+}
+
+void NkWASMEventImpl::SetWindowCallback(void* nativeHandle, NkEventCallback cb)
+{
+    void* handle = nativeHandle;
+    if (!handle)
+        handle = mPrimaryHandle;
+    if (!handle && !mWindowMap.empty())
+        handle = mWindowMap.begin()->first;
+    if (!handle)
+        return;
+
+    auto it = mWindowMap.find(handle);
+    if (it == mWindowMap.end())
+        return;
+
+    it->second.callback = std::move(cb);
+}
+
+void NkWASMEventImpl::SetInputOptions(const NkWebInputOptions& options)
+{
+    gWebInputOptions = options;
+}
+
+NkWebInputOptions NkWASMEventImpl::GetInputOptions()
+{
+    return gWebInputOptions;
+}
+
+void NkWASMEventImpl::DispatchEvent(NkEvent& event, void* nativeHandle)
+{
+    void* handle = nativeHandle;
+    if (!handle)
+        handle = mPrimaryHandle;
+
+    auto it = mWindowMap.find(handle);
+    if (it != mWindowMap.end() && it->second.callback)
+        it->second.callback(event);
+
+    if (mGlobalCallback)
+        mGlobalCallback(event);
+}
+
+void NkWASMEventImpl::PushAndDispatch(NkEvent&& event, void* nativeHandle)
+{
+    mQueue.push(event);
+    NkEvent dispatchCopy = event;
+    DispatchEvent(dispatchCopy, nativeHandle);
+}
+
+struct NkCanvasCoordMap
+{
+    NkI32 x = 0;
+    NkI32 y = 0;
+    double sx = 1.0;
+    double sy = 1.0;
+};
+
+static NkCanvasCoordMap MapCssToCanvasCoords(NkI32 cssX, NkI32 cssY)
+{
+    NkCanvasCoordMap out{};
+    out.x = cssX;
+    out.y = cssY;
+
+    int canvasW = 0;
+    int canvasH = 0;
+    double cssW = 0.0;
+    double cssH = 0.0;
+
+    if (emscripten_get_canvas_element_size("#canvas", &canvasW, &canvasH) != EMSCRIPTEN_RESULT_SUCCESS)
+        return out;
+    if (emscripten_get_element_css_size("#canvas", &cssW, &cssH) != EMSCRIPTEN_RESULT_SUCCESS)
+        return out;
+    if (canvasW <= 0 || canvasH <= 0 || cssW <= 0.0 || cssH <= 0.0)
+        return out;
+
+    out.sx = static_cast<double>(canvasW) / cssW;
+    out.sy = static_cast<double>(canvasH) / cssH;
+    out.x = static_cast<NkI32>(std::lround(static_cast<double>(cssX) * out.sx));
+    out.y = static_cast<NkI32>(std::lround(static_cast<double>(cssY) * out.sy));
+    return out;
+}
+
+void NkWASMEventImpl::PushTouchEvent(const EmscriptenTouchEvent* te, NkTouchPhase phase, NkEventType type)
+{
+    if (!te) return;
+
+    NkTouchData td;
+    td.globalPhase = phase;
+
+    for (int i = 0; i < te->numTouches; ++i)
+    {
+        const EmscriptenTouchPoint& tp = te->touches[i];
+        if (!tp.isChanged && phase != NkTouchPhase::NK_TOUCH_PHASE_MOVED)
+            continue;
+
+        NkTouchPoint p;
+        p.id = static_cast<NkU64>(tp.identifier);
+        p.phase = phase;
+        const NkCanvasCoordMap mapped =
+            MapCssToCanvasCoords(static_cast<NkI32>(tp.targetX), static_cast<NkI32>(tp.targetY));
+        p.clientX = static_cast<float>(mapped.x);
+        p.clientY = static_cast<float>(mapped.y);
+        p.screenX = static_cast<float>(tp.screenX);
+        p.screenY = static_cast<float>(tp.screenY);
+        td.AddTouch(p);
+    }
+
+    if (td.numTouches == 0)
+        return;
+
+    td.UpdateCentroid();
+    PushAndDispatch(NkEvent(td, type), mPrimaryHandle);
+}
+
+static bool IsBrowserShortcut(const EmscriptenKeyboardEvent* ke)
+{
+    if (!ke)
+        return false;
+
+    const unsigned long kc = ke->keyCode;
+
+    // Let browser/devtools shortcuts pass through.
+    if (kc == 123) // F12
+        return true;
+    if (ke->ctrlKey && ke->shiftKey && (kc == 73 || kc == 74)) // Ctrl+Shift+I/J
+        return true;
+    if (ke->ctrlKey && (kc == 82 || kc == 116)) // Ctrl+R / F5
+        return true;
+    if (ke->metaKey) // macOS browser shortcuts
+        return true;
+
+    return false;
 }
 
 EM_BOOL NkWASMEventImpl::OnKeyDown(int, const EmscriptenKeyboardEvent* ke, void*)
 {
-    if (!sInstance) return EM_TRUE;
+    if (!sInstance || !ke) return EM_FALSE;
+    if (!gWebInputOptions.captureKeyboard) return EM_FALSE;
+    if (gWebInputOptions.allowBrowserShortcuts && IsBrowserShortcut(ke)) return EM_FALSE;
 
-    // Préférer DOM code (ex: "KeyQ") au keyCode numérique — layout-agnostic
     NkScancode sc = NkScancodeFromDOMCode(ke->code);
-    NkKey k = NkScancodeToKey(sc);
-    if (k == NkKey::NK_UNKNOWN)
-        k = DomVkToNkKey(ke->keyCode);  // Fallback keyCode numérique
+    NkKey key = NkScancodeToKey(sc);
+    if (key == NkKey::NK_UNKNOWN)
+        key = DomVkToNkKey(ke->keyCode);
 
-    if (k != NkKey::NK_UNKNOWN)
-    {
-        NkModifierState mods(ke->ctrlKey, ke->altKey, ke->shiftKey, ke->metaKey);
-        bool isRepeat = ke->repeat;
-        NkButtonState st = isRepeat ? NkButtonState::NK_REPEAT : NkButtonState::NK_PRESSED;
-        NkKeyData kd(k, st, mods, sc, static_cast<NkU32>(ke->keyCode), false, isRepeat);
-        NkEvent ev(kd);
-        sInstance->mQueue.push(ev);
-        if (sInstance->mOwner) sInstance->mOwner->DispatchEvent(ev);
-    }
+    if (key == NkKey::NK_UNKNOWN)
+        return EM_FALSE;
+
+    NkModifierState mods(ke->ctrlKey, ke->altKey, ke->shiftKey, ke->metaKey);
+    const bool repeat = ke->repeat;
+    const NkButtonState st = repeat ? NkButtonState::NK_REPEAT : NkButtonState::NK_PRESSED;
+    NkKeyData kd(key, st, mods, sc, static_cast<NkU32>(ke->keyCode), false, repeat);
+    sInstance->PushAndDispatch(NkEvent(kd), sInstance->mPrimaryHandle);
     return EM_TRUE;
 }
 
 EM_BOOL NkWASMEventImpl::OnKeyUp(int, const EmscriptenKeyboardEvent* ke, void*)
 {
-    if (!sInstance) return EM_TRUE;
+    if (!sInstance || !ke) return EM_FALSE;
+    if (!gWebInputOptions.captureKeyboard) return EM_FALSE;
+    if (gWebInputOptions.allowBrowserShortcuts && IsBrowserShortcut(ke)) return EM_FALSE;
 
     NkScancode sc = NkScancodeFromDOMCode(ke->code);
-    NkKey k = NkScancodeToKey(sc);
-    if (k == NkKey::NK_UNKNOWN)
-        k = DomVkToNkKey(ke->keyCode);
+    NkKey key = NkScancodeToKey(sc);
+    if (key == NkKey::NK_UNKNOWN)
+        key = DomVkToNkKey(ke->keyCode);
 
-    if (k != NkKey::NK_UNKNOWN)
-    {
-        NkModifierState mods(ke->ctrlKey, ke->altKey, ke->shiftKey, ke->metaKey);
-        NkKeyData kd(k, NkButtonState::NK_RELEASED, mods,
-                     sc, static_cast<NkU32>(ke->keyCode), false, false);
-        NkEvent ev(kd);
-        sInstance->mQueue.push(ev);
-        if (sInstance->mOwner) sInstance->mOwner->DispatchEvent(ev);
-    }
+    if (key == NkKey::NK_UNKNOWN)
+        return EM_FALSE;
+
+    NkModifierState mods(ke->ctrlKey, ke->altKey, ke->shiftKey, ke->metaKey);
+    NkKeyData kd(key, NkButtonState::NK_RELEASED, mods, sc, static_cast<NkU32>(ke->keyCode), false, false);
+    sInstance->PushAndDispatch(NkEvent(kd), sInstance->mPrimaryHandle);
     return EM_TRUE;
 }
 
 EM_BOOL NkWASMEventImpl::OnMouseMove(int, const EmscriptenMouseEvent* me, void*)
 {
-    if (!sInstance) return EM_TRUE;
-    NkEvent ev(NkMouseMoveData(
-        static_cast<NkU32>(me->targetX), static_cast<NkU32>(me->targetY),
-        static_cast<NkU32>(me->screenX), static_cast<NkU32>(me->screenY),
-        static_cast<NkI32>(me->movementX), static_cast<NkI32>(me->movementY)));
-    sInstance->mQueue.push(ev);
-    if (sInstance->mOwner) sInstance->mOwner->DispatchEvent(ev);
+    if (!sInstance || !me) return EM_TRUE;
+    if (!gWebInputOptions.captureMouseMove) return EM_FALSE;
+    const NkCanvasCoordMap mapped =
+        MapCssToCanvasCoords(static_cast<NkI32>(me->targetX), static_cast<NkI32>(me->targetY));
+    NkMouseMoveData d(
+        mapped.x,
+        mapped.y,
+        static_cast<NkI32>(me->screenX),
+        static_cast<NkI32>(me->screenY),
+        static_cast<NkI32>(std::lround(static_cast<double>(me->movementX) * mapped.sx)),
+        static_cast<NkI32>(std::lround(static_cast<double>(me->movementY) * mapped.sy))
+    );
+    sInstance->PushAndDispatch(NkEvent(d), sInstance->mPrimaryHandle);
     return EM_TRUE;
 }
 
 EM_BOOL NkWASMEventImpl::OnMouseDown(int, const EmscriptenMouseEvent* me, void*)
 {
-    if (!sInstance) return EM_TRUE;
-    NkMouseButton btn = me->button == 0 ? NkMouseButton::NK_LEFT
-                      : me->button == 1 ? NkMouseButton::NK_MIDDLE
-                      :                   NkMouseButton::NK_RIGHT;
-    NkEvent ev(NkMouseInputData(btn, NkButtonState::NK_PRESSED, {}));
-    sInstance->mQueue.push(ev);
-    if (sInstance->mOwner) sInstance->mOwner->DispatchEvent(ev);
+    if (!sInstance || !me) return EM_TRUE;
+    if ((me->button == 0 && !gWebInputOptions.captureMouseLeft)   ||
+        (me->button == 1 && !gWebInputOptions.captureMouseMiddle) ||
+        (me->button == 2 && !gWebInputOptions.captureMouseRight))
+    {
+        return EM_FALSE;
+    }
+    NkMouseButton btn = me->button == 0 ? NkMouseButton::NK_MB_LEFT
+                      : me->button == 1 ? NkMouseButton::NK_MB_MIDDLE
+                                        : NkMouseButton::NK_MB_RIGHT;
+    const NkCanvasCoordMap mapped =
+        MapCssToCanvasCoords(static_cast<NkI32>(me->targetX), static_cast<NkI32>(me->targetY));
+    NkMouseButtonData d(
+        btn,
+        NkButtonState::NK_PRESSED,
+        mapped.x,
+        mapped.y,
+        static_cast<NkI32>(me->screenX),
+        static_cast<NkI32>(me->screenY)
+    );
+    sInstance->PushAndDispatch(
+        NkEvent(NkEventType::NK_MOUSE_BUTTON_PRESS, d),
+        sInstance->mPrimaryHandle
+    );
     return EM_TRUE;
 }
 
 EM_BOOL NkWASMEventImpl::OnMouseUp(int, const EmscriptenMouseEvent* me, void*)
 {
-    if (!sInstance) return EM_TRUE;
-    NkMouseButton btn = me->button == 0 ? NkMouseButton::NK_LEFT
-                      : me->button == 1 ? NkMouseButton::NK_MIDDLE
-                      :                   NkMouseButton::NK_RIGHT;
-    NkEvent ev(NkMouseInputData(btn, NkButtonState::NK_RELEASED, {}));
-    sInstance->mQueue.push(ev);
-    if (sInstance->mOwner) sInstance->mOwner->DispatchEvent(ev);
+    if (!sInstance || !me) return EM_TRUE;
+    if ((me->button == 0 && !gWebInputOptions.captureMouseLeft)   ||
+        (me->button == 1 && !gWebInputOptions.captureMouseMiddle) ||
+        (me->button == 2 && !gWebInputOptions.captureMouseRight))
+    {
+        return EM_FALSE;
+    }
+    NkMouseButton btn = me->button == 0 ? NkMouseButton::NK_MB_LEFT
+                      : me->button == 1 ? NkMouseButton::NK_MB_MIDDLE
+                                        : NkMouseButton::NK_MB_RIGHT;
+    const NkCanvasCoordMap mapped =
+        MapCssToCanvasCoords(static_cast<NkI32>(me->targetX), static_cast<NkI32>(me->targetY));
+    NkMouseButtonData d(
+        btn,
+        NkButtonState::NK_RELEASED,
+        mapped.x,
+        mapped.y,
+        static_cast<NkI32>(me->screenX),
+        static_cast<NkI32>(me->screenY)
+    );
+    sInstance->PushAndDispatch(
+        NkEvent(NkEventType::NK_MOUSE_BUTTON_RELEASE, d),
+        sInstance->mPrimaryHandle
+    );
     return EM_TRUE;
 }
 
 EM_BOOL NkWASMEventImpl::OnWheel(int, const EmscriptenWheelEvent* we, void*)
 {
+    if (!sInstance || !we) return EM_TRUE;
+    if (!gWebInputOptions.captureMouseWheel) return EM_FALSE;
+
+    NkMouseWheelData d;
+    d.delta = -we->deltaY / 100.0;
+    d.deltaY = d.delta;
+    d.deltaX = we->deltaX / 100.0;
+    sInstance->PushAndDispatch(NkEvent(d), sInstance->mPrimaryHandle);
+    return EM_TRUE;
+}
+
+EM_BOOL NkWASMEventImpl::OnTouchStart(int, const EmscriptenTouchEvent* te, void*)
+{
     if (!sInstance) return EM_TRUE;
-    NkEvent ev(NkMouseWheelData(-we->deltaY / 100.0, {}));
-    sInstance->mQueue.push(ev);
-    if (sInstance->mOwner) sInstance->mOwner->DispatchEvent(ev);
+    if (!gWebInputOptions.captureTouch) return EM_FALSE;
+    sInstance->PushTouchEvent(te, NkTouchPhase::NK_TOUCH_PHASE_BEGAN, NkEventType::NK_TOUCH_BEGIN);
+    return EM_TRUE;
+}
+
+EM_BOOL NkWASMEventImpl::OnTouchMove(int, const EmscriptenTouchEvent* te, void*)
+{
+    if (!sInstance) return EM_TRUE;
+    if (!gWebInputOptions.captureTouch) return EM_FALSE;
+    sInstance->PushTouchEvent(te, NkTouchPhase::NK_TOUCH_PHASE_MOVED, NkEventType::NK_TOUCH_MOVE);
+    return EM_TRUE;
+}
+
+EM_BOOL NkWASMEventImpl::OnTouchEnd(int, const EmscriptenTouchEvent* te, void*)
+{
+    if (!sInstance) return EM_TRUE;
+    if (!gWebInputOptions.captureTouch) return EM_FALSE;
+    sInstance->PushTouchEvent(te, NkTouchPhase::NK_TOUCH_PHASE_ENDED, NkEventType::NK_TOUCH_END);
+    return EM_TRUE;
+}
+
+EM_BOOL NkWASMEventImpl::OnTouchCancel(int, const EmscriptenTouchEvent* te, void*)
+{
+    if (!sInstance) return EM_TRUE;
+    if (!gWebInputOptions.captureTouch) return EM_FALSE;
+    sInstance->PushTouchEvent(te, NkTouchPhase::NK_TOUCH_PHASE_CANCELLED, NkEventType::NK_TOUCH_CANCEL);
     return EM_TRUE;
 }
 
@@ -141,7 +429,7 @@ NkKey NkWASMEventImpl::DomVkToNkKey(unsigned long kc)
     case 56: return NkKey::NK_NUM8; case 57: return NkKey::NK_NUM9;
     case 65: return NkKey::NK_A; case 66: return NkKey::NK_B;
     case 67: return NkKey::NK_C; case 68: return NkKey::NK_D;
-    case 69: return NkKey::NK_E; case 70: return NkKey::NK_F_KEY;
+    case 69: return NkKey::NK_E; case 70: return NkKey::NK_F;
     case 71: return NkKey::NK_G; case 72: return NkKey::NK_H;
     case 73: return NkKey::NK_I; case 74: return NkKey::NK_J;
     case 75: return NkKey::NK_K; case 76: return NkKey::NK_L;
@@ -154,17 +442,17 @@ NkKey NkWASMEventImpl::DomVkToNkKey(unsigned long kc)
     case 89: return NkKey::NK_Y; case 90: return NkKey::NK_Z;
     case 32: return NkKey::NK_SPACE;
     case 13: return NkKey::NK_ENTER;
-    case  8: return NkKey::NK_BACK;
-    case  9: return NkKey::NK_TAB;
+    case 8: return NkKey::NK_BACK;
+    case 9: return NkKey::NK_TAB;
     case 16: return NkKey::NK_LSHIFT;
-    case 17: return NkKey::NK_LCONTROL;
+    case 17: return NkKey::NK_LCTRL;
     case 18: return NkKey::NK_LALT;
     case 37: return NkKey::NK_LEFT;  case 39: return NkKey::NK_RIGHT;
     case 38: return NkKey::NK_UP;    case 40: return NkKey::NK_DOWN;
-    case 45: return NkKey::NK_INSERT;case 46: return NkKey::NK_DELETE;
+    case 45: return NkKey::NK_INSERT; case 46: return NkKey::NK_DELETE;
     case 36: return NkKey::NK_HOME;  case 35: return NkKey::NK_END;
-    case 33: return NkKey::NK_PGUP;  case 34: return NkKey::NK_PGDN;
-    default: return NkKey::NK_KEY_MAX;
+    case 33: return NkKey::NK_PAGE_UP; case 34: return NkKey::NK_PAGE_DOWN;
+    default: return NkKey::NK_UNKNOWN;
     }
 }
 

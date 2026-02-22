@@ -14,7 +14,7 @@ namespace nkentseu
 class NkWASMWindowImpl : public IWindowImpl
 {
 public:
-    bool Create(const NkWindowConfig& config, IEventImpl& ev) override;
+    bool Create(const NkWindowConfig& config) override;
     void Close()  override;
     bool IsOpen() const override { return mIsOpen; }
 
@@ -38,12 +38,15 @@ public:
     void ShowMouse(bool show)          override;
     void CaptureMouse(bool cap)        override;
     void SetProgress(float)            override {}
-    void SetBackgroundColor(NkU32 c)   override { mBgColor = c; }
-    NkU32 GetBackgroundColor() const   override { return mBgColor; }
+    void SetWebInputOptions(const NkWebInputOptions& options) override;
+    NkWebInputOptions GetWebInputOptions() const override { return mConfig.webInput; }
     NkSurfaceDesc GetSurfaceDesc() const override;
+    bool SupportsOrientationControl() const override { return true; }
+    void SetScreenOrientation(NkScreenOrientation orientation) override;
+    NkScreenOrientation GetScreenOrientation() const override { return mConfig.screenOrientation; }
+    NkSafeAreaInsets GetSafeAreaInsets() const override;
 
 private:
-    bool        mIsOpen    = false;
-    IEventImpl* mEventImpl = nullptr;
+    bool mIsOpen = false;
 };
 } // namespace nkentseu

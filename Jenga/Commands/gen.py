@@ -2,21 +2,19 @@
 # -*- coding: utf-8 -*-
 """
 Gen command – Génère des fichiers projet pour différents outils de build.
-Support : CMake (CMakeLists.txt), Makefile, Visual Studio 2022, Xcode (partiel).
+Support : CMake, Makefile, MK, Android NDK MK, Visual Studio 2022, Xcode.
 """
 
 import argparse
-import sys
 import uuid
-import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..Core.Loader import Loader
 from ..Core.Cache import Cache
 from ..Core.Builder import Builder
 from ..Core.Platform import Platform
-from ..Utils import FileSystem, Colored, Display
+from ..Utils import FileSystem, Colored
 from ..Core import Api
 
 
@@ -26,17 +24,25 @@ class GenCommand:
     @staticmethod
     def Execute(args: List[str]) -> int:
         parser = argparse.ArgumentParser(prog="jenga gen", description="Generate IDE project files.")
+        parser.add_argument("--all", action="store_true", help="Generate all available outputs")
         parser.add_argument("--cmake", action="store_true", help="Generate CMakeLists.txt")
         parser.add_argument("--makefile", action="store_true", help="Generate Makefile")
+        parser.add_argument("--mk", action="store_true", help="Generate workspace.mk include file")
+        parser.add_argument("--android-mk", action="store_true", help="Generate Android.mk/Application.mk")
         parser.add_argument("--vs2022", action="store_true", help="Generate Visual Studio 2022 solution")
-        parser.add_argument("--xcode", action="store_true", help="Generate Xcode project (experimental)")
+        parser.add_argument("--xcode", action="store_true", help="Generate Xcode project (.xcodeproj)")
+        parser.add_argument("--config", default="Debug", help="Context configuration for filters")
+        parser.add_argument("--platform", default=None, help="Context platform for filters (e.g. Windows-x86_64)")
         parser.add_argument("--output", "-o", default=".", help="Output directory")
         parser.add_argument("--no-cache", action="store_true", help="Reload workspace without cache")
         parser.add_argument("--jenga-file", help="Path to the workspace .jenga file (default: auto-detected)")
-        parsed = parser.parse_args(args)
+        parsed, unknown_args = parser.parse_known_args(args)
 
-        if not (parsed.cmake or parsed.makefile or parsed.vs2022 or parsed.xcode):
-            Colored.PrintError("No generator specified. Use --cmake, --makefile, --vs2022 or --xcode.")
+        if parsed.all:
+            parsed.cmake = parsed.makefile = parsed.mk = parsed.android_mk = parsed.vs2022 = parsed.xcode = True
+
+        if not (parsed.cmake or parsed.makefile or parsed.mk or parsed.android_mk or parsed.vs2022 or parsed.xcode):
+            Colored.PrintError("No generator specified. Use --cmake, --makefile, --mk, --android-mk, --vs2022 or --xcode.")
             return 1
 
         # Déterminer le répertoire de travail (workspace root)
@@ -70,112 +76,286 @@ class GenCommand:
         output_dir = Path(parsed.output).resolve()
         FileSystem.MakeDirectory(output_dir)
 
+        from .build import BuildCommand
+        try:
+            cli_custom_options = BuildCommand.ParseCustomOptionArgs(unknown_args)
+        except ValueError as e:
+            Colored.PrintError(str(e))
+            return 1
+
+        try:
+            custom_option_values = BuildCommand.ResolveWorkspaceOptions(workspace, cli_custom_options)
+        except ValueError as e:
+            Colored.PrintError(str(e))
+            return 1
+
+        # Each generator gets its own filter action context.
+        context_platform = parsed.platform
+        if not context_platform:
+            host_os = Platform.GetHostOS().value
+            host_arch = Platform.GetHostArchitecture().value
+            context_platform = f"{host_os}-{host_arch}"
+
+        android_context_platform = context_platform
+        if not parsed.platform and parsed.android_mk:
+            android_arch = None
+            for arch in (workspace.targetArchs or []):
+                if GenCommand._MapArchToAndroidAbi(arch):
+                    android_arch = arch
+                    break
+            if android_arch is None:
+                android_arch = Api.TargetArch.ARM64
+            android_context_platform = f"{Api.TargetOS.ANDROID.value}-{android_arch.value}"
+
+        def _build_gen_context(action: str, generator_token: str, platform_override: Optional[str] = None) -> Builder:
+            active_platform = platform_override or context_platform
+            opts = BuildCommand.CollectFilterOptions(
+                config=parsed.config,
+                platform=active_platform,
+                target=None,
+                verbose=False,
+                no_cache=parsed.no_cache,
+                no_daemon=True,
+                extra=[f"action:{action}", f"generator:{generator_token}"],
+                custom_option_values=custom_option_values
+            )
+            bld = GenCommand._CreateGenerationBuilder(
+                workspace,
+                config=parsed.config,
+                platform=active_platform,
+                action=action,
+                options=opts
+            )
+            GenCommand._ApplyGenerationFilters(workspace, bld)
+            return bld
+
         if parsed.cmake:
-            GenCommand._GenerateCMake(workspace, output_dir)
+            builder = _build_gen_context("gen-cmake", "cmake")
+            GenCommand._GenerateCMake(workspace, output_dir, builder)
         if parsed.makefile:
-            GenCommand._GenerateMakefile(workspace, output_dir)
+            builder = _build_gen_context("gen-makefile", "makefile")
+            GenCommand._GenerateMakefile(workspace, output_dir, builder, entry_file)
+        if parsed.mk:
+            builder = _build_gen_context("gen-mk", "mk")
+            GenCommand._GenerateMk(workspace, output_dir, builder, entry_file)
+        if parsed.android_mk:
+            builder = _build_gen_context("gen-android-mk", "android-mk", platform_override=android_context_platform)
+            GenCommand._GenerateAndroidMk(workspace, output_dir, builder)
         if parsed.vs2022:
-            GenCommand._GenerateVS2022(workspace, output_dir)
+            builder = _build_gen_context("gen-vs2022", "vs2022")
+            GenCommand._GenerateVS2022(workspace, output_dir, builder)
         if parsed.xcode:
-            GenCommand._GenerateXcode(workspace, output_dir)
+            builder = _build_gen_context("gen-xcode", "xcode")
+            GenCommand._GenerateXcode(workspace, output_dir, builder)
 
         return 0
+
+    @staticmethod
+    def _ApplyGenerationFilters(workspace, builder: Builder) -> None:
+        """Materialize project filters for the generation action/context."""
+        for proj in workspace.projects.values():
+            if proj.name.startswith("__"):
+                continue
+            builder._ApplyProjectFilters(proj)
+
+    @staticmethod
+    def _CreateGenerationBuilder(workspace,
+                                 config: str,
+                                 platform: Optional[str],
+                                 action: str,
+                                 options: Optional[List[str]] = None) -> Builder:
+        """
+        Create a lightweight builder context for generation/filter resolution.
+        This intentionally avoids toolchain detection so `jenga gen` works even
+        when no compiler toolchain is installed on the host.
+        """
+        target_os = None
+        target_arch = None
+        target_env = None
+
+        if platform:
+            parts = platform.split("-")
+            os_name = parts[0]
+            for os_enum in Api.TargetOS:
+                if os_enum.value.lower() == os_name.lower():
+                    target_os = os_enum
+                    break
+            if len(parts) > 1:
+                arch_name = parts[1]
+                for arch_enum in Api.TargetArch:
+                    if arch_enum.value.lower() == arch_name.lower():
+                        target_arch = arch_enum
+                        break
+            if len(parts) > 2:
+                env_name = parts[2]
+                for env_enum in Api.TargetEnv:
+                    if env_enum.value.lower() == env_name.lower():
+                        target_env = env_enum
+                        break
+
+        if target_os is None:
+            target_os = Platform.GetHostOS()
+        if target_arch is None:
+            target_arch = Platform.GetHostArchitecture()
+
+        platform_value = platform or f"{target_os.value}-{target_arch.value}"
+
+        class _GenerationContextBuilder(Builder):
+            def _ValidateHostTarget(self):
+                # Generation does not emit binaries, so host-target restrictions
+                # (e.g. iOS/macOS) are not relevant here.
+                return
+
+            def _ResolveToolchain(self) -> None:
+                class _GenToolchain:
+                    name = "gen-context"
+                    compilerFamily = Api.CompilerFamily.CLANG
+                self.toolchain = _GenToolchain()
+
+            def Compile(self, project, sourceFile: str, objectFile: str) -> bool:
+                return True
+
+            def Link(self, project, objectFiles: List[str], outputFile: str) -> bool:
+                return True
+
+            def GetOutputExtension(self, project) -> str:
+                return ""
+
+            def GetObjectExtension(self) -> str:
+                return ".o"
+
+            def GetModuleFlags(self, project, sourceFile: str) -> List[str]:
+                return []
+
+        return _GenerationContextBuilder(
+            workspace=workspace,
+            config=config,
+            platform=platform_value,
+            targetOs=target_os,
+            targetArch=target_arch,
+            targetEnv=target_env,
+            verbose=False,
+            action=action,
+            options=options or [],
+        )
 
     # -----------------------------------------------------------------------
     # Générateur CMake
     # -----------------------------------------------------------------------
 
     @staticmethod
-    def _GenerateCMake(workspace, output_dir: Path):
+    def _GenerateCMake(workspace, output_dir: Path, builder: Builder):
         """Génère un CMakeLists.txt à la racine du workspace."""
         cmake_path = output_dir / "CMakeLists.txt"
         with open(cmake_path, 'w', encoding='utf-8') as f:
-            f.write(f"cmake_minimum_required(VERSION 3.15)\n")
+            f.write("cmake_minimum_required(VERSION 3.20)\n")
             f.write(f"project({workspace.name} LANGUAGES C CXX ASM OBJC OBJCXX)\n\n")
 
-            # Options de configuration
-            f.write("# Build configurations\n")
-            for cfg in workspace.configurations:
-                f.write(f"set(CMAKE_CONFIGURATION_TYPES \"{' '.join(workspace.configurations)}\" CACHE STRING \"\" FORCE)\n")
-            f.write("\n")
-
-            # Définir les répertoires de sortie par défaut (peuvent être surchargés)
-            f.write("# Output directories\n")
-            f.write(f"set(JENGA_OUTPUT_BIN \"${{CMAKE_BINARY_DIR}}/Bin/${{CMAKE_BUILD_TYPE}}\")\n")
-            f.write(f"set(JENGA_OUTPUT_LIB \"${{CMAKE_BINARY_DIR}}/Lib/${{CMAKE_BUILD_TYPE}}\")\n")
-            f.write(f"set(JENGA_OUTPUT_OBJ \"${{CMAKE_BINARY_DIR}}/Obj/${{CMAKE_BUILD_TYPE}}\")\n\n")
+            # Options de configuration (multi-config generators)
+            if workspace.configurations:
+                joined_cfg = " ".join(workspace.configurations)
+                f.write(f"set(CMAKE_CONFIGURATION_TYPES \"{joined_cfg}\" CACHE STRING \"Jenga configurations\" FORCE)\n")
+                f.write("if(NOT CMAKE_BUILD_TYPE)\n")
+                f.write(f"  set(CMAKE_BUILD_TYPE \"{workspace.configurations[0]}\" CACHE STRING \"\" FORCE)\n")
+                f.write("endif()\n\n")
 
             # Ajouter tous les projets
             for proj_name, proj in workspace.projects.items():
                 if proj_name.startswith('__'):
                     continue
-                GenCommand._WriteCMakeProject(f, proj_name, proj, workspace)
+                GenCommand._WriteCMakeProject(f, proj_name, proj, workspace, builder)
 
         Colored.PrintSuccess(f"CMakeLists.txt generated: {cmake_path}")
 
     @staticmethod
-    def _WriteCMakeProject(f, name: str, proj, workspace):
+    def _WriteCMakeProject(f, name: str, proj, workspace, builder: Builder):
         """Écrit un projet CMake (add_executable ou add_library)."""
         # Déterminer le type
         if proj.kind in (Api.ProjectKind.CONSOLE_APP, Api.ProjectKind.WINDOWED_APP, Api.ProjectKind.TEST_SUITE):
-            cmd = "add_executable"
+            cmd = f"add_executable({name}"
         elif proj.kind == Api.ProjectKind.STATIC_LIB:
-            cmd = "add_library"
+            cmd = f"add_library({name} STATIC"
         elif proj.kind == Api.ProjectKind.SHARED_LIB:
-            cmd = "add_library"
+            cmd = f"add_library({name} SHARED"
         else:
             return
 
         f.write(f"\n# Project: {name}\n")
-        # Collecter les fichiers sources
-        src_exts = Builder.GetSourceFileExtensions(proj.language)
-        hdr_exts = Builder.GetHeaderFileExtensions()
-        src_files = []
-        hdr_files = []
-        base_dir = Path(proj.location) if proj.location else Path.cwd()
+        src_files, hdr_files = GenCommand._CollectProjectFilesForGen(proj, builder)
 
-        for pattern in proj.files:
-            matched = FileSystem.ListFiles(base_dir, pattern, recursive=True, fullPath=True)
-            for m in matched:
-                p = Path(m)
-                ext = p.suffix.lower()
-                if ext in src_exts:
-                    src_files.append(str(p.relative_to(base_dir)))
-                elif ext in hdr_exts:
-                    hdr_files.append(str(p.relative_to(base_dir)))
-
-        # Écrire la commande
-        f.write(f"{cmd}({name}\n")
+        # Écrire la commande principale
+        f.write(f"{cmd}\n")
         for sf in src_files:
-            f.write(f"    {sf}\n")
+            f.write(f"  \"{sf}\"\n")
         f.write(")\n")
 
         # Headers (pour IDE)
         if hdr_files:
             f.write(f"target_sources({name} PRIVATE\n")
             for hf in hdr_files:
-                f.write(f"    {hf}\n")
+                f.write(f"  \"{hf}\"\n")
             f.write(")\n")
 
         # Includes
         if proj.includeDirs:
             f.write(f"target_include_directories({name} PRIVATE\n")
             for inc in proj.includeDirs:
-                f.write(f"    {inc}\n")
+                resolved = builder.ResolveProjectPath(proj, inc)
+                f.write(f"  \"{resolved}\"\n")
+            f.write(")\n")
+
+        # Library search paths
+        if proj.libDirs:
+            f.write(f"target_link_directories({name} PRIVATE\n")
+            for libdir in proj.libDirs:
+                resolved = builder.ResolveProjectPath(proj, libdir)
+                f.write(f"  \"{resolved}\"\n")
             f.write(")\n")
 
         # Définitions
         if proj.defines:
             f.write(f"target_compile_definitions({name} PRIVATE\n")
             for d in proj.defines:
-                f.write(f"    {d}\n")
+                f.write(f"  {d}\n")
+            f.write(")\n")
+
+        # Compile options
+        c_flags = [flag for flag in proj.cflags if flag]
+        cxx_flags = [flag for flag in proj.cxxflags if flag]
+        if c_flags:
+            f.write(f"target_compile_options({name} PRIVATE\n")
+            for flag in c_flags:
+                f.write(f"  $<$<COMPILE_LANGUAGE:C>:{flag}>\n")
+            f.write(")\n")
+        if cxx_flags:
+            f.write(f"target_compile_options({name} PRIVATE\n")
+            for flag in cxx_flags:
+                f.write(f"  $<$<COMPILE_LANGUAGE:CXX>:{flag}>\n")
+            f.write(")\n")
+
+        # Link options
+        if proj.ldflags:
+            f.write(f"target_link_options({name} PRIVATE\n")
+            for flag in proj.ldflags:
+                f.write(f"  {flag}\n")
             f.write(")\n")
 
         # Librairies
         if proj.links:
             f.write(f"target_link_libraries({name} PRIVATE\n")
             for lib in proj.links:
-                f.write(f"    {lib}\n")
+                if lib in workspace.projects:
+                    f.write(f"  {lib}\n")
+                else:
+                    f.write(f"  {lib}\n")
+            f.write(")\n")
+
+        # Dépendances explicites de build order
+        deps = [dep for dep in proj.dependsOn if dep in workspace.projects and not dep.startswith("__")]
+        if deps:
+            f.write(f"add_dependencies({name}\n")
+            for dep in deps:
+                f.write(f"  {dep}\n")
             f.write(")\n")
 
         # Propriétés spécifiques
@@ -190,56 +370,340 @@ class GenCommand:
             std_flag = f"set_property(TARGET {name} PROPERTY C_STANDARD {proj.cdialect.replace('C', '')})\n"
         f.write(std_flag)
 
-        # Répertoires de sortie
+        # Répertoires de sortie (selon contexte de génération)
+        target_dir = str(builder.GetTargetDir(proj))
+        f.write(f"set_target_properties({name} PROPERTIES\n")
         if proj.kind in (Api.ProjectKind.CONSOLE_APP, Api.ProjectKind.WINDOWED_APP, Api.ProjectKind.TEST_SUITE):
-            f.write(f"set_target_properties({name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY \"${{JENGA_OUTPUT_BIN}}/{name}\")\n")
+            f.write(f"  RUNTIME_OUTPUT_DIRECTORY \"{target_dir}\"\n")
         elif proj.kind == Api.ProjectKind.SHARED_LIB:
-            f.write(f"set_target_properties({name} PROPERTIES LIBRARY_OUTPUT_DIRECTORY \"${{JENGA_OUTPUT_LIB}}/{name}\")\n")
-            f.write(f"set_target_properties({name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY \"${{JENGA_OUTPUT_BIN}}/{name}\")\n")  # DLL sur Windows
+            f.write(f"  LIBRARY_OUTPUT_DIRECTORY \"{target_dir}\"\n")
+            f.write(f"  RUNTIME_OUTPUT_DIRECTORY \"{target_dir}\"\n")
         elif proj.kind == Api.ProjectKind.STATIC_LIB:
-            f.write(f"set_target_properties({name} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY \"${{JENGA_OUTPUT_LIB}}/{name}\")\n")
+            f.write(f"  ARCHIVE_OUTPUT_DIRECTORY \"{target_dir}\"\n")
+        f.write(")\n")
 
         f.write("\n")
+
+    @staticmethod
+    def _CollectProjectFilesForGen(proj, builder: Builder) -> Tuple[List[str], List[str]]:
+        """Collect source/header files for generators using project globs and excludes."""
+        import glob as _glob
+
+        src_files = builder._CollectSourceFiles(proj)
+
+        # Collect headers from project file patterns while honoring exclusions.
+        hdr_exts = set(Builder.GetHeaderFileExtensions())
+        header_files: List[str] = []
+        workspace_base = Path(builder.workspace.location).resolve() if builder.workspace and builder.workspace.location else Path.cwd()
+        if proj.location:
+            proj_base = Path(proj.location)
+            if not proj_base.is_absolute():
+                proj_base = (workspace_base / proj_base).resolve()
+            else:
+                proj_base = proj_base.resolve()
+        else:
+            proj_base = workspace_base
+
+        excluded = set()
+        for pattern in proj.excludeFiles:
+            expanded_pattern = pattern
+            if getattr(builder, "_expander", None):
+                builder._expander.SetProject(proj)
+                expanded_pattern = builder._expander.Expand(pattern, recursive=True)
+            p = Path(expanded_pattern)
+            if p.is_absolute():
+                if any(ch in expanded_pattern for ch in ("*", "?", "[")):
+                    excluded.update([m for m in _glob.glob(expanded_pattern, recursive=True) if Path(m).is_file()])
+                elif p.exists():
+                    excluded.add(str(p.resolve()))
+            else:
+                excluded.update(FileSystem.ListFiles(proj_base, pattern=expanded_pattern, recursive=True, fullPath=True))
+
+        for pattern in proj.files:
+            expanded_pattern = pattern
+            if getattr(builder, "_expander", None):
+                builder._expander.SetProject(proj)
+                expanded_pattern = builder._expander.Expand(pattern, recursive=True)
+
+            p = Path(expanded_pattern)
+            if p.is_absolute():
+                if any(ch in expanded_pattern for ch in ("*", "?", "[")):
+                    matched = [m for m in _glob.glob(expanded_pattern, recursive=True) if Path(m).is_file()]
+                elif p.exists():
+                    matched = [str(p.resolve())]
+                else:
+                    matched = []
+            else:
+                matched = FileSystem.ListFiles(proj_base, pattern=expanded_pattern, recursive=True, fullPath=True)
+
+            for f in matched:
+                p = Path(f).resolve()
+                if str(p) in excluded:
+                    continue
+                if p.suffix.lower() in hdr_exts:
+                    header_files.append(str(p))
+
+        src_files = sorted(set(src_files))
+        header_files = sorted(set(header_files))
+        return src_files, header_files
 
     # -----------------------------------------------------------------------
     # Générateur Makefile (simple)
     # -----------------------------------------------------------------------
 
     @staticmethod
-    def _GenerateMakefile(workspace, output_dir: Path):
-        """Génère un Makefile basique pour le workspace."""
+    def _GenerateMakefile(workspace, output_dir: Path, builder: Builder, entry_file: Path):
+        """Génère un Makefile robuste pour le workspace."""
         make_path = output_dir / "Makefile"
+        projects = [name for name in workspace.projects.keys() if not name.startswith("__")]
+        default_platform = builder.platform or builder.targetOs.value
+        default_target = workspace.startProject or (projects[0] if projects else "")
         with open(make_path, 'w', encoding='utf-8') as f:
             f.write("# Makefile generated by Jenga\n\n")
             f.write(f"WORKSPACE = {workspace.name}\n")
+            f.write(f"JENGA ?= jenga\n")
+            f.write(f"JENGA_FILE ?= {entry_file}\n")
             f.write("CONFIG ?= Debug\n")
-            f.write("PLATFORM ?= $(shell uname -s)\n\n")
+            f.write(f"PLATFORM ?= {default_platform}\n")
+            if default_target:
+                f.write(f"TARGET ?= {default_target}\n")
+            f.write("\n")
 
-            f.write("all: $(WORKSPACE)\n\n")
-            f.write(f"$(WORKSPACE):\n")
-            f.write("\t@echo \"Building workspace $(WORKSPACE) with config=$(CONFIG), platform=$(PLATFORM)\"\n")
-            f.write("\t@jenga build --config $(CONFIG) --platform $(PLATFORM)\n\n")
+            if projects:
+                f.write(f"PROJECTS := {' '.join(projects)}\n\n")
+                f.write("all: $(PROJECTS:%=build-%)\n\n")
+                f.write("build-%:\n")
+                f.write("\t@$(JENGA) build --action build --config $(CONFIG) --platform $(PLATFORM) --target $* --jenga-file $(JENGA_FILE)\n\n")
+            else:
+                f.write("all:\n")
+                f.write("\t@$(JENGA) build --action build --config $(CONFIG) --platform $(PLATFORM) --jenga-file $(JENGA_FILE)\n\n")
+
+            f.write("build:\n")
+            f.write("\t@$(JENGA) build --action build --config $(CONFIG) --platform $(PLATFORM) --jenga-file $(JENGA_FILE)\n\n")
 
             f.write("clean:\n")
-            f.write("\t@jenga clean --config $(CONFIG) --platform $(PLATFORM)\n\n")
+            f.write("\t@$(JENGA) clean --config $(CONFIG) --jenga-file $(JENGA_FILE)\n\n")
 
-            f.write("rebuild: clean all\n\n")
-            f.write("run:\n")
-            f.write("\t@jenga run --config $(CONFIG) --platform $(PLATFORM)\n\n")
+            f.write("rebuild:\n")
+            f.write("\t@$(JENGA) rebuild --config $(CONFIG) --platform $(PLATFORM) --jenga-file $(JENGA_FILE)\n\n")
+
+            if default_target:
+                f.write("run:\n")
+                f.write("\t@$(JENGA) run $(TARGET) --config $(CONFIG) --platform $(PLATFORM) --jenga-file $(JENGA_FILE)\n\n")
 
             f.write("test:\n")
-            f.write("\t@jenga test --config $(CONFIG) --platform $(PLATFORM)\n\n")
+            f.write("\t@$(JENGA) test --config $(CONFIG) --platform $(PLATFORM) --jenga-file $(JENGA_FILE)\n\n")
 
-            f.write(".PHONY: all clean rebuild run test\n")
+            phony_targets = ["all", "build", "clean", "rebuild", "test"]
+            if default_target:
+                phony_targets.append("run")
+            if projects:
+                phony_targets.append("build-%")
+            f.write(f".PHONY: {' '.join(phony_targets)}\n")
 
         Colored.PrintSuccess(f"Makefile generated: {make_path}")
+
+    @staticmethod
+    def _GenerateMk(workspace, output_dir: Path, builder: Builder, entry_file: Path):
+        """Generate a reusable .mk include file for the workspace."""
+        mk_path = output_dir / f"{workspace.name}.mk"
+        projects = [name for name in workspace.projects.keys() if not name.startswith("__")]
+        default_platform = builder.platform or builder.targetOs.value
+        default_target = workspace.startProject or (projects[0] if projects else "")
+
+        with open(mk_path, "w", encoding="utf-8") as f:
+            f.write("# workspace.mk generated by Jenga\n")
+            f.write(f"WORKSPACE := {workspace.name}\n")
+            f.write("JENGA ?= jenga\n")
+            f.write(f"JENGA_FILE ?= {entry_file}\n")
+            f.write("CONFIG ?= Debug\n")
+            f.write(f"PLATFORM ?= {default_platform}\n")
+            if default_target:
+                f.write(f"TARGET ?= {default_target}\n")
+            f.write("\n")
+            if projects:
+                f.write(f"PROJECTS := {' '.join(projects)}\n\n")
+            else:
+                f.write("PROJECTS :=\n\n")
+
+            f.write("define JENGA_BUILD\n")
+            f.write("\t@$(JENGA) build --action build --config $(CONFIG) --platform $(PLATFORM) --jenga-file $(JENGA_FILE) $(1)\n")
+            f.write("endef\n\n")
+
+            f.write("build:\n")
+            f.write("\t$(call JENGA_BUILD,)\n\n")
+
+            f.write("build-%:\n")
+            f.write("\t$(call JENGA_BUILD,--target $*)\n\n")
+
+            f.write("clean:\n")
+            f.write("\t@$(JENGA) clean --config $(CONFIG) --jenga-file $(JENGA_FILE)\n\n")
+
+            f.write("rebuild:\n")
+            f.write("\t@$(JENGA) rebuild --config $(CONFIG) --platform $(PLATFORM) --jenga-file $(JENGA_FILE)\n\n")
+
+            f.write("test:\n")
+            f.write("\t@$(JENGA) test --config $(CONFIG) --platform $(PLATFORM) --jenga-file $(JENGA_FILE)\n\n")
+
+            if default_target:
+                f.write("run:\n")
+                f.write("\t@$(JENGA) run $(TARGET) --config $(CONFIG) --platform $(PLATFORM) --jenga-file $(JENGA_FILE)\n\n")
+
+            f.write(".PHONY: build build-% clean rebuild test")
+            if default_target:
+                f.write(" run")
+            f.write("\n")
+
+        Colored.PrintSuccess(f"MK include generated: {mk_path}")
+
+    @staticmethod
+    def _MapArchToAndroidAbi(arch: Api.TargetArch) -> Optional[str]:
+        mapping = {
+            Api.TargetArch.ARM: "armeabi-v7a",
+            Api.TargetArch.ARM64: "arm64-v8a",
+            Api.TargetArch.X86: "x86",
+            Api.TargetArch.X86_64: "x86_64",
+        }
+        return mapping.get(arch)
+
+    @staticmethod
+    def _GenerateAndroidMk(workspace, output_dir: Path, builder: Builder):
+        """
+        Generate Android.mk + Application.mk for ndk-build workflows.
+        This is additive and does not replace the default native Jenga Android flow.
+        """
+        android_mk_path = output_dir / "Android.mk"
+        application_mk_path = output_dir / "Application.mk"
+
+        projects = [
+            proj for proj in workspace.projects.values()
+            if not proj.name.startswith("__")
+        ]
+        if not projects:
+            Colored.PrintWarning("No project available for Android.mk generation.")
+            return
+
+        module_names: Dict[str, str] = {}
+        for proj in projects:
+            module_names[proj.name] = (proj.targetName or proj.name).replace(" ", "_")
+
+        lines: List[str] = []
+        lines.append("# Android.mk generated by Jenga")
+        lines.append("LOCAL_PATH := $(call my-dir)")
+        lines.append("")
+
+        for proj in projects:
+            src_files, _ = GenCommand._CollectProjectFilesForGen(proj, builder)
+            if not src_files:
+                continue
+
+            module_name = module_names[proj.name]
+            project_srcs = [str(Path(src).resolve()) for src in src_files]
+            include_dirs = [str(Path(builder.ResolveProjectPath(proj, inc)).resolve()) for inc in proj.includeDirs]
+            defines = [f"-D{d}" for d in proj.defines if d]
+            cflags = [f for f in proj.cflags if f]
+            cxxflags = [f for f in proj.cxxflags if f]
+            ldlibs: List[str] = []
+            local_static: List[str] = []
+            local_shared: List[str] = []
+
+            for dep_name in proj.dependsOn:
+                dep_proj = workspace.projects.get(dep_name)
+                if not dep_proj or dep_name.startswith("__"):
+                    continue
+                dep_module = module_names.get(dep_name)
+                if not dep_module:
+                    continue
+                if dep_proj.kind == Api.ProjectKind.STATIC_LIB:
+                    local_static.append(dep_module)
+                else:
+                    local_shared.append(dep_module)
+
+            for link in proj.links:
+                if link in module_names:
+                    continue
+                link_token = str(link).strip()
+                if not link_token:
+                    continue
+                if link_token.startswith("-l"):
+                    ldlibs.append(link_token)
+                elif "/" in link_token or "\\" in link_token:
+                    # path-like libs should be handled by LOCAL_LDFLAGS
+                    ldlibs.append(link_token)
+                else:
+                    ldlibs.append(f"-l{link_token}")
+
+            lines.append("include $(CLEAR_VARS)")
+            lines.append(f"LOCAL_MODULE := {module_name}")
+            lines.append("LOCAL_SRC_FILES := \\")
+            for idx, src in enumerate(project_srcs):
+                suffix = " \\" if idx < len(project_srcs) - 1 else ""
+                lines.append(f"\t{src}{suffix}")
+
+            if include_dirs:
+                lines.append("LOCAL_C_INCLUDES := \\")
+                for idx, inc in enumerate(include_dirs):
+                    suffix = " \\" if idx < len(include_dirs) - 1 else ""
+                    lines.append(f"\t{inc}{suffix}")
+
+            if defines or cflags:
+                lines.append(f"LOCAL_CFLAGS += {' '.join(defines + cflags)}")
+            if defines or cxxflags:
+                lines.append(f"LOCAL_CPPFLAGS += {' '.join(defines + cxxflags)}")
+            if ldlibs:
+                lines.append(f"LOCAL_LDLIBS += {' '.join(ldlibs)}")
+            if local_static:
+                lines.append(f"LOCAL_STATIC_LIBRARIES += {' '.join(local_static)}")
+            if local_shared:
+                lines.append(f"LOCAL_SHARED_LIBRARIES += {' '.join(local_shared)}")
+
+            if proj.kind == Api.ProjectKind.STATIC_LIB:
+                lines.append("include $(BUILD_STATIC_LIBRARY)")
+            else:
+                lines.append("include $(BUILD_SHARED_LIBRARY)")
+            lines.append("")
+
+        android_mk_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        # Application.mk
+        app_abis: List[str] = []
+        for arch in (workspace.targetArchs or []):
+            abi = GenCommand._MapArchToAndroidAbi(arch)
+            if abi and abi not in app_abis:
+                app_abis.append(abi)
+        if not app_abis:
+            fallback = GenCommand._MapArchToAndroidAbi(builder.targetArch)
+            if fallback:
+                app_abis.append(fallback)
+        if not app_abis:
+            app_abis = ["arm64-v8a"]
+
+        min_sdk = 21
+        for proj in projects:
+            if getattr(proj, "androidMinSdk", None):
+                try:
+                    min_sdk = min(min_sdk, int(proj.androidMinSdk))
+                except Exception:
+                    pass
+
+        app_lines = [
+            "# Application.mk generated by Jenga",
+            f"APP_ABI := {' '.join(app_abis)}",
+            f"APP_PLATFORM := android-{min_sdk}",
+            "APP_STL := c++_shared",
+            "APP_CPPFLAGS += -std=c++17",
+        ]
+        application_mk_path.write_text("\n".join(app_lines) + "\n", encoding="utf-8")
+
+        Colored.PrintSuccess(f"Android.mk generated: {android_mk_path}")
+        Colored.PrintSuccess(f"Application.mk generated: {application_mk_path}")
 
     # -----------------------------------------------------------------------
     # Générateur Visual Studio 2022 (amélioré)
     # -----------------------------------------------------------------------
 
     @staticmethod
-    def _GenerateVS2022(workspace, output_dir: Path):
+    def _GenerateVS2022(workspace, output_dir: Path, builder: Builder):
         """Génère une solution Visual Studio 2022 avec tous les projets."""
         sln_path = output_dir / f"{workspace.name}.sln"
         vs_version = "17.0"
@@ -254,15 +718,26 @@ class GenCommand:
             f.write("VisualStudioVersion = 17.0.31903.59\n")
             f.write("MinimumVisualStudioVersion = 10.0.40219.1\n")
 
-            # Projets
-            project_guids = {}
+            # Projets (générer d'abord tous les GUIDs pour résoudre dépendances avant écriture)
+            project_guids = {
+                proj_name: "{" + str(uuid.uuid4()).upper() + "}"
+                for proj_name in workspace.projects.keys()
+                if not proj_name.startswith('__')
+            }
             for proj_name, proj in workspace.projects.items():
                 if proj_name.startswith('__'):
                     continue
-                proj_guid = "{" + str(uuid.uuid4()).upper() + "}"
-                project_guids[proj_name] = proj_guid
+                proj_guid = project_guids[proj_name]
                 proj_path = f"{proj_name}.vcxproj"
                 f.write(f'Project("{{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}}") = "{proj_name}", "{proj_path}", "{proj_guid}"\n')
+                project_deps = [dep for dep in proj.dependsOn if dep in workspace.projects and not dep.startswith("__")]
+                if project_deps:
+                    f.write("\tProjectSection(ProjectDependencies) = postProject\n")
+                    for dep in project_deps:
+                        dep_guid = project_guids.get(dep)
+                        if dep_guid:
+                            f.write(f"\t\t{dep_guid} = {dep_guid}\n")
+                    f.write("\tEndProjectSection\n")
                 f.write("EndProject\n")
 
             # Global
@@ -287,13 +762,13 @@ class GenCommand:
         for proj_name, proj in workspace.projects.items():
             if proj_name.startswith('__'):
                 continue
-            GenCommand._GenerateVCXProj(proj, output_dir / f"{proj_name}.vcxproj", workspace)
+            GenCommand._GenerateVCXProj(proj, output_dir / f"{proj_name}.vcxproj", workspace, builder)
 
         Colored.PrintSuccess(f"Visual Studio 2022 solution generated: {sln_path}")
 
     @staticmethod
-    def _GenerateVCXProj(project, proj_path: Path, workspace):
-        """Génère un fichier .vcxproj complet."""
+    def _GenerateVCXProj(project, proj_path: Path, workspace, builder: Builder):
+        """Génère un fichier .vcxproj avec dépendances et chemins complets."""
         from xml.etree.ElementTree import Element, SubElement, tostring
         import xml.dom.minidom
 
@@ -326,64 +801,134 @@ class GenCommand:
                 SubElement(pg, "PlatformToolset").text = "v143"
                 if project.kind == Api.ProjectKind.SHARED_LIB:
                     SubElement(pg, "LinkIncremental").text = "false"
+                target_dir = str(builder.GetTargetDir(project))
+                obj_dir = str(builder.GetObjectDir(project))
+                SubElement(pg, "OutDir").text = target_dir + "\\"
+                SubElement(pg, "IntDir").text = str(Path(obj_dir) / config / plat) + "\\"
 
         SubElement(root, "Import", Project="$(VCTargetsPath)\\Microsoft.Cpp.props")
 
-        # Include paths
-        ig_inc = SubElement(root, "ItemDefinitionGroup")
-        cl = SubElement(ig_inc, "ClCompile")
-        inc_paths = SubElement(cl, "AdditionalIncludeDirectories")
-        all_includes = project.includeDirs[:]
-        all_includes.append("%(AdditionalIncludeDirectories)")
-        inc_paths.text = ";".join(all_includes)
+        # Property sheet placeholders (MSBuild convention)
+        import_group = SubElement(root, "ImportGroup", Label="ExtensionSettings")
+        SubElement(root, "ImportGroup", Label="Shared")
+        for config in workspace.configurations:
+            for plat in ["x64", "Win32", "ARM64"]:
+                ig = SubElement(root, "ImportGroup", Label="PropertySheets", Condition=f"'$(Configuration)|$(Platform)'=='{config}|{plat}'")
+                SubElement(ig, "Import", Project="$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props",
+                           Condition="exists('$(UserRootDir)\\Microsoft.Cpp.$(Platform).user.props')",
+                           Label="LocalAppDataPlatform")
+        SubElement(root, "PropertyGroup", Label="UserMacros")
 
-        # Définitions
-        if project.defines:
-            defs = SubElement(cl, "PreprocessorDefinitions")
-            defs.text = ";".join(project.defines + ["%(PreprocessorDefinitions)"])
+        # Compiler/Linker settings per config/platform
+        for config in workspace.configurations:
+            for plat in ["x64", "Win32", "ARM64"]:
+                ig_def = SubElement(root, "ItemDefinitionGroup", Condition=f"'$(Configuration)|$(Platform)'=='{config}|{plat}'")
+                cl = SubElement(ig_def, "ClCompile")
+                link = SubElement(ig_def, "Link")
 
-        # Standard
-        if project.language == Api.Language.CPP:
-            SubElement(cl, "LanguageStandard").text = "stdcpp" + project.cppdialect.replace("C++", "")
-        elif project.language == Api.Language.C:
-            SubElement(cl, "LanguageStandard_C").text = "stdc" + project.cdialect.replace("C", "")
+                # Includes
+                include_dirs = [builder.ResolveProjectPath(project, inc) for inc in project.includeDirs]
+                include_dirs.append("%(AdditionalIncludeDirectories)")
+                SubElement(cl, "AdditionalIncludeDirectories").text = ";".join(include_dirs)
 
-        # Optimisation
-        opt = project.optimize.value if hasattr(project.optimize, 'value') else project.optimize
-        if opt == "Off":
-            SubElement(cl, "Optimization").text = "Disabled"
-        elif opt == "Size":
-            SubElement(cl, "Optimization").text = "MinSpace"
-        elif opt == "Speed":
-            SubElement(cl, "Optimization").text = "MaxSpeed"
-        elif opt == "Full":
-            SubElement(cl, "Optimization").text = "Full"
+                # Defines
+                defs = list(project.defines)
+                if config.lower() == "debug":
+                    defs.extend(["_DEBUG", "DEBUG"])
+                else:
+                    defs.extend(["NDEBUG", "RELEASE"])
+                defs.append("%(PreprocessorDefinitions)")
+                SubElement(cl, "PreprocessorDefinitions").text = ";".join(dict.fromkeys(defs))
 
-        # Fichiers sources
-        src_exts = Builder.GetSourceFileExtensions(project.language)
-        hdr_exts = Builder.GetHeaderFileExtensions()
+                # Language standard
+                if project.language == Api.Language.CPP:
+                    SubElement(cl, "LanguageStandard").text = "stdcpp" + project.cppdialect.replace("C++", "")
+                elif project.language == Api.Language.C:
+                    SubElement(cl, "LanguageStandard_C").text = "stdc" + project.cdialect.replace("C", "")
 
-        base_dir = Path(project.location) if project.location else Path.cwd()
-        for pattern in project.files:
-            matched = FileSystem.ListFiles(base_dir, pattern, recursive=True, fullPath=True)
-            for f in matched:
-                rel = Path(f).relative_to(base_dir)
-                ext = Path(f).suffix.lower()
-                if ext in src_exts:
-                    ig_src = SubElement(root, "ItemGroup")
-                    SubElement(ig_src, "ClCompile", Include=str(rel))
-                elif ext in hdr_exts:
-                    ig_hdr = SubElement(root, "ItemGroup")
-                    SubElement(ig_hdr, "ClInclude", Include=str(rel))
+                # Warnings
+                warn = project.warnings.value if hasattr(project.warnings, "value") else str(project.warnings)
+                warn_map = {
+                    "None": "TurnOffAllWarnings",
+                    "Default": "Level3",
+                    "All": "Level4",
+                    "Extra": "Level4",
+                    "Pedantic": "Level4",
+                    "Everything": "EnableAllWarnings",
+                    "Error": "Level4",
+                }
+                SubElement(cl, "WarningLevel").text = warn_map.get(warn, "Level3")
+                if warn == "Error":
+                    SubElement(cl, "TreatWarningAsError").text = "true"
 
-        # Link
-        if project.links:
-            ig_link = SubElement(root, "ItemDefinitionGroup")
-            link = SubElement(ig_link, "Link")
-            deps = SubElement(link, "AdditionalDependencies")
-            deps.text = ";".join([f"{lib}.lib" for lib in project.links] + ["%(AdditionalDependencies)"])
+                # Debug symbols
+                if project.symbols or config.lower() == "debug":
+                    SubElement(cl, "DebugInformationFormat").text = "ProgramDatabase"
+
+                # Optimization
+                opt = project.optimize.value if hasattr(project.optimize, 'value') else project.optimize
+                opt_map = {
+                    "Off": "Disabled",
+                    "Size": "MinSpace",
+                    "Speed": "MaxSpeed",
+                    "Full": "Full",
+                }
+                SubElement(cl, "Optimization").text = opt_map.get(opt, "Disabled" if config.lower() == "debug" else "MaxSpeed")
+
+                # Custom compile flags
+                extra_compile = list(project.cflags) + list(project.cxxflags)
+                if extra_compile:
+                    SubElement(cl, "AdditionalOptions").text = " ".join(extra_compile) + " %(AdditionalOptions)"
+
+                # Link dependencies
+                libs: List[str] = []
+                for lib in project.links:
+                    if lib in workspace.projects:
+                        deps_proj = workspace.projects[lib]
+                        lib_name = deps_proj.targetName or deps_proj.name
+                        if not lib_name.lower().endswith(".lib"):
+                            lib_name += ".lib"
+                        libs.append(lib_name)
+                    else:
+                        lib_text = lib
+                        if not (lib_text.lower().endswith(".lib") or "\\" in lib_text or "/" in lib_text):
+                            lib_text += ".lib"
+                        libs.append(lib_text)
+                libs.append("%(AdditionalDependencies)")
+                SubElement(link, "AdditionalDependencies").text = ";".join(dict.fromkeys(libs))
+
+                # Link directories
+                lib_dirs = [builder.ResolveProjectPath(project, d) for d in project.libDirs]
+                for dep in project.dependsOn:
+                    if dep in workspace.projects and not dep.startswith("__"):
+                        lib_dirs.append(str(builder.GetTargetDir(workspace.projects[dep])))
+                lib_dirs.append("%(AdditionalLibraryDirectories)")
+                SubElement(link, "AdditionalLibraryDirectories").text = ";".join(dict.fromkeys(lib_dirs))
+
+                # Custom link options
+                if project.ldflags:
+                    SubElement(link, "AdditionalOptions").text = " ".join(project.ldflags) + " %(AdditionalOptions)"
+
+        # Fichiers sources / headers
+        src_files, hdr_files = GenCommand._CollectProjectFilesForGen(project, builder)
+        if src_files:
+            ig_src = SubElement(root, "ItemGroup")
+            for src in src_files:
+                SubElement(ig_src, "ClCompile", Include=src)
+        if hdr_files:
+            ig_hdr = SubElement(root, "ItemGroup")
+            for hdr in hdr_files:
+                SubElement(ig_hdr, "ClInclude", Include=hdr)
+
+        # Project references for local dependencies
+        dep_projects = [dep for dep in project.dependsOn if dep in workspace.projects and not dep.startswith("__")]
+        if dep_projects:
+            ig_refs = SubElement(root, "ItemGroup")
+            for dep in dep_projects:
+                SubElement(ig_refs, "ProjectReference", Include=f"{dep}.vcxproj")
 
         SubElement(root, "Import", Project="$(VCTargetsPath)\\Microsoft.Cpp.targets")
+        SubElement(root, "ImportGroup", Label="ExtensionTargets")
 
         # Pretty print
         xml_str = tostring(root, encoding='utf-8')
@@ -405,6 +950,482 @@ class GenCommand:
             return "Application"
 
     @staticmethod
-    def _GenerateXcode(workspace, output_dir: Path):
-        """Génère un projet Xcode (placeholder)."""
-        Colored.PrintWarning("Xcode generator is not yet implemented.")
+    def _GenerateXcode(workspace, output_dir: Path, builder: Optional[Builder] = None):
+        """Generate a real .xcodeproj with project.pbxproj."""
+        if builder is None:
+            Colored.PrintError("Xcode generation requires a generation builder context.")
+            return
+
+        import plistlib
+
+        xcodeproj_dir = output_dir / f"{workspace.name}.xcodeproj"
+        FileSystem.MakeDirectory(xcodeproj_dir)
+
+        pbxproj, target_meta = GenCommand._BuildXcodePbxProj(workspace, builder)
+        pbxproj_path = xcodeproj_dir / "project.pbxproj"
+        with open(pbxproj_path, "wb") as f:
+            plistlib.dump(pbxproj, f, fmt=plistlib.FMT_XML, sort_keys=False)
+
+        # Shared scheme for start project (or first non-internal target)
+        start_target = workspace.startProject
+        if not start_target or start_target not in workspace.projects or start_target.startswith("__"):
+            for proj_name in workspace.projects.keys():
+                if not proj_name.startswith("__"):
+                    start_target = proj_name
+                    break
+        if start_target and start_target in target_meta:
+            GenCommand._WriteXcodeScheme(xcodeproj_dir, workspace, start_target, target_meta[start_target])
+        GenCommand._WriteXcodeWorkspaceSettings(xcodeproj_dir)
+
+        Colored.PrintSuccess(f"Xcode project generated: {xcodeproj_dir}")
+
+    @staticmethod
+    def _XcodeNewId(state: Dict[str, int]) -> str:
+        state["counter"] += 1
+        return f"{state['counter']:024X}"
+
+    @staticmethod
+    def _XcodeFileType(path: Path) -> str:
+        ext = path.suffix.lower()
+        mapping = {
+            ".c": "sourcecode.c.c",
+            ".m": "sourcecode.c.objc",
+            ".mm": "sourcecode.cpp.objcpp",
+            ".cc": "sourcecode.cpp.cpp",
+            ".cpp": "sourcecode.cpp.cpp",
+            ".cxx": "sourcecode.cpp.cpp",
+            ".c++": "sourcecode.cpp.cpp",
+            ".cppm": "sourcecode.cpp.cpp",
+            ".ixx": "sourcecode.cpp.cpp",
+            ".mpp": "sourcecode.cpp.cpp",
+            ".h": "sourcecode.c.h",
+            ".hpp": "sourcecode.c.h",
+            ".hxx": "sourcecode.c.h",
+            ".hh": "sourcecode.c.h",
+            ".inl": "sourcecode.c.h",
+            ".s": "sourcecode.asm",
+            ".asm": "sourcecode.asm",
+        }
+        return mapping.get(ext, "text")
+
+    @staticmethod
+    def _XcodeDialectCpp(dialect: str) -> str:
+        value = (dialect or "C++17").strip().lower().replace(" ", "")
+        if value.startswith("c++"):
+            value = "c++" + value[3:]
+        return value
+
+    @staticmethod
+    def _XcodeDialectC(dialect: str) -> str:
+        value = (dialect or "C11").strip().lower().replace(" ", "")
+        if value.startswith("c"):
+            value = "gnu" + value
+        return value
+
+    @staticmethod
+    def _XcodeOptimization(project, config_name: str) -> str:
+        config_lower = (config_name or "").strip().lower()
+        if config_lower == "debug":
+            return "0"
+        opt = project.optimize.value if hasattr(project.optimize, "value") else str(project.optimize)
+        mapping = {
+            "Off": "0",
+            "Size": "s",
+            "Speed": "3",
+            "Full": "fast",
+        }
+        return mapping.get(str(opt), "3")
+
+    @staticmethod
+    def _XcodeProductSpec(project) -> Dict[str, str]:
+        target_name = (project.targetName or project.name).replace(" ", "_")
+        if project.kind == Api.ProjectKind.STATIC_LIB:
+            return {
+                "product_type": "com.apple.product-type.library.static",
+                "product_file_type": "archive.ar",
+                "product_file_name": f"lib{target_name}.a",
+                "executable_extension": "a",
+                "executable_prefix": "lib",
+                "mach_o_type": "staticlib",
+            }
+        if project.kind == Api.ProjectKind.SHARED_LIB:
+            return {
+                "product_type": "com.apple.product-type.library.dynamic",
+                "product_file_type": "compiled.mach-o.dylib",
+                "product_file_name": f"lib{target_name}.dylib",
+                "executable_extension": "dylib",
+                "executable_prefix": "lib",
+                "mach_o_type": "mh_dylib",
+            }
+        if project.kind == Api.ProjectKind.WINDOWED_APP:
+            return {
+                "product_type": "com.apple.product-type.application",
+                "product_file_type": "wrapper.application",
+                "product_file_name": f"{target_name}.app",
+                "executable_extension": "",
+                "executable_prefix": "",
+                "mach_o_type": "mh_execute",
+            }
+        # Console app + test suite default to command line tool.
+        return {
+            "product_type": "com.apple.product-type.tool",
+            "product_file_type": "compiled.mach-o.executable",
+            "product_file_name": target_name,
+            "executable_extension": "",
+            "executable_prefix": "",
+            "mach_o_type": "mh_execute",
+        }
+
+    @staticmethod
+    def _BuildXcodeTargetBuildSettings(project, workspace, builder: Builder, config_name: str) -> Dict[str, Any]:
+        include_dirs = [str(Path(builder.ResolveProjectPath(project, inc)).resolve()) for inc in project.includeDirs]
+        lib_dirs = [str(Path(builder.ResolveProjectPath(project, d)).resolve()) for d in project.libDirs]
+        for dep_name in project.dependsOn:
+            dep_proj = workspace.projects.get(dep_name)
+            if dep_proj and not dep_name.startswith("__"):
+                dep_dir = str(builder.GetTargetDir(dep_proj))
+                if dep_dir not in lib_dirs:
+                    lib_dirs.append(dep_dir)
+
+        defines = [str(d) for d in project.defines if str(d).strip()]
+        if config_name.lower() == "debug":
+            if "DEBUG=1" not in defines:
+                defines.append("DEBUG=1")
+        else:
+            if "NDEBUG=1" not in defines:
+                defines.append("NDEBUG=1")
+        defines.append("$(inherited)")
+
+        other_ldflags: List[str] = []
+        for link in project.links:
+            token = str(link).strip()
+            if not token or token in workspace.projects:
+                continue
+            if token.startswith("-"):
+                other_ldflags.append(token)
+            elif "/" in token or "\\" in token:
+                other_ldflags.append(token)
+            else:
+                other_ldflags.append(f"-l{token}")
+        other_ldflags.extend([str(flag) for flag in project.ldflags if str(flag).strip()])
+        other_ldflags.append("$(inherited)")
+
+        settings: Dict[str, Any] = {
+            "ALWAYS_SEARCH_USER_PATHS": "NO",
+            "CLANG_ENABLE_MODULES": "YES",
+            "CLANG_CXX_LANGUAGE_STANDARD": GenCommand._XcodeDialectCpp(project.cppdialect),
+            "CLANG_CXX_LIBRARY": "libc++",
+            "GCC_C_LANGUAGE_STANDARD": GenCommand._XcodeDialectC(project.cdialect),
+            "HEADER_SEARCH_PATHS": include_dirs + ["$(inherited)"],
+            "LIBRARY_SEARCH_PATHS": lib_dirs + ["$(inherited)"],
+            "GCC_PREPROCESSOR_DEFINITIONS": defines,
+            "OTHER_CFLAGS": [str(flag) for flag in project.cflags if str(flag).strip()] + ["$(inherited)"],
+            "OTHER_CPLUSPLUSFLAGS": [str(flag) for flag in project.cxxflags if str(flag).strip()] + ["$(inherited)"],
+            "OTHER_LDFLAGS": other_ldflags,
+            "CONFIGURATION_BUILD_DIR": str(builder.GetTargetDir(project)),
+            "DEBUG_INFORMATION_FORMAT": "dwarf" if config_name.lower() == "debug" else "dwarf-with-dsym",
+            "GCC_OPTIMIZATION_LEVEL": GenCommand._XcodeOptimization(project, config_name),
+            "ENABLE_TESTABILITY": "YES" if config_name.lower() == "debug" else "NO",
+            "SDKROOT": "macosx",
+            "MACOSX_DEPLOYMENT_TARGET": "11.0",
+        }
+
+        product_spec = GenCommand._XcodeProductSpec(project)
+        target_name = (project.targetName or project.name).replace(" ", "_")
+        settings["PRODUCT_NAME"] = target_name
+        settings["MACH_O_TYPE"] = product_spec["mach_o_type"]
+        if product_spec["executable_prefix"]:
+            settings["EXECUTABLE_PREFIX"] = product_spec["executable_prefix"]
+        if product_spec["executable_extension"]:
+            settings["EXECUTABLE_EXTENSION"] = product_spec["executable_extension"]
+        return settings
+
+    @staticmethod
+    def _BuildXcodePbxProj(workspace, builder: Builder) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]]]:
+        ids = {"counter": 0}
+        objects: Dict[str, Dict[str, Any]] = {}
+        configs = list(workspace.configurations or ["Debug", "Release"])
+
+        main_group_id = GenCommand._XcodeNewId(ids)
+        products_group_id = GenCommand._XcodeNewId(ids)
+        project_config_list_id = GenCommand._XcodeNewId(ids)
+        project_id = GenCommand._XcodeNewId(ids)
+
+        objects[main_group_id] = {
+            "isa": "PBXGroup",
+            "children": [],
+            "sourceTree": "<group>",
+        }
+        objects[products_group_id] = {
+            "isa": "PBXGroup",
+            "children": [],
+            "name": "Products",
+            "sourceTree": "<group>",
+        }
+
+        project_cfg_ids: List[str] = []
+        for cfg_name in configs:
+            cfg_id = GenCommand._XcodeNewId(ids)
+            project_cfg_ids.append(cfg_id)
+            objects[cfg_id] = {
+                "isa": "XCBuildConfiguration",
+                "name": cfg_name,
+                "buildSettings": {
+                    "ALWAYS_SEARCH_USER_PATHS": "NO",
+                },
+            }
+        objects[project_config_list_id] = {
+            "isa": "XCConfigurationList",
+            "buildConfigurations": project_cfg_ids,
+            "defaultConfigurationIsVisible": "0",
+            "defaultConfigurationName": configs[0] if configs else "Debug",
+        }
+
+        target_ids: List[str] = []
+        target_meta: Dict[str, Dict[str, Any]] = {}
+
+        projects = [
+            (proj_name, proj) for proj_name, proj in workspace.projects.items()
+            if not proj_name.startswith("__")
+        ]
+
+        for proj_name, proj in projects:
+            target_name = (proj.targetName or proj.name).replace(" ", "_")
+            product_spec = GenCommand._XcodeProductSpec(proj)
+
+            group_id = GenCommand._XcodeNewId(ids)
+            product_ref_id = GenCommand._XcodeNewId(ids)
+            sources_phase_id = GenCommand._XcodeNewId(ids)
+            frameworks_phase_id = GenCommand._XcodeNewId(ids)
+            target_config_list_id = GenCommand._XcodeNewId(ids)
+            target_id = GenCommand._XcodeNewId(ids)
+            resources_phase_id = GenCommand._XcodeNewId(ids) if proj.kind == Api.ProjectKind.WINDOWED_APP else None
+
+            objects[group_id] = {
+                "isa": "PBXGroup",
+                "children": [],
+                "name": proj_name,
+                "sourceTree": "<group>",
+            }
+
+            src_files, hdr_files = GenCommand._CollectProjectFilesForGen(proj, builder)
+            file_refs: List[str] = []
+            source_build_files: List[str] = []
+            for filepath in src_files + hdr_files:
+                path_obj = Path(filepath)
+                file_ref_id = GenCommand._XcodeNewId(ids)
+                objects[file_ref_id] = {
+                    "isa": "PBXFileReference",
+                    "lastKnownFileType": GenCommand._XcodeFileType(path_obj),
+                    "name": path_obj.name,
+                    "path": str(path_obj.resolve()),
+                    "sourceTree": "<absolute>",
+                }
+                file_refs.append(file_ref_id)
+                if filepath in src_files:
+                    build_file_id = GenCommand._XcodeNewId(ids)
+                    objects[build_file_id] = {
+                        "isa": "PBXBuildFile",
+                        "fileRef": file_ref_id,
+                    }
+                    source_build_files.append(build_file_id)
+
+            objects[group_id]["children"] = file_refs
+
+            objects[sources_phase_id] = {
+                "isa": "PBXSourcesBuildPhase",
+                "buildActionMask": "2147483647",
+                "files": source_build_files,
+                "runOnlyForDeploymentPostprocessing": "0",
+            }
+            objects[frameworks_phase_id] = {
+                "isa": "PBXFrameworksBuildPhase",
+                "buildActionMask": "2147483647",
+                "files": [],
+                "runOnlyForDeploymentPostprocessing": "0",
+            }
+            if resources_phase_id:
+                objects[resources_phase_id] = {
+                    "isa": "PBXResourcesBuildPhase",
+                    "buildActionMask": "2147483647",
+                    "files": [],
+                    "runOnlyForDeploymentPostprocessing": "0",
+                }
+
+            target_cfg_ids: List[str] = []
+            for cfg_name in configs:
+                cfg_id = GenCommand._XcodeNewId(ids)
+                target_cfg_ids.append(cfg_id)
+                objects[cfg_id] = {
+                    "isa": "XCBuildConfiguration",
+                    "name": cfg_name,
+                    "buildSettings": GenCommand._BuildXcodeTargetBuildSettings(proj, workspace, builder, cfg_name),
+                }
+            objects[target_config_list_id] = {
+                "isa": "XCConfigurationList",
+                "buildConfigurations": target_cfg_ids,
+                "defaultConfigurationIsVisible": "0",
+                "defaultConfigurationName": configs[0] if configs else "Debug",
+            }
+
+            objects[product_ref_id] = {
+                "isa": "PBXFileReference",
+                "explicitFileType": product_spec["product_file_type"],
+                "includeInIndex": "0",
+                "path": product_spec["product_file_name"],
+                "sourceTree": "BUILT_PRODUCTS_DIR",
+            }
+
+            build_phases = [sources_phase_id, frameworks_phase_id]
+            if resources_phase_id:
+                build_phases.append(resources_phase_id)
+            objects[target_id] = {
+                "isa": "PBXNativeTarget",
+                "buildConfigurationList": target_config_list_id,
+                "buildPhases": build_phases,
+                "buildRules": [],
+                "dependencies": [],
+                "name": proj_name,
+                "productName": target_name,
+                "productReference": product_ref_id,
+                "productType": product_spec["product_type"],
+            }
+
+            target_ids.append(target_id)
+            objects[main_group_id]["children"].append(group_id)
+            objects[products_group_id]["children"].append(product_ref_id)
+            target_meta[proj_name] = {
+                "target_id": target_id,
+                "frameworks_phase_id": frameworks_phase_id,
+                "product_ref_id": product_ref_id,
+                "buildable_name": product_spec["product_file_name"],
+            }
+
+        # Attach product group after all project groups.
+        objects[main_group_id]["children"].append(products_group_id)
+
+        # Target dependencies + linked local products
+        for proj_name, proj in projects:
+            meta = target_meta.get(proj_name)
+            if not meta:
+                continue
+            target_obj = objects.get(meta["target_id"], {})
+            frameworks_phase_obj = objects.get(meta["frameworks_phase_id"], {})
+            dep_refs: List[str] = []
+            framework_build_files: List[str] = list(frameworks_phase_obj.get("files", []))
+            linked_locals = set()
+
+            local_links = [dep for dep in proj.dependsOn if dep in target_meta]
+            local_links.extend([lib for lib in proj.links if lib in target_meta])
+
+            for dep_name in local_links:
+                if dep_name == proj_name or dep_name in linked_locals:
+                    continue
+                linked_locals.add(dep_name)
+                dep_meta = target_meta[dep_name]
+
+                proxy_id = GenCommand._XcodeNewId(ids)
+                dep_id = GenCommand._XcodeNewId(ids)
+                build_file_id = GenCommand._XcodeNewId(ids)
+
+                objects[proxy_id] = {
+                    "isa": "PBXContainerItemProxy",
+                    "containerPortal": project_id,
+                    "proxyType": "1",
+                    "remoteGlobalIDString": dep_meta["target_id"],
+                    "remoteInfo": dep_name,
+                }
+                objects[dep_id] = {
+                    "isa": "PBXTargetDependency",
+                    "target": dep_meta["target_id"],
+                    "targetProxy": proxy_id,
+                }
+                objects[build_file_id] = {
+                    "isa": "PBXBuildFile",
+                    "fileRef": dep_meta["product_ref_id"],
+                }
+
+                dep_refs.append(dep_id)
+                framework_build_files.append(build_file_id)
+
+            if dep_refs:
+                target_obj["dependencies"] = dep_refs
+            if framework_build_files:
+                frameworks_phase_obj["files"] = framework_build_files
+
+        objects[project_id] = {
+            "isa": "PBXProject",
+            "attributes": {
+                "LastUpgradeCheck": "1500",
+            },
+            "buildConfigurationList": project_config_list_id,
+            "compatibilityVersion": "Xcode 14.0",
+            "developmentRegion": "en",
+            "hasScannedForEncodings": "0",
+            "knownRegions": ["en"],
+            "mainGroup": main_group_id,
+            "productRefGroup": products_group_id,
+            "projectDirPath": "",
+            "projectRoot": "",
+            "targets": target_ids,
+        }
+
+        pbx = {
+            "archiveVersion": "1",
+            "classes": {},
+            "objectVersion": "56",
+            "objects": objects,
+            "rootObject": project_id,
+        }
+        return pbx, target_meta
+
+    @staticmethod
+    def _WriteXcodeWorkspaceSettings(xcodeproj_dir: Path) -> None:
+        settings_dir = xcodeproj_dir / "project.xcworkspace" / "xcshareddata"
+        FileSystem.MakeDirectory(settings_dir)
+        settings_path = settings_dir / "WorkspaceSettings.xcsettings"
+        settings_path.write_text(
+            """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>BuildSystemType</key>
+    <string>Original</string>
+</dict>
+</plist>
+""",
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def _WriteXcodeScheme(xcodeproj_dir: Path, workspace, project_name: str, target_info: Dict[str, Any]) -> None:
+        scheme_dir = xcodeproj_dir / "xcshareddata" / "xcschemes"
+        FileSystem.MakeDirectory(scheme_dir)
+        proj = workspace.projects.get(project_name)
+        if proj is None:
+            return
+        buildable_name = str(target_info.get("buildable_name") or (proj.targetName or proj.name).replace(" ", "_"))
+        blueprint_id = str(target_info.get("target_id", ""))
+        if not blueprint_id:
+            return
+
+        scheme_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="1500" version="1.7">
+  <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES">
+    <BuildActionEntries>
+      <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">
+        <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="{blueprint_id}" BuildableName="{buildable_name}" BlueprintName="{project_name}" ReferencedContainer="container:{workspace.name}.xcodeproj"/>
+      </BuildActionEntry>
+    </BuildActionEntries>
+  </BuildAction>
+  <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES">
+    <Testables/>
+  </TestAction>
+  <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES"/>
+  <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"/>
+  <AnalyzeAction buildConfiguration="Debug"/>
+  <ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>
+</Scheme>
+"""
+        scheme_path = scheme_dir / f"{project_name}.xcscheme"
+        scheme_path.write_text(scheme_content, encoding="utf-8")

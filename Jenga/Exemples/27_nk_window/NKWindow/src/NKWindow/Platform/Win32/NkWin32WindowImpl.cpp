@@ -11,10 +11,53 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+
 #include <Windows.h>
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi.lib")
 #pragma comment(lib, "uxtheme.lib")
+
+// Dynamic loading of DPI-aware APIs (Windows 10 1607+)
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((DPI_AWARENESS_CONTEXT)-4)
+#endif
+
+typedef DPI_AWARENESS_CONTEXT (WINAPI *SetThreadDpiAwarenessContextProc)(DPI_AWARENESS_CONTEXT);
+typedef UINT (WINAPI *GetDpiForWindowProc)(HWND);
+
+namespace {
+    SetThreadDpiAwarenessContextProc pSetThreadDpiAwarenessContext = nullptr;
+    GetDpiForWindowProc pGetDpiForWindow = nullptr;
+    bool sDpiAPIsInitialized = false;
+    // Avoid dependency on external IID_ITaskbarList3 symbol export differences
+    // across MinGW variants.
+    const IID kIIDTaskbarList3 = {
+        0xEA1AFB91, 0x9E28, 0x4B86, {0x90, 0xE9, 0x9E, 0x9F, 0x8A, 0x5E, 0xEA, 0x84}
+    };
+
+    void InitializeDpiAPIs()
+    {
+        if (sDpiAPIsInitialized) return;
+        sDpiAPIsInitialized = true;
+
+        HMODULE user32 = GetModuleHandleA("user32.dll");
+        if (user32)
+        {
+            pSetThreadDpiAwarenessContext = (SetThreadDpiAwarenessContextProc)GetProcAddress(user32, "SetThreadDpiAwarenessContext");
+            pGetDpiForWindow = (GetDpiForWindowProc)GetProcAddress(user32, "GetDpiForWindow");
+        }
+    }
+
+    DPI_AWARENESS_CONTEXT NkSetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT ctx)
+    {
+        return pSetThreadDpiAwarenessContext ? pSetThreadDpiAwarenessContext(ctx) : nullptr;
+    }
+
+    UINT NkGetDpiForWindow(HWND hwnd)
+    {
+        return pGetDpiForWindow ? pGetDpiForWindow(hwnd) : USER_DEFAULT_SCREEN_DPI;
+    }
+}
 
 namespace nkentseu
 {
@@ -113,8 +156,9 @@ bool NkWin32WindowImpl::Create(const NkWindowConfig& config)
     RegisterClassExW(&wc); // peut échouer si déjà enregistrée
 
     // --- DPI awareness ---
+    InitializeDpiAPIs();
     DPI_AWARENESS_CONTEXT prev =
-        SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        NkSetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     // --- Création Unicode ---
     mData.hwnd = CreateWindowExW(
@@ -129,7 +173,7 @@ bool NkWin32WindowImpl::Create(const NkWindowConfig& config)
         mData.hinstance,
         nullptr);
 
-    SetThreadDpiAwarenessContext(prev);
+    NkSetThreadDpiAwarenessContext(prev);
 
     if (!mData.hwnd)
     {
@@ -161,7 +205,7 @@ bool NkWin32WindowImpl::Create(const NkWindowConfig& config)
 
     // --- Taskbar ---
     CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER,
-                     IID_ITaskbarList3,
+                     kIIDTaskbarList3,
                      reinterpret_cast<void**>(&mData.taskbarList));
 
     if (config.visible)
@@ -249,7 +293,7 @@ NkVec2u NkWin32WindowImpl::GetPosition() const
 float NkWin32WindowImpl::GetDpiScale() const
 {
     return mData.hwnd
-        ? static_cast<float>(GetDpiForWindow(mData.hwnd)) / USER_DEFAULT_SCREEN_DPI
+        ? static_cast<float>(NkGetDpiForWindow(mData.hwnd)) / USER_DEFAULT_SCREEN_DPI
         : 1.f;
 }
 
@@ -321,7 +365,12 @@ void NkWin32WindowImpl::ShowMouse(bool show)
 { ShowCursor(show ? TRUE : FALSE); }
 
 void NkWin32WindowImpl::CaptureMouse(bool cap)
-{ cap ? SetCapture(mData.hwnd) : ReleaseCapture(); }
+{
+    if (cap)
+        SetCapture(mData.hwnd);
+    else
+        ReleaseCapture();
+}
 
 void NkWin32WindowImpl::SetProgress(float progress)
 {

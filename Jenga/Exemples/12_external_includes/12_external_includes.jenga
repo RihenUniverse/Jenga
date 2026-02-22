@@ -1,9 +1,21 @@
+import os
 from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
 
 with workspace("ExternalIncludesDemo"):
+    RegisterJengaGlobalToolchains()
     configurations(["Debug", "Release"])
-    targetoses([TargetOS.WINDOWS, TargetOS.LINUX])
-    targetarchs([TargetArch.X86_64])
+    targetoses([
+        TargetOS.WINDOWS,
+        TargetOS.LINUX,
+        TargetOS.ANDROID,
+        TargetOS.WEB,
+    ])
+    targetarchs([TargetArch.X86_64, TargetArch.ARM64, TargetArch.WASM32])
+
+    # Android SDK/NDK paths
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
 
     with include("libs/logger.jenga"):
         pass
@@ -14,7 +26,29 @@ with workspace("ExternalIncludesDemo"):
     with project("App"):
         consoleapp()
         language("C++")
+        cppdialect("C++17")
         files(["src/main.cpp"])
         includedirs(["libs/logger/include", "libs/math/include"])
         links(["Logger", "MathLib"])
         dependson(["Logger", "MathLib"])
+
+        # Windows
+        with filter("system:Windows"):
+            usetoolchain("clang-mingw")
+
+        # Linux
+        with filter("system:Linux"):
+            usetoolchain("zig-linux-x64")
+
+        # Android
+        with filter("system:Android"):
+            usetoolchain("android-ndk")
+            androidapplicationid("com.jenga.externalincludes")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidabis(["arm64-v8a", "x86_64"])
+
+        # Web
+        with filter("system:Web"):
+            usetoolchain("emscripten")
+            emscripteninitialmemory(16)

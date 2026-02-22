@@ -11,6 +11,7 @@
 
 #include <cmath>
 #include <algorithm>
+#include <cstring>
 #include <stdexcept>
 
 namespace nkentseu
@@ -104,13 +105,78 @@ void NkRenderer::EndFrame()   { if (mImpl) mImpl->EndFrame(); }
 
 void NkRenderer::Present()
 {
-    if (!mImpl || !mWindow) return;
+    if (!mImpl) return;
+    if (mExternalTarget)
+        ResolveToExternalRenderTarget();
+    if (!mWindowPresentEnabled) return;
+    if (!mWindow || !mWindow->IsOpen()) return;
     mImpl->Present(mWindow->GetSurfaceDesc());
 }
 
 void NkRenderer::Resize(NkU32 w, NkU32 h)
 {
     if (mImpl) mImpl->Resize(w, h);
+}
+
+// ---------------------------------------------------------------------------
+// Sortie (fenêtre / offscreen)
+// ---------------------------------------------------------------------------
+
+void NkRenderer::SetWindowPresentEnabled(bool enabled)
+{
+    mWindowPresentEnabled = enabled;
+}
+
+bool NkRenderer::IsWindowPresentEnabled() const
+{
+    return mWindowPresentEnabled;
+}
+
+void NkRenderer::SetExternalRenderTarget(NkRenderTexture* target)
+{
+    mExternalTarget = target;
+}
+
+NkRenderTexture* NkRenderer::GetExternalRenderTarget() const
+{
+    return mExternalTarget;
+}
+
+bool NkRenderer::ResolveToExternalRenderTarget()
+{
+    if (!mExternalTarget || !mImpl) return false;
+
+    const NkFramebufferInfo& fb = mImpl->GetFramebufferInfo();
+    if (!fb.pixels || !fb.width || !fb.height || !fb.pitch) return false;
+
+    const NkU32 dstPitch = fb.width * 4;
+    if (fb.pitch < dstPitch) return false;
+
+    mExternalTarget->width  = fb.width;
+    mExternalTarget->height = fb.height;
+    mExternalTarget->pitch  = dstPitch;
+
+    const std::size_t rowCount = static_cast<std::size_t>(fb.height);
+    const std::size_t dstBytes = static_cast<std::size_t>(dstPitch) * rowCount;
+    mExternalTarget->pixels.resize(dstBytes);
+
+    const NkU8* src = fb.pixels;
+    NkU8*       dst = mExternalTarget->pixels.data();
+    if (fb.pitch == dstPitch)
+    {
+        std::memcpy(dst, src, dstBytes);
+        return true;
+    }
+
+    for (std::size_t row = 0; row < rowCount; ++row)
+    {
+        std::memcpy(
+            dst + row * dstPitch,
+            src + row * fb.pitch,
+            dstPitch
+        );
+    }
+    return true;
 }
 
 // ---------------------------------------------------------------------------

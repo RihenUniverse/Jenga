@@ -9,7 +9,7 @@ import sys
 from typing import List, Optional, Tuple
 
 from .Clean import CleanCommand
-from .Build import BuildCommand
+from .build import BuildCommand
 
 
 class RebuildCommand:
@@ -47,6 +47,7 @@ class RebuildCommand:
         # 2. Build
         build_args = [
             "--config", parsed.config,
+            "--action", "rebuild",
             "--no-cache" if parsed.no_cache else "",
             "--verbose" if parsed.verbose else "",
             "--no-daemon" if parsed.no_daemon else ""

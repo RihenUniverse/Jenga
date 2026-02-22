@@ -109,7 +109,7 @@ public:
                     float v = static_cast<float>(evt.value) / 32767.f;
                     if (std::abs(v) < NK_JS_DEADZONE) v = 0.f;
                     NkGamepadAxis ax = JsAxisToNk(evt.number);
-                    if (ax != NkGamepadAxis::NK_GP_AXIS_MAX)
+                    if (ax != NkGamepadAxis::NK_GAMEPAD_AXIS_MAX)
                         mStates[i].axes[static_cast<NkU32>(ax)] = v;
                 }
             }
@@ -372,7 +372,7 @@ private:
         case 5: return A::NK_GP_AXIS_RT;
         case 6: return A::NK_GP_AXIS_DPAD_X;
         case 7: return A::NK_GP_AXIS_DPAD_Y;
-        default: return A::NK_GP_AXIS_MAX; // invalide
+        default: return A::NK_GAMEPAD_AXIS_MAX; // invalide
         }
     }
 };

@@ -8,7 +8,6 @@ Gère les .dylib, .a, .app bundles, frameworks.
 
 from pathlib import Path
 from typing import List
-import plistlib
 
 from Jenga.Core.Api import Project, ProjectKind, CompilerFamily, TargetArch
 from ...Utils import Process, FileSystem
@@ -24,6 +23,12 @@ class MacOSBuilder(Builder):
         super().__init__(workspace, config, platform, targetOs, targetArch, targetEnv, verbose)
         # Apple Clang ou Clang standard
         self.is_apple_clang = self.toolchain.compilerFamily == CompilerFamily.APPLE_CLANG
+
+    @staticmethod
+    def _IsDirectLibPath(lib: str) -> bool:
+        """Return True if lib is a direct path (contains slash or extension)."""
+        p = Path(lib)
+        return p.suffix in (".a", ".dylib", ".so", ".framework", ".lib") or "/" in lib or "\\" in lib or p.is_absolute()
 
     @staticmethod
     def _EnumValue(v):
@@ -57,7 +62,9 @@ class MacOSBuilder(Builder):
         self._lastResult = result
         return result.returnCode == 0
 
-    def GetModuleFlags(self, sourceFile: str) -> List[str]:
+    def GetModuleFlags(self, project: Project, sourceFile: str) -> List[str]:
+        if not self.IsModuleFile(sourceFile):
+            return []
         return ["-std=c++20", "-fmodules", "-fcxx-modules"]
 
     def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
@@ -74,19 +81,31 @@ class MacOSBuilder(Builder):
             args = [linker, "-o", str(out)]
             if project.kind == ProjectKind.SHARED_LIB:
                 args.append("-dynamiclib")
-            # Frameworks
+            # Frameworks (toolchain)
             for fw in getattr(self.toolchain, 'frameworks', []):
-                args.append(f"-framework {fw}")
+                args.extend(["-framework", fw])
+            # Frameworks (project)
+            for fw in project.frameworks:
+                args.extend(["-framework", fw])
+            # Framework paths
             for fw_path in getattr(self.toolchain, 'frameworkPaths', []):
                 args.append(f"-F{fw_path}")
-            # Bibliothèques
+            # Library directories
             for libdir in project.libDirs:
                 args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
+            # Libraries (links)
             for lib in project.links:
-                args.append(f"-l{lib}")
+                if self._IsDirectLibPath(lib):
+                    args.append(self.ResolveProjectPath(project, lib))
+                else:
+                    args.append(f"-l{lib}")
             # RPATH
             args.append("-Wl,-rpath,@loader_path")
+            # Toolchain ldflags
             args.extend(self.toolchain.ldflags)
+            # Project ldflags
+            args.extend(project.ldflags)
+            # Object files
             args.extend(objectFiles)
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
@@ -96,13 +115,18 @@ class MacOSBuilder(Builder):
     def _GetCompilerFlags(self, project: Project) -> List[str]:
         flags = []
 
+        # Sysroot (if defined in toolchain)
+        if self.toolchain.sysroot:
+            flags.append(f"-isysroot{self.toolchain.sysroot}")
+
         # Includes
         for inc in project.includeDirs:
             flags.append(f"-I{self.ResolveProjectPath(project, inc)}")
 
-        # Définitions
+        # Defines (toolchain)
         for define in self.toolchain.defines:
             flags.append(f"-D{define}")
+        # Defines (project)
         for define in project.defines:
             flags.append(f"-D{define}")
 

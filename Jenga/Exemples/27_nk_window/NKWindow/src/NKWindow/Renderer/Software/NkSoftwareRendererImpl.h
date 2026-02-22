@@ -3,7 +3,7 @@
 // =============================================================================
 // NkSoftwareRendererImpl.h — Renderer logiciel (déclaration)
 // Séparé de l'implémentation dans NkSoftwareRendererImpl.cpp.
-// Present(surface) fait le blit OS (Win32/XCB/XLib/Android/iOS).
+// Present(surface) fait le blit OS (Win32/XCB/XLib/Android/WASM/iOS).
 // =============================================================================
 
 #include "../../Core/IRendererImpl.h"
@@ -61,6 +61,7 @@ private:
     void BlitXCB  (const NkSurfaceDesc& sd, NkU32 w, NkU32 h);
     void BlitXLib (const NkSurfaceDesc& sd, NkU32 w, NkU32 h);
     void BlitANW  (const NkSurfaceDesc& sd, NkU32 w, NkU32 h);
+    void BlitWASM (const NkSurfaceDesc& sd, NkU32 w, NkU32 h);
 };
 
 } // namespace nkentseu

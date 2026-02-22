@@ -47,6 +47,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     }
     LocalFree(wargv);
 
+#ifndef NK_APP_NAME
+#define NK_APP_NAME "windows_app"
+#endif
+
     nkentseu::NkEntryState state(hInstance, hPrevInstance, lpCmdLine, nCmdShow, args);
     state.appName = NK_APP_NAME;
     nkentseu::gState = &state;
@@ -56,7 +60,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     nkentseu::gState = nullptr;
     return result;
 }
-
-#ifndef NK_APP_NAME
-#define NK_APP_NAME "windows_app"
-#endif

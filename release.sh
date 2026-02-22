@@ -49,8 +49,8 @@ echo "[6/7] Reinstallation locale du wheel..."
 "$PYTHON_BIN" -m pip install --force-reinstall "$WHEEL_FILE"
 
 echo "[7/7] Verification de la version installee..."
-if [[ -f "$SCRIPT_DIR/jenga.sh" ]]; then
-    bash "$SCRIPT_DIR/jenga.sh" --version
+if [[ -f "$SCRIPT_DIR/Jenga/jenga.sh" ]]; then
+    bash "$SCRIPT_DIR/Jenga/jenga.sh" --version
 else
     jenga --version
 fi

@@ -2,7 +2,7 @@ from Jenga import *
 
 with workspace("ModulesCpp20"):
     configurations(["Debug", "Release"])
-    targetoses([TargetOS.WINDOWS])
+    targetoses([TargetOS.WINDOWS, TargetOS.LINUX])
     targetarchs([TargetArch.X86_64])
 
     with project("MathApp"):

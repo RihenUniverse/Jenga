@@ -24,8 +24,11 @@ bool NkAndroidWindowImpl::Create(const NkWindowConfig& config)
     mNativeWindow = nk_android_global_app->window;
     if (!mNativeWindow) { mLastError = NkError(2,"ANativeWindow null"); return false; }
 
+    // Forcer un format 32-bit cohérent avec le renderer software (RGBA8).
+    ANativeWindow_setBuffersGeometry(mNativeWindow, 0, 0, WINDOW_FORMAT_RGBA_8888);
     ANativeWindow_acquire(mNativeWindow);
     UpdateSafeArea();
+    SetScreenOrientation(mConfig.screenOrientation);
 
     IEventImpl* ev = NkGetEventImpl();
     if (ev) ev->Initialize(this, mNativeWindow);
@@ -89,6 +92,83 @@ NkSurfaceDesc NkAndroidWindowImpl::GetSurfaceDesc() const
 NkSafeAreaInsets NkAndroidWindowImpl::GetSafeAreaInsets() const
 {
     return mSafeArea;
+}
+
+void NkAndroidWindowImpl::SetScreenOrientation(NkScreenOrientation orientation)
+{
+    if (ApplyOrientation(orientation))
+        mOrientation = orientation;
+}
+
+void NkAndroidWindowImpl::SetAutoRotateEnabled(bool enabled)
+{
+    if (enabled)
+    {
+        SetScreenOrientation(NkScreenOrientation::NK_SCREEN_ORIENTATION_AUTO);
+        return;
+    }
+
+    NkVec2u sz = GetSize();
+    const bool landscape = (sz.x > sz.y);
+    SetScreenOrientation(
+        landscape ? NkScreenOrientation::NK_SCREEN_ORIENTATION_LANDSCAPE
+                  : NkScreenOrientation::NK_SCREEN_ORIENTATION_PORTRAIT
+    );
+}
+
+bool NkAndroidWindowImpl::ApplyOrientation(NkScreenOrientation orientation)
+{
+#ifdef __ANDROID__
+    if (!nk_android_global_app || !nk_android_global_app->activity || !nk_android_global_app->activity->vm)
+        return false;
+
+    JNIEnv* env = nullptr;
+    JavaVM* vm = nk_android_global_app->activity->vm;
+    bool attachedHere = false;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
+    {
+        if (vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env)
+            return false;
+        attachedHere = true;
+    }
+
+    bool ok = false;
+    jobject activity = nk_android_global_app->activity->clazz;
+    if (activity)
+    {
+        jclass actClass = env->GetObjectClass(activity);
+        if (actClass)
+        {
+            jmethodID setReq = env->GetMethodID(actClass, "setRequestedOrientation", "(I)V");
+            if (setReq)
+            {
+                jint requested = 10; // SCREEN_ORIENTATION_FULL_SENSOR
+                if (orientation == NkScreenOrientation::NK_SCREEN_ORIENTATION_PORTRAIT)
+                    requested = 1; // SCREEN_ORIENTATION_PORTRAIT
+                else if (orientation == NkScreenOrientation::NK_SCREEN_ORIENTATION_LANDSCAPE)
+                    requested = 0; // SCREEN_ORIENTATION_LANDSCAPE
+
+                env->CallVoidMethod(activity, setReq, requested);
+                if (!env->ExceptionCheck())
+                {
+                    ok = true;
+                }
+                else
+                {
+                    env->ExceptionClear();
+                }
+            }
+            env->DeleteLocalRef(actClass);
+        }
+    }
+
+    if (attachedHere)
+        vm->DetachCurrentThread();
+    return ok;
+#else
+    (void)orientation;
+    return false;
+#endif
 }
 
 void NkAndroidWindowImpl::UpdateSafeArea()

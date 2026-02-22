@@ -375,8 +375,8 @@ struct NkModifierState
     NkModifierState(bool ctrl, bool alt, bool shift, bool super = false)
         : ctrl(ctrl), alt(alt), shift(shift), super(super) {}
 
-    bool Any()  const { return ctrl || alt || shift || super || altGr; }
-    bool None() const { return !Any(); }
+    bool Any()    const { return ctrl || alt || shift || super || altGr; }
+    bool IsNone() const { return !Any(); }
 
     bool operator==(const NkModifierState& o) const
     {

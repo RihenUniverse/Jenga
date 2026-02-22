@@ -30,10 +30,23 @@ class PackageCommand:
     SUPPORTED_PLATFORMS = {
         'android': {'apk', 'aab'},
         'ios': {'ipa'},
+        'tvos': {'ipa'},
+        'watchos': {'ipa'},
         'windows': {'msi', 'exe', 'zip'},
         'linux': {'deb', 'rpm', 'appimage', 'snap'},
         'macos': {'pkg', 'dmg'},
         'web': {'zip'},
+    }
+
+    DEFAULT_PACKAGE_TYPE = {
+        'android': 'apk',
+        'ios': 'ipa',
+        'tvos': 'ipa',
+        'watchos': 'ipa',
+        'windows': 'zip',
+        'linux': 'deb',
+        'macos': 'pkg',
+        'web': 'zip',
     }
 
     @staticmethod
@@ -41,6 +54,8 @@ class PackageCommand:
         parser = argparse.ArgumentParser(prog="jenga package", description="Create distributable packages.")
         parser.add_argument("--platform", required=True, choices=list(PackageCommand.SUPPORTED_PLATFORMS.keys()),
                             help="Target platform")
+        parser.add_argument("--ios-builder", choices=["direct", "xcode", "xbuilder"], default=None,
+                            help="Apple mobile builder backend (direct or xcode/xbuilder).")
         parser.add_argument("--config", default="Release", help="Build configuration (default: Release)")
         parser.add_argument("--output", "-o", default="./dist", help="Output directory (default: ./dist)")
         parser.add_argument("--project", help="Specific project to package (default: first executable)")
@@ -67,7 +82,10 @@ class PackageCommand:
         # Déterminer le type de package par défaut
         pkg_type = parsed.type
         if not pkg_type:
-            pkg_type = list(PackageCommand.SUPPORTED_PLATFORMS[parsed.platform])[0]
+            pkg_type = PackageCommand.DEFAULT_PACKAGE_TYPE.get(parsed.platform)
+            if not pkg_type:
+                # Fallback de sûreté, stable.
+                pkg_type = sorted(PackageCommand.SUPPORTED_PLATFORMS[parsed.platform])[0]
 
         if pkg_type not in PackageCommand.SUPPORTED_PLATFORMS[parsed.platform]:
             Colored.PrintError(f"Unsupported package type '{pkg_type}' for platform '{parsed.platform}'.")
@@ -77,9 +95,8 @@ class PackageCommand:
         loader = Loader(verbose=parsed.verbose)
         cache = Cache(workspace_root, workspaceName=entry_file.stem)
 
-        if parsed.no_daemon:
-            workspace = loader.LoadWorkspace(str(entry_file))
-        else:
+        workspace = None
+        if not parsed.no_daemon:
             from ..Core.Daemon import DaemonClient, DaemonStatus
             client = DaemonClient(workspace_root)
             if client.IsAvailable():
@@ -100,11 +117,13 @@ class PackageCommand:
                         return 1
                 except Exception as e:
                     Colored.PrintWarning(f"Daemon error: {e}, falling back to direct package.")
+
+        if workspace is None:
             workspace = cache.LoadWorkspace(entry_file, loader)
-            if workspace is None:
-                workspace = loader.LoadWorkspace(str(entry_file))
-                if workspace:
-                    cache.SaveWorkspace(workspace, entry_file, loader)
+        if workspace is None:
+            workspace = loader.LoadWorkspace(str(entry_file))
+            if workspace:
+                cache.SaveWorkspace(workspace, entry_file, loader)
 
         if workspace is None:
             Colored.PrintError("Failed to load workspace.")
@@ -128,7 +147,23 @@ class PackageCommand:
 
         # Créer le builder pour ce projet (nécessaire pour connaître les chemins de sortie)
         try:
-            builder = PackageCommand._CreateBuilder(workspace, parsed.config, parsed.platform, project_name, parsed.verbose)
+            from ..Commands.Build import BuildCommand
+            builder = PackageCommand._CreateBuilder(
+                workspace, parsed.config, parsed.platform, project_name, parsed.verbose,
+                action="package",
+                options=BuildCommand.CollectFilterOptions(
+                    config=parsed.config,
+                    platform=parsed.platform,
+                    target=project_name,
+                    verbose=parsed.verbose,
+                    no_cache=False,
+                    no_daemon=parsed.no_daemon,
+                    extra=(
+                        ["action:package", f"package:{pkg_type}"] +
+                        ([f"ios-builder={parsed.ios_builder}"] if parsed.ios_builder else [])
+                    )
+                )
+            )
         except Exception as e:
             Colored.PrintError(f"Cannot create builder: {e}")
             return 1
@@ -139,7 +174,7 @@ class PackageCommand:
         # Dispatch selon plateforme
         if parsed.platform == 'android':
             return PackageCommand._PackageAndroid(project, builder, pkg_type, output_dir)
-        elif parsed.platform == 'ios':
+        elif parsed.platform in ('ios', 'tvos', 'watchos'):
             return PackageCommand._PackageIOS(project, builder, pkg_type, output_dir)
         elif parsed.platform == 'windows':
             return PackageCommand._PackageWindows(project, builder, pkg_type, output_dir)
@@ -154,10 +189,20 @@ class PackageCommand:
             return 1
 
     @staticmethod
-    def _CreateBuilder(workspace, config: str, platform: str, target: str, verbose: bool) -> Builder:
+    def _CreateBuilder(workspace,
+                       config: str,
+                       platform: str,
+                       target: str,
+                       verbose: bool,
+                       action: str = "package",
+                       options: Optional[List[str]] = None) -> Builder:
         """Crée un builder pour le projet cible."""
         from ..Commands.Build import BuildCommand
-        return BuildCommand.CreateBuilder(workspace, config, platform, target, verbose)
+        return BuildCommand.CreateBuilder(
+            workspace, config, platform, target, verbose,
+            action=action,
+            options=options
+        )
 
     # -----------------------------------------------------------------------
     # Android

@@ -251,6 +251,7 @@ LRESULT NkWin32EventImpl::ProcessWin32Message(
 {
     LRESULT result = 0;
     NkEvent nkEvent;
+    bool suppressDefaultProc = false;
 
     switch (msg)
     {
@@ -265,6 +266,9 @@ LRESULT NkWin32EventImpl::ProcessWin32Message(
 
     case WM_CLOSE:
         nkEvent = NkEvent(NkWindowCloseData(false));
+        // WM_CLOSE is a close request event. Do not force-destroy the window
+        // here; the app decides by calling window.Close() or not.
+        suppressDefaultProc = true;
         break;
 
     case WM_DESTROY:
@@ -455,7 +459,7 @@ LRESULT NkWin32EventImpl::ProcessWin32Message(
             kd.key       = k;
             kd.state     = st;
             kd.modifiers = CurrentMods();
-            kd.scancode  = win32Sc;
+            kd.scancode  = static_cast<NkScancode>(win32Sc);
             kd.nativeKey = static_cast<NkU32>(wp);
             kd.extended  = isExt;
             kd.repeat    = isRep;
@@ -566,6 +570,9 @@ LRESULT NkWin32EventImpl::ProcessWin32Message(
         mQueue.push(nkEvent);
         DispatchEvent(nkEvent, hwnd);
     }
+
+    if (suppressDefaultProc)
+        return 0;
 
     return result ? result : DefWindowProc(hwnd, msg, wp, lp);
 }

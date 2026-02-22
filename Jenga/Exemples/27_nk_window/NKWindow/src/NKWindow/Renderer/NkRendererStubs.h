@@ -33,9 +33,11 @@ public:                                                                      \
     { static NkFramebufferInfo sDummy; return sDummy; }                     \
     void BeginFrame(NkU32)         override {}                              \
     void EndFrame()                override {}                              \
-    void Present(NkU8*,NkU32,NkU32)override {}                              \
+    void Present(const NkSurfaceDesc&) override {}                          \
     void Resize(NkU32,NkU32)       override {}                              \
     void SetPixel(NkI32,NkI32,NkU32)override {}                             \
+    void  SetBackgroundColor(NkU32 rgba) override { mBgColor = rgba; }      \
+    NkU32 GetBackgroundColor() const override { return mBgColor; }          \
 };
 
 NK_STUB_RENDERER_IMPL(NkVulkanRendererImpl,   NK_VULKAN,    "Vulkan",     true)

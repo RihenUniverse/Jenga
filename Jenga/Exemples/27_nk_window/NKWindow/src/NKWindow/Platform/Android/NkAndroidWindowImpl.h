@@ -43,6 +43,14 @@ public:
     void Maximize()                    override {}
     void Restore()                     override {}
     void SetFullscreen(bool)           override {} // toujours full sur mobile
+    bool SupportsOrientationControl() const override { return true; }
+    void SetScreenOrientation(NkScreenOrientation orientation) override;
+    NkScreenOrientation GetScreenOrientation() const override { return mOrientation; }
+    void SetAutoRotateEnabled(bool enabled) override;
+    bool IsAutoRotateEnabled() const override
+    {
+        return mOrientation == NkScreenOrientation::NK_SCREEN_ORIENTATION_AUTO;
+    }
     void SetMousePosition(NkU32,NkU32) override {}
     void ShowMouse(bool)               override {}
     void CaptureMouse(bool)            override {}
@@ -57,8 +65,10 @@ private:
     ANativeWindow* mNativeWindow = nullptr;
     bool           mIsOpen       = false;
     NkSafeAreaInsets mSafeArea;
+    NkScreenOrientation mOrientation = NkScreenOrientation::NK_SCREEN_ORIENTATION_AUTO;
 
     void UpdateSafeArea();
+    bool ApplyOrientation(NkScreenOrientation orientation);
 };
 
 } // namespace nkentseu

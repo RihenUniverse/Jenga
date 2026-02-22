@@ -260,6 +260,11 @@ public:
     bool StartVideoRecord(const NkVideoRecordConfig& config) override
     {
         if (mSinkWriter || !mReady()) return false;
+        if (config.mode == NkVideoRecordConfig::Mode::IMAGE_SEQUENCE_ONLY)
+        {
+            mLastError = "IMAGE_SEQUENCE_ONLY mode is not implemented on Win32 backend yet";
+            return false;
+        }
         std::wstring wPath = Utf8ToWide(config.outputPath);
 
         ComPtr<IMFAttributes> pAttr;

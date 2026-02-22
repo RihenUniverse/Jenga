@@ -262,6 +262,11 @@ bool NkUIKitCameraBackend::CapturePhotoToFile(const std::string& path)
 bool NkUIKitCameraBackend::StartVideoRecord(const NkVideoRecordConfig& config)
 {
     if (mRecording) return false;
+    if (config.mode == NkVideoRecordConfig::Mode::IMAGE_SEQUENCE_ONLY)
+    {
+        mLastError = "IMAGE_SEQUENCE_ONLY mode is not implemented on UIKit backend yet";
+        return false;
+    }
     auto* p=(UIKitPrivate*)mPriv;
     NSURL* url=[NSURL fileURLWithPath:[NSString stringWithUTF8String:config.outputPath.c_str()]];
     NSError* err=nil;

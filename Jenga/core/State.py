@@ -37,9 +37,11 @@ class BuildState:
     Instance unique par exécution de commande.
     """
 
-    def __init__(self, workspace: Any):
+    def __init__(self, workspace: Any, platform: str = "", targetArch: str = ""):
         self.workspace = workspace
         self.workspaceName: str = getattr(workspace, 'name', 'unknown')
+        self.platform = platform  # e.g., "android-arm64-v8a", "windows-x64-msvc"
+        self.targetArch = targetArch  # e.g., "arm64", "x86_64"
         self.compiledProjects: Set[str] = set()
         self.failedProjects: Set[str] = set()
         self.startTime: float = time.time()
@@ -57,22 +59,67 @@ class BuildState:
         # Flags de configuration (pour savoir si le projet doit être recompilé)
         self._configHash: Optional[str] = None
 
+        # NEW: Track compiled projects per (project, platform, arch) context
+        # Format: "ProjectName:platform:arch" → prevents ABI conflicts in multi-ABI builds
+        self._compiledProjectsPerContext: Set[str] = set()
+        self._failedProjectsPerContext: Set[str] = set()
+
     # -----------------------------------------------------------------------
     # Gestion des projets
     # -----------------------------------------------------------------------
 
-    def MarkProjectCompiled(self, projectName: str, success: bool = True) -> None:
-        """Marque un projet comme compilé (ou échoué)."""
+    def _GetProjectKey(self, projectName: str, platform: Optional[str] = None, targetArch: Optional[str] = None) -> str:
+        """
+        Génère une clé unique pour un projet dans un contexte donné.
+
+        Pour éviter les conflits dans les builds multi-ABI/multi-plateforme (ex: Android),
+        chaque combinaison (project, platform, arch) est trackée séparément.
+
+        Examples:
+            - "NativeApp:android-arm64-v8a:arm64"
+            - "NativeApp:android-x86_64:x86_64"
+            - "MyApp:windows-x64-msvc:x86_64"
+        """
+        plat = platform if platform is not None else self.platform
+        arch = targetArch if targetArch is not None else self.targetArch
+        if plat or arch:
+            return f"{projectName}:{plat}:{arch}"
+        return projectName  # Fallback: pas de contexte
+
+    def MarkProjectCompiled(self, projectName: str, success: bool = True,
+                           platform: Optional[str] = None, targetArch: Optional[str] = None) -> None:
+        """Marque un projet comme compilé (ou échoué) pour un contexte donné."""
+        key = self._GetProjectKey(projectName, platform, targetArch)
+
         if success:
+            # Legacy (for backward compat - some code may still check compiledProjects)
             self.compiledProjects.add(projectName)
             self.failedProjects.discard(projectName)
+
+            # NEW: Context-aware tracking
+            self._compiledProjectsPerContext.add(key)
+            self._failedProjectsPerContext.discard(key)
         else:
             self.failedProjects.add(projectName)
+            self._failedProjectsPerContext.add(key)
 
-    def IsProjectCompiled(self, projectName: str) -> bool:
-        return projectName in self.compiledProjects
+    def IsProjectCompiled(self, projectName: str, platform: Optional[str] = None, targetArch: Optional[str] = None) -> bool:
+        """Vérifie si un projet a été compilé pour un contexte donné."""
+        key = self._GetProjectKey(projectName, platform, targetArch)
 
-    def HasProjectFailed(self, projectName: str) -> bool:
+        # If platform/arch context is specified → ONLY check context-aware tracking
+        # (don't use legacy fallback, as it would incorrectly return True for different ABIs)
+        if platform is not None or targetArch is not None:
+            return key in self._compiledProjectsPerContext
+
+        # No context specified → check both (for backward compatibility)
+        return key in self._compiledProjectsPerContext or projectName in self.compiledProjects
+
+    def HasProjectFailed(self, projectName: str, platform: Optional[str] = None, targetArch: Optional[str] = None) -> bool:
+        """Vérifie si un projet a échoué pour un contexte donné."""
+        key = self._GetProjectKey(projectName, platform, targetArch)
+        if key in self._failedProjectsPerContext:
+            return True
         return projectName in self.failedProjects
 
     def Reset(self) -> None:

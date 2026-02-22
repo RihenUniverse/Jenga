@@ -28,6 +28,7 @@
 #include "NkSurface.h"
 #include "NkEvent.h"
 #include "IWindowImpl.h"
+#include "IEventImpl.h"
 #include "NkSystem.h"
 #include <memory>
 #include <string>
@@ -87,12 +88,26 @@ public:
     void Maximize();
     void Restore();
     void SetFullscreen(bool fullscreen);
+    bool SupportsOrientationControl() const;
+    void SetScreenOrientation(NkScreenOrientation orientation);
+    NkScreenOrientation GetScreenOrientation() const;
+    void SetAutoRotateEnabled(bool enabled);
+    bool IsAutoRotateEnabled() const;
 
     // --- Souris ---
 
     void SetMousePosition(NkU32 x, NkU32 y);
     void ShowMouse(bool show);
     void CaptureMouse(bool capture);
+
+    // --- Web / WASM input policy ---
+
+    /**
+     * @brief Configure le routage des entrées navigateur <-> application (WASM).
+     * Sur les autres plateformes: stocke la config mais n'a pas d'effet runtime.
+     */
+    void SetWebInputOptions(const NkWebInputOptions& options);
+    NkWebInputOptions GetWebInputOptions() const;
 
     // --- OS extras ---
 
@@ -110,14 +125,6 @@ public:
     // --- Surface graphique (pour Renderer) ---
 
     NkSurfaceDesc GetSurfaceDesc() const;
-
-    // --- Safe area (mobile) ---
-
-    /**
-     * @brief Retourne les marges de zone sûre de la fenêtre.
-     * Sur desktop : retourne {0,0,0,0}.  Appelable à tout moment.
-     */
-    NkSafeAreaInsets GetSafeAreaInsets() const;
 
     // --- Callback événements (délégué à l'EventImpl) ---
 

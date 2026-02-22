@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <cmath>
 #include <string>
 #include <memory>
 #include <functional>

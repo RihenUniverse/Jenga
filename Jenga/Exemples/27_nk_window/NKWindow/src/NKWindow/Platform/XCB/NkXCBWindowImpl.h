@@ -60,6 +60,8 @@ public:
 
     xcb_window_t      GetXcbWindow()    const { return mData.window;     }
     xcb_connection_t* GetConnection()   const { return mData.connection;  }
+    xcb_atom_t        GetWmDeleteAtom() const { return mData.wmDelete;    }
+    xcb_atom_t        GetWmProtocolsAtom() const { return mData.wmProtocols; }
 
 private:
     NkXCBData mData;

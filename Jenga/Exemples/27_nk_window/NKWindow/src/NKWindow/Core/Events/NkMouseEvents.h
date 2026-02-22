@@ -122,7 +122,7 @@ struct NkMouseButtonData
         s += NkButtonStateToString(state);
         s += " at " + std::to_string(x) + "," + std::to_string(y);
         if (clickCount > 1) s += " x" + std::to_string(clickCount);
-        if (!modifiers.None()) { s += ", "; s += modifiers.ToString(); }
+        if (!modifiers.IsNone()) { s += ", "; s += modifiers.ToString(); }
         s += ")";
         return s;
     }
@@ -176,7 +176,7 @@ struct NkMouseWheelData
         if (deltaY != 0.0) s += "V=" + std::to_string(deltaY) + " ";
         if (deltaX != 0.0) s += "H=" + std::to_string(deltaX) + " ";
         if (highPrecision) s += "HiPrec ";
-        if (!modifiers.None()) s += modifiers.ToString();
+        if (!modifiers.IsNone()) s += modifiers.ToString();
         s += ")";
         return s;
     }

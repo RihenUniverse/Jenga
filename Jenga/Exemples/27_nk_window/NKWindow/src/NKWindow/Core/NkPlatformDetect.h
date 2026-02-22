@@ -11,7 +11,12 @@
 // Détection automatique de la plateforme
 // ---------------------------------------------------------------------------
 
-#if defined(_GAMING_XBOX_SCARLETT) || defined(_GAMING_XBOX_XBOXONE) || defined(WINAPI_FAMILY_GAMES)
+#if defined(NKENTSEU_PLATFORM_XBOX)    || defined(NKENTSEU_PLATFORM_UWP)   || defined(NKENTSEU_PLATFORM_WIN32) || \
+    defined(NKENTSEU_PLATFORM_WASM)    || defined(NKENTSEU_PLATFORM_ANDROID)|| defined(NKENTSEU_PLATFORM_COCOA) || \
+    defined(NKENTSEU_PLATFORM_UIKIT)   || defined(NKENTSEU_PLATFORM_XCB)   || defined(NKENTSEU_PLATFORM_XLIB)  || \
+    defined(NKENTSEU_PLATFORM_NOOP)
+// Platform explicitly provided by build flags.
+#elif defined(_GAMING_XBOX_SCARLETT) || defined(_GAMING_XBOX_XBOXONE) || defined(WINAPI_FAMILY_GAMES)
 #   define NKENTSEU_PLATFORM_XBOX    1
 #elif defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
 #   define NKENTSEU_PLATFORM_UWP     1

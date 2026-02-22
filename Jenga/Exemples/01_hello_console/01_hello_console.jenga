@@ -1,14 +1,51 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
 
 with workspace("HelloConsole"):
+    RegisterJengaGlobalToolchains()
     configurations(["Debug", "Release"])
-    targetoses([TargetOS.WINDOWS, TargetOS.LINUX, TargetOS.MACOS])
-    targetarchs([TargetArch.X86_64])
+    targetoses([
+        TargetOS.WINDOWS,
+        TargetOS.LINUX,
+        TargetOS.ANDROID,
+        TargetOS.WEB,
+        # TargetOS.HARMONYOS,  # TODO: Add HarmonyOS toolchain
+    ])
+    targetarchs([TargetArch.X86_64, TargetArch.ARM64, TargetArch.WASM32])
+
+    # Android SDK/NDK paths
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
 
     with project("Hello"):
         consoleapp()
         language("C++")
+        cppdialect("C++17")
         files(["**.cpp"])
+
+        # Windows
+        with filter("system:Windows"):
+            usetoolchain("clang-mingw")
+
+        # Linux (cross-compile via Zig)
+        with filter("system:Linux"):
+            usetoolchain("zig-linux-x64")
+
+        # Android (APK console app → requires NativeActivity)
+        with filter("system:Android"):
+            windowedapp()  # Android requires windowed app even for console output
+            usetoolchain("android-ndk")
+            androidapplicationid("com.jenga.helloconsole")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidabis(["arm64-v8a", "x86_64"])
+            androidnativeactivity(True)
+
+        # Web/Emscripten
+        with filter("system:Web"):
+            usetoolchain("emscripten")
+            emscripteninitialmemory(16)

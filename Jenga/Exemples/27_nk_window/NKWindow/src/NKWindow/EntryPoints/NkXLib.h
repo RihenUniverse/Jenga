@@ -8,6 +8,8 @@
 #include "../Core/NkEntry.h"
 #include "../Platform/XLib/NkXLibWindowImpl.h"
 #include <X11/Xlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <vector>
 #include <string>
 
@@ -21,10 +23,20 @@ int main(int argc, char* argv[])
 {
     XInitThreads();
 
-    Display* display = XOpenDisplay(nullptr);
-    if (!display) return 1;
+    const char* displayName = std::getenv("DISPLAY");
+    Display* display = XOpenDisplay((displayName && *displayName) ? displayName : nullptr);
+    if (!display)
+    {
+        std::fprintf(
+            stderr,
+            "[NkWindow][XLIB] Unable to open X display. DISPLAY='%s'. "
+            "Enable WSLg/X11 server (or run headless backend).\n",
+            displayName ? displayName : "(null)"
+        );
+        return 1;
+    }
 
-    nk_xlib_global_display = display;
+    nkentseu::nk_xlib_global_display = display;
 
     std::vector<std::string> args(argv, argv + argc);
 
@@ -35,7 +47,7 @@ int main(int argc, char* argv[])
     int result = nkmain(state);
 
     nkentseu::gState        = nullptr;
-    nk_xlib_global_display  = nullptr;
+    nkentseu::nk_xlib_global_display  = nullptr;
 
     XCloseDisplay(display);
     return result;

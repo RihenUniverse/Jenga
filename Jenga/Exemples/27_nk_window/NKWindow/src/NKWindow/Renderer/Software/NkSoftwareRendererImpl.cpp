@@ -35,6 +35,11 @@
 #   include <android/native_window.h>
 #endif
 
+#if defined(NKENTSEU_PLATFORM_WASM)
+#   include <emscripten.h>
+#   include <cstdint>
+#endif
+
 namespace nkentseu
 {
 
@@ -135,6 +140,8 @@ void NkSoftwareRendererImpl::BlitOS(const NkSurfaceDesc& surface,
     BlitXLib(surface, w, h);
 #elif defined(NKENTSEU_PLATFORM_ANDROID)
     BlitANW(surface, w, h);
+#elif defined(NKENTSEU_PLATFORM_WASM)
+    BlitWASM(surface, w, h);
 #else
     (void)surface; (void)w; (void)h;
 #endif
@@ -196,7 +203,7 @@ void NkSoftwareRendererImpl::BlitWin32(const NkSurfaceDesc& sd,
                                         NkU32 w, NkU32 h)
 {
 #if defined(NKENTSEU_FAMILY_WINDOWS)
-    if (!sd.hwnd) return;
+    if (!sd.hwnd || !IsWindow(sd.hwnd)) return;
 
     // Conversion in-place (copie temporaire BGRA)
     std::vector<NkU8> bgra(mBuffer.size());
@@ -240,7 +247,8 @@ void NkSoftwareRendererImpl::BlitXCB(const NkSurfaceDesc& sd,
                                       NkU32 w, NkU32 h)
 {
 #if defined(NKENTSEU_PLATFORM_XCB)
-    if (!sd.connection) return;
+    if (!sd.connection || sd.window == XCB_WINDOW_NONE) return;
+    if (xcb_connection_has_error(sd.connection)) return;
     xcb_connection_t* conn = sd.connection;
     xcb_window_t      win  = sd.window;
 
@@ -286,7 +294,7 @@ void NkSoftwareRendererImpl::BlitXLib(const NkSurfaceDesc& sd,
                                        NkU32 w, NkU32 h)
 {
 #if defined(NKENTSEU_PLATFORM_XLIB)
-    if (!sd.display) return;
+    if (!sd.display || sd.window == 0) return;
     Display* dpy = sd.display;
     ::Window  win = sd.window;
 
@@ -344,6 +352,63 @@ void NkSoftwareRendererImpl::BlitANW(const NkSurfaceDesc& sd,
                     std::min(w, static_cast<NkU32>(buf.stride)) * 4);
     }
     ANativeWindow_unlockAndPost(anw);
+#else
+    (void)sd; (void)w; (void)h;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// BlitWASM : RGBA -> canvas 2D ImageData (WebAssembly)
+// ---------------------------------------------------------------------------
+
+void NkSoftwareRendererImpl::BlitWASM(const NkSurfaceDesc& sd,
+                                       NkU32 w, NkU32 h)
+{
+#if defined(NKENTSEU_PLATFORM_WASM)
+    if (mBuffer.empty() || w == 0 || h == 0)
+        return;
+
+    const char* canvasId =
+        (sd.canvasId && sd.canvasId[0] != '\0') ? sd.canvasId : "#canvas";
+    const std::uintptr_t ptr =
+        reinterpret_cast<std::uintptr_t>(mBuffer.data());
+    const int iw = static_cast<int>(w);
+    const int ih = static_cast<int>(h);
+
+    EM_ASM({
+        var selector = UTF8ToString($0);
+        var ptr = $1 >>> 0;
+        var w = $2 | 0;
+        var h = $3 | 0;
+        var size = (w * h * 4) | 0;
+
+        var canvas = document.querySelector(selector);
+        if (!canvas && Module["canvas"]) canvas = Module["canvas"];
+        if (!canvas) return;
+
+        if (canvas.width !== w) canvas.width = w;
+        if (canvas.height !== h) canvas.height = h;
+
+        var ctx = canvas.__nk_ctx2d;
+        if (!ctx) {
+            ctx = canvas.getContext("2d");
+            canvas.__nk_ctx2d = ctx;
+        }
+        if (!ctx) return;
+
+        var imageData = canvas.__nk_imgData;
+        if (!imageData || imageData.width !== w || imageData.height !== h) {
+            imageData = ctx.createImageData(w, h);
+            canvas.__nk_imgData = imageData;
+        }
+
+        var heap = (typeof HEAPU8 !== "undefined")
+                 ? HEAPU8
+                 : ((typeof Module !== "undefined" && Module["HEAPU8"]) ? Module["HEAPU8"] : null);
+        if (!heap) return;
+        imageData.data.set(heap.subarray(ptr, ptr + size));
+        ctx.putImageData(imageData, 0, 0);
+    }, canvasId, ptr, iw, ih);
 #else
     (void)sd; (void)w; (void)h;
 #endif

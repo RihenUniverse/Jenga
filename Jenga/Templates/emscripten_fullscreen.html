@@ -80,7 +80,7 @@
 <body>
     <div id="canvas-container">
         <div class="spinner" id="spinner"></div>
-        <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+        <canvas id="canvas" tabindex="-1"></canvas>
     </div>
     <div id="output"></div>
 
@@ -88,6 +88,7 @@
         // Configuration
         var enableScroll = false; // Changer à true pour activer le scroll
         var showConsole = false;  // Changer à true pour afficher la console
+        var disableContextMenu = false; // true = bloque clic droit sur le canvas
 
         if (enableScroll) {
             document.body.classList.add('with-scroll');
@@ -99,6 +100,9 @@
 
         // Gestion du redimensionnement du canvas
         var canvas = document.getElementById('canvas');
+        if (disableContextMenu) {
+            canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+        }
 
         function resizeCanvas() {
             var container = document.getElementById('canvas-container');
@@ -135,12 +139,14 @@
             })(),
             setStatus: function(text) {
                 var spinner = document.getElementById('spinner');
-                if (!text) {
+                var t = (text || '').toString();
+                var isRunning = t.indexOf('Running') === 0;
+                if (!t || isRunning) {
                     spinner.style.display = 'none';
                 } else {
                     spinner.style.display = 'block';
                 }
-                console.log('Status:', text);
+                console.log('Status:', t);
             },
             totalDependencies: 0,
             monitorRunDependencies: function(left) {

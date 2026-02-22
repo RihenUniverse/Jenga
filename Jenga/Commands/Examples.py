@@ -171,25 +171,77 @@ class ExamplesCommand:
             "language": "C++",
             "platforms": ["Windows", "Linux", "macOS", "Android", "iOS", "Web"],
             "difficulty": "Advanced"
+        },
+        "23_android_sdl3_ndk_mk": {
+            "name": "Android SDL3 (ndk-build)",
+            "description": "SDL3 Android via Android.mk/ndk-build",
+            "language": "C++",
+            "platforms": ["Android"],
+            "difficulty": "Advanced"
+        },
+        "24_all_platforms": {
+            "name": "All Platforms",
+            "description": "Single project configured for multiple platforms",
+            "language": "C++",
+            "platforms": ["Windows", "Linux", "Android", "Web"],
+            "difficulty": "Advanced"
+        },
+        "25_opengl_triangle": {
+            "name": "OpenGL Triangle",
+            "description": "Cross-platform OpenGL/GLES triangle demo",
+            "language": "C++",
+            "platforms": ["Windows", "Linux", "Android", "Web"],
+            "difficulty": "Advanced"
+        },
+        "26_xbox_project_kinds": {
+            "name": "Xbox Project Kinds",
+            "description": "Xbox static/shared libraries plus console and windowed apps",
+            "language": "C++",
+            "platforms": ["Xbox One", "Xbox Series", "Windows"],
+            "difficulty": "Advanced"
+        },
+        "26_xbox_uwp_dev_mode": {
+            "name": "Xbox UWP Dev Mode",
+            "description": "Explicit UWP Dev Mode flow for Xbox without GDK packaging",
+            "language": "C++",
+            "platforms": ["Xbox Dev Mode (UWP)", "Windows"],
+            "difficulty": "Advanced"
+        },
+        "27_nk_window": {
+            "name": "NK Window Framework",
+            "description": "Multi-platform windowing framework with NKWindow and Sandbox demos",
+            "language": "C++",
+            "platforms": ["Windows", "Linux", "macOS", "Android", "iOS", "Web", "HarmonyOS"],
+            "difficulty": "Advanced"
         }
     }
 
     @staticmethod
     def GetExamplesPath() -> Path:
         """Get the path to the examples directory."""
-        # Try to find examples directory relative to the module
-        module_path = Path(__file__).resolve().parent.parent.parent  # Go up to Jenga root
-        examples_path = module_path / "Exemples"
+        module_path = Path(__file__).resolve().parent.parent.parent  # package root
 
-        if not examples_path.exists():
-            # Fallback: try common installation paths
-            import site
-            for site_path in site.getsitepackages():
-                candidate = Path(site_path) / "Jenga" / "Exemples"
+        candidates = [
+            module_path / "Exemples",            # legacy layout
+            module_path / "Jenga" / "Exemples", # current repo layout
+        ]
+
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+
+        # Fallback: try common installation paths
+        import site
+        for site_path in site.getsitepackages():
+            installed_candidates = [
+                Path(site_path) / "Jenga" / "Exemples",
+                Path(site_path) / "Jenga" / "Jenga" / "Exemples",
+            ]
+            for candidate in installed_candidates:
                 if candidate.exists():
                     return candidate
 
-        return examples_path
+        return candidates[0]
 
     @staticmethod
     def ListExamples(args: List[str]) -> int:

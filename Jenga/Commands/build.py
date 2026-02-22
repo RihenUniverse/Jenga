@@ -8,7 +8,7 @@ Utilise le daemon s'il est actif, sinon exécute un build direct.
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from ..Core.Builder import Builder
 from ..Core.Platform import Platform
@@ -20,11 +20,210 @@ from ..Core import Api
 
 
 class BuildCommand:
-    """jenga build [--config NAME] [--platform NAME] [--target PROJECT] [--no-cache] [--verbose]"""
+    """jenga build [--config NAME] [--platform NAME] [--target PROJECT] [--action NAME] [--no-cache] [--verbose]"""
     ALL_PLATFORMS_TOKEN = "jengaall"
 
     @staticmethod
-    def CreateBuilder(workspace, config: str, platform: str, target: Optional[str], verbose: bool) -> Builder:
+    def NormalizeOptionTrigger(trigger: str) -> str:
+        token = str(trigger or "").strip().lower()
+        if token.startswith("--"):
+            token = token[2:]
+        return token
+
+    @staticmethod
+    def ParseCustomOptionArgs(raw_args: List[str]) -> Dict[str, Optional[str]]:
+        """
+        Parse CLI unknown args into custom option map.
+        Supports:
+          --feature
+          --feature=value
+          --feature value
+          --no-feature
+        """
+        custom: Dict[str, Optional[str]] = {}
+        i = 0
+        while i < len(raw_args):
+            token = raw_args[i]
+            if not token.startswith("--"):
+                raise ValueError(f"Unknown argument: {token}")
+
+            body = token[2:]
+            if not body:
+                raise ValueError(f"Invalid option token: {token}")
+
+            value: Optional[str] = None
+            if "=" in body:
+                trigger, raw_value = body.split("=", 1)
+                value = raw_value
+            elif body.startswith("no-") and len(body) > 3:
+                trigger = body[3:]
+                value = "false"
+            else:
+                trigger = body
+                # `--opt value` form
+                if i + 1 < len(raw_args) and not raw_args[i + 1].startswith("-"):
+                    value = raw_args[i + 1]
+                    i += 1
+
+            trigger = BuildCommand.NormalizeOptionTrigger(trigger)
+            if not trigger:
+                raise ValueError(f"Invalid option trigger in token: {token}")
+            custom[trigger] = value
+            i += 1
+        return custom
+
+    @staticmethod
+    def _OptionValueIsTruthy(value: Optional[str]) -> bool:
+        if value is None:
+            return True
+        return str(value).strip().lower() not in ("0", "false", "off", "no")
+
+    @staticmethod
+    def ResolveWorkspaceOptions(workspace, cli_options: Optional[Dict[str, Optional[str]]] = None) -> Dict[str, Optional[str]]:
+        """
+        Merge workspace `newoption(...)` defaults with CLI-provided custom options.
+        CLI values always override defaults.
+        """
+        resolved: Dict[str, Optional[str]] = {}
+        definitions = dict(getattr(workspace, "options", {}) or {})
+        normalized_cli: Dict[str, Optional[str]] = {}
+        for key, value in (cli_options or {}).items():
+            trigger = BuildCommand.NormalizeOptionTrigger(key)
+            if trigger:
+                normalized_cli[trigger] = value
+
+        # Apply defaults from DSL declarations.
+        for trigger, meta in definitions.items():
+            norm_trigger = BuildCommand.NormalizeOptionTrigger(trigger)
+            if not norm_trigger:
+                continue
+            if norm_trigger in normalized_cli:
+                continue
+            if not isinstance(meta, dict):
+                continue
+            if "default" not in meta:
+                continue
+            default_value = meta.get("default")
+            if default_value is None:
+                continue
+            if isinstance(default_value, bool):
+                if default_value:
+                    resolved[norm_trigger] = None
+                continue
+            default_text = str(default_value).strip()
+            if not default_text:
+                continue
+            resolved[norm_trigger] = default_text
+
+        # Apply CLI values.
+        resolved.update(normalized_cli)
+
+        # Validate declared options.
+        for trigger, meta in definitions.items():
+            norm_trigger = BuildCommand.NormalizeOptionTrigger(trigger)
+            if not norm_trigger or norm_trigger not in resolved:
+                continue
+            if not isinstance(meta, dict):
+                continue
+
+            value_key = str(meta.get("value", "") or "").strip()
+            value = resolved[norm_trigger]
+            if value_key and (value is None or not str(value).strip()):
+                raise ValueError(f"Option '--{norm_trigger}' requires a value.")
+
+            allowed = list(meta.get("allowed") or [])
+            if allowed and value is not None:
+                allowed_norm = {str(v).strip().lower() for v in allowed}
+                if str(value).strip().lower() not in allowed_norm:
+                    raise ValueError(
+                        f"Invalid value for '--{norm_trigger}': {value}. "
+                        f"Allowed: {', '.join(str(v) for v in allowed)}"
+                    )
+
+        return resolved
+
+    @staticmethod
+    def OptionValuesToTokens(option_values: Optional[Dict[str, Optional[str]]]) -> List[str]:
+        """
+        Convert custom option map to filter tokens.
+        Example:
+          {'with-sdl': '/opt/sdl3', 'asan': None} ->
+            ['asan', 'with-sdl', 'with-sdl=/opt/sdl3']
+        """
+        tokens: List[str] = []
+        for trigger, raw_value in (option_values or {}).items():
+            norm_trigger = BuildCommand.NormalizeOptionTrigger(trigger)
+            if not norm_trigger:
+                continue
+            if BuildCommand._OptionValueIsTruthy(raw_value):
+                tokens.append(norm_trigger)
+            if raw_value is not None:
+                tokens.append(f"{norm_trigger}={str(raw_value).strip()}")
+        return tokens
+
+    @staticmethod
+    def ResolveAppleMobileBuilderMode(workspace,
+                                      target: Optional[str],
+                                      options: Optional[List[str]]) -> str:
+        """
+        Resolve Apple mobile builder backend.
+        Default: direct (option 1).
+        Supported tokens in options:
+          - ios-builder=direct|xcode|1|2
+          - apple-builder=direct|xcode|1|2
+          - xbuilder / xcode / direct
+        """
+        mode = "direct"
+
+        # Optional project-level preference from DSL/data model.
+        project_mode = ""
+        if workspace:
+            selected_project = None
+            if target and target in workspace.projects:
+                selected_project = workspace.projects[target]
+            elif workspace.startProject and workspace.startProject in workspace.projects:
+                selected_project = workspace.projects[workspace.startProject]
+            elif len(workspace.projects) == 1:
+                selected_project = next(iter(workspace.projects.values()))
+
+            if selected_project is not None:
+                project_mode = str(getattr(selected_project, "iosBuildSystem", "") or "").strip().lower()
+                if project_mode in ("2", "xcode", "xbuilder"):
+                    mode = "xcode"
+                elif project_mode in ("1", "direct"):
+                    mode = "direct"
+
+        for token in (options or []):
+            opt = str(token or "").strip().lower()
+            if not opt:
+                continue
+            if opt in ("xcode", "xbuilder", "2", "ios-builder:xcode", "apple-builder:xcode", "ios-builder:2", "apple-builder:2"):
+                mode = "xcode"
+                continue
+            if opt in ("direct", "1", "ios-builder:direct", "apple-builder:direct", "ios-builder:1", "apple-builder:1"):
+                mode = "direct"
+                continue
+
+            if "=" in opt:
+                key, value = opt.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+                if key in ("ios-builder", "apple-builder", "ios-build-system", "apple-build-system"):
+                    if value in ("xcode", "xbuilder", "2"):
+                        mode = "xcode"
+                    elif value in ("direct", "1"):
+                        mode = "direct"
+        return mode
+
+    @staticmethod
+    def CreateBuilder(workspace,
+                      config: str,
+                      platform: str,
+                      target: Optional[str],
+                      verbose: bool,
+                      action: str = "build",
+                      options: Optional[List[str]] = None,
+                      jobs: int = 0) -> Builder:
         """Crée un builder pour la configuration et la plateforme spécifiées."""
         # Déterminer la cible à partir de la plateforme
         target_os = None
@@ -38,18 +237,36 @@ class BuildCommand:
                 if os_enum.value.lower() == os_name.lower():
                     target_os = os_enum
                     break
+            if target_os is None and hasattr(Api, "_NormalizeOSName"):
+                try:
+                    normalized_os = Api._NormalizeOSName(os_name)
+                    target_os = Api.TargetOS[normalized_os]
+                except Exception:
+                    target_os = None
             if len(parts) > 1:
                 arch_name = parts[1]
                 for arch_enum in Api.TargetArch:
                     if arch_enum.value.lower() == arch_name.lower():
                         target_arch = arch_enum
                         break
+                if target_arch is None and hasattr(Api, "_NormalizeArchName"):
+                    try:
+                        normalized_arch = Api._NormalizeArchName(arch_name)
+                        target_arch = Api.TargetArch[normalized_arch]
+                    except Exception:
+                        target_arch = None
             if len(parts) > 2:
                 env_name = parts[2]
                 for env_enum in Api.TargetEnv:
                     if env_enum.value.lower() == env_name.lower():
                         target_env = env_enum
                         break
+                if target_env is None and hasattr(Api, "_NormalizeEnvName"):
+                    try:
+                        normalized_env = Api._NormalizeEnvName(env_name)
+                        target_env = Api.TargetEnv[normalized_env]
+                    except Exception:
+                        target_env = None
 
         # Valeurs par défaut
         if target_os is None:
@@ -71,19 +288,82 @@ class BuildCommand:
 
         # Utiliser le système de résolution des builders
         from ..Core.Builders import get_builder_class
-        builder_class = get_builder_class(target_os.value)
+        apple_mode = BuildCommand.ResolveAppleMobileBuilderMode(workspace, target, options)
+        builder_class = get_builder_class(target_os.value, apple_mobile_mode=apple_mode)
         if not builder_class:
             raise RuntimeError(f"Unsupported target platform: {target_os.value}")
 
-        return builder_class(
-            workspace=workspace,
-            config=config,
-            platform=platform,
-            targetOs=target_os,
-            targetArch=target_arch,
-            targetEnv=target_env,
-            verbose=verbose
-        )
+        try:
+            builder = builder_class(
+                workspace=workspace,
+                config=config,
+                platform=platform,
+                targetOs=target_os,
+                targetArch=target_arch,
+                targetEnv=target_env,
+                verbose=verbose,
+                action=action,
+                options=options or []
+            )
+            builder.jobs = jobs  # Set parallel jobs count
+            return builder
+        except TypeError as e:
+            # Backward compatibility: some concrete builders still expose the old __init__ signature.
+            msg = str(e)
+            if "unexpected keyword argument 'action'" not in msg and "unexpected keyword argument 'options'" not in msg:
+                raise
+            builder = builder_class(
+                workspace=workspace,
+                config=config,
+                platform=platform,
+                targetOs=target_os,
+                targetArch=target_arch,
+                targetEnv=target_env,
+                verbose=verbose
+            )
+            builder.action = (action or "build").strip().lower()
+            builder.options = sorted({str(opt).strip().lower() for opt in (options or []) if str(opt).strip()})
+            builder.jobs = jobs  # Set parallel jobs count
+            if getattr(builder, "_expander", None) is not None:
+                cfg = dict(getattr(builder._expander, "_config", {}) or {})
+                cfg["action"] = builder.action
+                cfg["options"] = " ".join(builder.options)
+                builder._expander.SetConfig(cfg)
+            return builder
+
+    @staticmethod
+    def CollectFilterOptions(config: str,
+                             platform: Optional[str],
+                             target: Optional[str],
+                             verbose: bool,
+                             no_cache: bool,
+                             no_daemon: bool,
+                             extra: Optional[List[str]] = None,
+                             custom_option_values: Optional[Dict[str, Optional[str]]] = None) -> List[str]:
+        """
+        Build a list of option tokens usable by filter("options:...").
+        Example tokens: verbose, no-cache, config:Debug, platform:Windows-x86_64, target:Sandbox.
+        """
+        opts: List[str] = []
+        if verbose:
+            opts.append("verbose")
+        if no_cache:
+            opts.append("no-cache")
+        if no_daemon:
+            opts.append("no-daemon")
+        if config:
+            opts.append(f"config:{config}")
+        if platform:
+            opts.append(f"platform:{platform}")
+        if target:
+            opts.append(f"target:{target}")
+        if custom_option_values:
+            opts.extend(BuildCommand.OptionValuesToTokens(custom_option_values))
+        if extra:
+            opts.extend([str(x).strip() for x in extra if str(x).strip()])
+        # normalize + unique
+        dedup = sorted({x.lower() for x in opts})
+        return dedup
 
     @staticmethod
     def IsAllPlatformsRequest(platform: Optional[str]) -> bool:
@@ -111,7 +391,10 @@ class BuildCommand:
 
     @staticmethod
     def BuildAcrossPlatforms(workspace, config: str, platforms: List[str],
-                             target: Optional[str], verbose: bool) -> int:
+                             target: Optional[str], verbose: bool,
+                             action: str = "build",
+                             options: Optional[List[str]] = None,
+                             jobs: int = 0) -> int:
         """
         Build séquentiel sur plusieurs plateformes.
         Continue même si une plateforme échoue, puis renvoie un code global.
@@ -131,7 +414,10 @@ class BuildCommand:
                     config=config,
                     platform=platform_name,
                     target=target,
-                    verbose=verbose
+                    verbose=verbose,
+                    action=action,
+                    options=(options or []) + [f"platform:{platform_name}"],
+                    jobs=jobs
                 )
             except Exception as e:
                 failures += 1
@@ -159,11 +445,27 @@ class BuildCommand:
         parser.add_argument("--config", default="Debug", help="Build configuration (Debug, Release, etc.)")
         parser.add_argument("--platform", default=None, help="Target platform (Windows, Linux, Android-arm64, etc.) or 'jengaall'")
         parser.add_argument("--target", default=None, help="Specific project to build")
+        parser.add_argument("--action", default="build", help="Action context for filters (default: build)")
+        parser.add_argument("--android-build-system", choices=["native", "ndk-mk"], default=None,
+                            help="Android build mode override (default: native)")
+        parser.add_argument("--use-android-mk", action="store_true",
+                            help="Shortcut for --android-build-system ndk-mk")
         parser.add_argument("--no-cache", action="store_true", help="Ignore cache and reload workspace")
         parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
         parser.add_argument("--no-daemon", action="store_true", help="Do not use daemon even if available")
+        parser.add_argument("--jobs", "-j", type=int, default=0,
+                            help="Number of parallel compilation jobs (0 = auto-detect CPU cores, 1 = sequential)")
         parser.add_argument("--jenga-file", help="Path to the workspace .jenga file (default: auto-detected)")
-        parsed = parser.parse_args(args)
+        parsed, unknown_args = parser.parse_known_args(args)
+        try:
+            cli_custom_options = BuildCommand.ParseCustomOptionArgs(unknown_args)
+        except ValueError as e:
+            Colored.PrintError(str(e))
+            return 1
+        if parsed.android_build_system:
+            cli_custom_options["android-build-system"] = parsed.android_build_system
+        if parsed.use_android_mk:
+            cli_custom_options["android-build-system"] = "ndk-mk"
 
         # Déterminer le répertoire de travail (workspace root)
         workspace_root = Path.cwd()
@@ -183,6 +485,17 @@ class BuildCommand:
             # Multi-platform orchestration is done in direct mode from CLI.
             parsed.no_daemon = True
 
+        daemon_filter_options = BuildCommand.CollectFilterOptions(
+            config=parsed.config,
+            platform=parsed.platform,
+            target=parsed.target,
+            verbose=parsed.verbose,
+            no_cache=parsed.no_cache,
+            no_daemon=parsed.no_daemon,
+            extra=[f"action:{parsed.action}"],
+            custom_option_values=cli_custom_options
+        )
+
         # Essayer d'utiliser le daemon si disponible
         if not parsed.no_daemon:
             from ..Core.Daemon import DaemonClient, Daemon
@@ -194,7 +507,11 @@ class BuildCommand:
                         'config': parsed.config,
                         'platform': parsed.platform,
                         'target': parsed.target,
-                        'verbose': parsed.verbose
+                        'verbose': parsed.verbose,
+                        'no_cache': parsed.no_cache,
+                        'options': daemon_filter_options,
+                        'custom_options': cli_custom_options,
+                        'action': parsed.action,
                     })
                     if response.get('status') == 'ok':
                         return response.get('return_code', 0)
@@ -229,6 +546,43 @@ class BuildCommand:
             Colored.PrintError("Failed to load workspace.")
             return 1
 
+        try:
+            custom_option_values = BuildCommand.ResolveWorkspaceOptions(workspace, cli_custom_options)
+        except ValueError as e:
+            Colored.PrintError(str(e))
+            return 1
+
+        declared_options = dict(getattr(workspace, "options", {}) or {})
+        if declared_options:
+            builtin_custom_options = {
+                "android-build-system",
+                "emscripten-fullscreen-shell",
+                "emscripten-fullscreen",
+            }
+            undeclared = sorted(
+                key for key in cli_custom_options.keys()
+                if BuildCommand.NormalizeOptionTrigger(key) not in builtin_custom_options
+                if BuildCommand.NormalizeOptionTrigger(key) not in {
+                    BuildCommand.NormalizeOptionTrigger(opt_key) for opt_key in declared_options.keys()
+                }
+            )
+            if undeclared:
+                Colored.PrintWarning(
+                    "Undeclared custom option(s) accepted for compatibility: "
+                    + ", ".join(f"--{name}" for name in undeclared)
+                )
+
+        filter_options = BuildCommand.CollectFilterOptions(
+            config=parsed.config,
+            platform=parsed.platform,
+            target=parsed.target,
+            verbose=parsed.verbose,
+            no_cache=parsed.no_cache,
+            no_daemon=parsed.no_daemon,
+            extra=[f"action:{parsed.action}"],
+            custom_option_values=custom_option_values
+        )
+
         if BuildCommand.IsAllPlatformsRequest(parsed.platform):
             platforms = BuildCommand.GetAllDeclaredPlatforms(workspace)
             return BuildCommand.BuildAcrossPlatforms(
@@ -236,7 +590,10 @@ class BuildCommand:
                 config=parsed.config,
                 platforms=platforms,
                 target=parsed.target,
-                verbose=parsed.verbose
+                verbose=parsed.verbose,
+                action=parsed.action,
+                options=filter_options,
+                jobs=parsed.jobs
             )
 
         # 2. Créer le builder
@@ -246,7 +603,10 @@ class BuildCommand:
                 config=parsed.config,
                 platform=parsed.platform,
                 target=parsed.target,
-                verbose=parsed.verbose
+                verbose=parsed.verbose,
+                action=parsed.action,
+                options=filter_options,
+                jobs=parsed.jobs
             )
         except Exception as e:
             Colored.PrintError(f"Cannot create builder: {e}")
@@ -276,7 +636,10 @@ class BuildCommand:
                     config=parsed.config,
                     platform=parsed.platform,
                     target=parsed.target,
-                    verbose=parsed.verbose
+                    verbose=parsed.verbose,
+                    action=parsed.action,
+                    options=filter_options,
+                    jobs=parsed.jobs
                 )
             except Exception as e:
                 Colored.PrintError(f"Cannot create builder after cache refresh: {e}")

@@ -22,6 +22,7 @@ struct NkXLibData
     int       screen      = 0;
     GC        gc          = nullptr;
     Atom      wmDelete    = 0;
+    Atom      wmProtocols = 0;
     Cursor    blankCursor = 0;
     bool      isOpen      = false;
     NkU32     width       = 0;
@@ -58,16 +59,19 @@ public:
     void ShowMouse(bool show)           override;
     void CaptureMouse(bool cap)         override;
     void SetProgress(float)             override {}
-    void SetBackgroundColor(NkU32 c)    override;
-    NkU32 GetBackgroundColor() const    override;
+    void SetBackgroundColor(NkU32 c);
+    NkU32 GetBackgroundColor() const;
 
     NkSurfaceDesc GetSurfaceDesc() const override;
 
     ::Window GetXlibWindow() const { return mData.window;  }
     Display* GetDisplay()    const { return mData.display; }
+    Atom     GetWmDeleteAtom() const { return mData.wmDelete; }
+    Atom     GetWmProtocolsAtom() const { return mData.wmProtocols; }
 
 private:
     NkXLibData  mData;
+    NkU32       mBgColor = 0x141414FF;
 };
 
 } // namespace nkentseu

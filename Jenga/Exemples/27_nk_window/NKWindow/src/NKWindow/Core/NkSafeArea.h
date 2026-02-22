@@ -19,6 +19,7 @@
 // =============================================================================
 
 #include "NkTypes.h"
+#include <string>
 
 namespace nkentseu
 {

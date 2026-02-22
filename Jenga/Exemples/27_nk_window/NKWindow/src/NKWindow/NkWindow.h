@@ -78,6 +78,7 @@
 #include "Core/NkWindow.h"
 #include "Core/NkEventSystem.h"
 #include "Core/NkRenderer.h"
+#include "Core/NkCamera2D.h"
 
 // Système de capture caméra physique
 #include "Core/Camera/NkCameraSystem.h"

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstring>
+
 // =============================================================================
 // NkScancode.h
 // Scancodes physiques cross-platform basés sur l'USB HID Usage Table 1.3
@@ -165,6 +167,11 @@ enum class NkScancode : NkU32
     NK_SC_MUTE            = 0x7F,
     NK_SC_VOLUME_UP       = 0x80,
     NK_SC_VOLUME_DOWN     = 0x81,
+    // Consumer/media aliases used by legacy key mapping code.
+    NK_SC_MEDIA_PLAY_PAUSE = 0xE0CD,
+    NK_SC_MEDIA_STOP       = 0xE0B7,
+    NK_SC_MEDIA_NEXT       = 0xE0B5,
+    NK_SC_MEDIA_PREV       = 0xE0B6,
 
     // ---[ 0xE0–0xE7 : Touches modificatrices ]-------------------------------
     NK_SC_LCTRL  = 0xE0,

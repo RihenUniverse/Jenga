@@ -139,6 +139,10 @@ class Platform:
             (TargetOS.ANDROID, TargetArch.X86_64),
             (TargetOS.IOS, TargetArch.ARM64),
             (TargetOS.IOS, TargetArch.X86_64),  # simulateur
+            (TargetOS.TVOS, TargetArch.ARM64),
+            (TargetOS.TVOS, TargetArch.X86_64),  # simulateur
+            (TargetOS.WATCHOS, TargetArch.ARM64),
+            (TargetOS.WATCHOS, TargetArch.X86_64),  # simulateur
             (TargetOS.WEB, TargetArch.WASM32),
             (TargetOS.WEB, TargetArch.WASM64),
             (TargetOS.PS4, TargetArch.X86_64),

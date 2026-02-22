@@ -315,6 +315,11 @@ class AndroidBuilder(Builder):
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
+        if result.returnCode != 0:
+            if result.stdout.strip():
+                Reporter.Error(result.stdout.rstrip())
+            if result.stderr.strip():
+                Reporter.Error(result.stderr.rstrip())
         return result.returnCode == 0
 
     def _BuildNativeAppGlueObject(self, project: Project, obj_dir: Path) -> Optional[str]:
@@ -791,6 +796,12 @@ class AndroidBuilder(Builder):
         """
         Reporter.Info(f"Building universal APK for {project.name} ({len(target_abis)} ABIs: {', '.join(target_abis)})")
 
+        # CRITICAL: Disable workspace cache for Universal APK builds
+        # The workspace cache doesn't handle platform/arch changes correctly
+        # We rely on file timestamp-based compilation instead (_NeedsCompileSource)
+        original_cache_status = getattr(self.workspace, '_cache_status', None)
+        self.workspace._cache_status = None  # Force cache bypass
+
         # Mapping ABI → TargetArch
         abi_to_arch = {
             'armeabi-v7a': TargetArch.ARM,
@@ -808,189 +819,158 @@ class AndroidBuilder(Builder):
         original_ndk_abi = self.ndk_abi
         original_ndk_triple = getattr(self, 'ndk_triple', None)
         original_ndk_llvm_triple = getattr(self, 'ndk_llvm_triple', None)
+        sentinel = object()
 
-        # Compiler pour chaque ABI
-        for abi in target_abis:
-            if abi not in abi_to_arch:
-                Reporter.Warning(f"Unknown ABI: {abi}, skipping")
-                continue
+        try:
+            # Compiler pour chaque ABI
+            for abi in target_abis:
+                if abi not in abi_to_arch:
+                    Reporter.Warning(f"Unknown ABI: {abi}, skipping")
+                    continue
 
-            Reporter.Info(f"  → Compiling for {abi}...")
+                Reporter.Info(f"  → Compiling for {abi}...")
 
-            # Changer temporairement l'architecture ET le platform suffix
-            self.targetArch = abi_to_arch[abi]
-            self.platform = f"android-{abi}"  # FIX: Use ABI-specific platform suffix
-            self._PrepareNDKToolchain()  # Reconfigurer la toolchain pour cette ABI
+                # Changer temporairement l'architecture ET le platform suffix
+                self.targetArch = abi_to_arch[abi]
+                self.platform = f"android-{abi}"
+                self._PrepareNDKToolchain()  # Reconfigurer la toolchain pour cette ABI
 
-            # CRITICAL FIX: Clear project.targetDir to force platform-based directory
-            original_target_dir = project.targetDir
-            project.targetDir = None
+                # Force des sorties ABI-spécifiques pour TOUS les projets compilés
+                # (app + dépendances), sinon des archives .a/.so peuvent être mélangées entre ABIs.
+                abi_tag = f"{self.config}-Android-{abi}"
+                abi_filter = f"platform:{self.platform}"
+                per_project_restore = {}
+                for proj_name, proj_ctx in self.workspace.projects.items():
+                    if proj_name.startswith("__"):
+                        continue
 
-            Reporter.Info(f"  Building {abi}: platform={self.platform}, target dir={self.GetTargetDir(project)}")
-
-            # Force rebuild by clearing object cache and workspace cache for this ABI
-            obj_dir = self.GetObjectDir(project)
-            if obj_dir.exists():
-                FileSystem.RemoveDirectory(obj_dir, recursive=True, ignoreErrors=True)
-
-            # Invalidate workspace cache to force recompilation
-            if hasattr(self.workspace, '_cache_status'):
-                self.workspace._cache_status = None
-
-            # Compiler le code natif pour cette ABI avec ses dépendances
-            build_result = super(AndroidBuilder, self).Build(project.name)
-            success = (build_result == 0)
-
-            # WORKAROUND: If BuildProject didn't create the binary (due to caching), compile manually
-            app_out_check = self.GetTargetPath(project)
-            if success and not app_out_check.exists():
-                Reporter.Info(f"  Forcing manual compilation for {abi} (cache bypass)")
-                # Manually compile and link
-                target_dir = self.GetTargetDir(project)
-                target_dir.mkdir(parents=True, exist_ok=True)
-
-                # Simple compile and link for the single source file
-                import glob
-                src_files = glob.glob(str(Path(project.location) / "src" / "*.cpp"))
-                if src_files:
-                    # Compile
-                    obj_file = target_dir / "main.o"
-                    compile_cmd = [
-                        str(self.toolchain.cxxPath),
-                        "-target", f"{self.ndk_triple}{self._GetMinApiLevel()}",
-                        "--sysroot", str(self.toolchain.sysroot),
-                        "-fPIC", "-c", src_files[0],
-                        "-o", str(obj_file)
-                    ]
-                    result = subprocess.run(compile_cmd, capture_output=True, text=True)
-                    if result.returncode != 0:
-                        Reporter.Error(f"Manual compile failed for {abi}: {result.stderr}")
-                        success = False
+                    if proj_ctx.kind in (ProjectKind.STATIC_LIB, ProjectKind.SHARED_LIB):
+                        forced_target = Path(self.workspace.location) / "Build" / "Lib" / abi_tag / proj_ctx.name
+                    elif proj_ctx.kind == ProjectKind.TEST_SUITE:
+                        forced_target = Path(self.workspace.location) / "Build" / "Tests" / abi_tag
                     else:
-                        # Link with native_app_glue for NativeActivity support
-                        native_app_glue_src = self.ndk_path / "sources" / "android" / "native_app_glue" / "android_native_app_glue.c"
-                        if native_app_glue_src.exists():
-                            # Compile native_app_glue
-                            glue_obj = target_dir / "android_native_app_glue.o"
-                            glue_compile_cmd = [
-                                str(self.toolchain.ccPath),
-                                "-target", f"{self.ndk_triple}{self._GetMinApiLevel()}",
-                                "--sysroot", str(self.toolchain.sysroot),
-                                "-I", str(native_app_glue_src.parent),
-                                "-fPIC", "-c", str(native_app_glue_src),
-                                "-o", str(glue_obj)
-                            ]
-                            result = subprocess.run(glue_compile_cmd, capture_output=True, text=True)
-                            if result.returncode != 0:
-                                Reporter.Error(f"Failed to compile native_app_glue: {result.stderr}")
-                                success = False
-                            else:
-                                # Link with glue
-                                link_cmd = [
-                                    str(self.toolchain.cxxPath),
-                                    "-target", f"{self.ndk_triple}{self._GetMinApiLevel()}",
-                                    "--sysroot", str(self.toolchain.sysroot),
-                                    "-shared", str(obj_file), str(glue_obj),
-                                    "-o", str(app_out_check),
-                                    "-llog", "-landroid"
-                                ]
-                                result = subprocess.run(link_cmd, capture_output=True, text=True)
-                                if result.returncode != 0:
-                                    Reporter.Error(f"Manual link failed for {abi}: {result.stderr}")
-                                    success = False
-                        else:
-                            Reporter.Warning("native_app_glue not found - linking without it")
-                            link_cmd = [
-                                str(self.toolchain.cxxPath),
-                                "-target", f"{self.ndk_triple}{self._GetMinApiLevel()}",
-                                "--sysroot", str(self.toolchain.sysroot),
-                                "-shared", str(obj_file),
-                                "-o", str(app_out_check),
-                                "-llog", "-landroid"
-                            ]
-                            result = subprocess.run(link_cmd, capture_output=True, text=True)
-                            if result.returncode != 0:
-                                Reporter.Error(f"Manual link failed for {abi}: {result.stderr}")
-                                success = False
+                        forced_target = Path(self.workspace.location) / "Build" / "Bin" / abi_tag / proj_ctx.name
+                    forced_obj = Path(self.workspace.location) / "Build" / "Obj" / abi_tag / proj_ctx.name
 
-            if not success:
-                Reporter.Error(f"Failed to build for {abi}")
-                # Restaurer les valeurs originales avant de sortir
-                self.targetArch = original_arch
-                self.platform = original_platform
-                self.ndk_abi = original_ndk_abi
-                project.targetDir = original_target_dir
-                if original_ndk_triple:
-                    self.ndk_triple = original_ndk_triple
-                if original_ndk_llvm_triple:
-                    self.ndk_llvm_triple = original_ndk_llvm_triple
+                    per_project_restore[proj_name] = {
+                        "targetDir": proj_ctx.targetDir,
+                        "objDir": proj_ctx.objDir,
+                        "appliedContext": getattr(proj_ctx, "_jenga_applied_filter_context", None),
+                        "filteredTargetDir": proj_ctx._filteredTargetDir.get(abi_filter, sentinel),
+                        "filteredObjDir": proj_ctx._filteredObjDir.get(abi_filter, sentinel),
+                    }
+
+                    proj_ctx._filteredTargetDir[abi_filter] = str(forced_target.resolve())
+                    proj_ctx._filteredObjDir[abi_filter] = str(forced_obj.resolve())
+                    proj_ctx._jenga_applied_filter_context = None
+
+                Reporter.Info(f"  Building {abi}: platform={self.platform}, out tag={abi_tag}")
+
+                native_libs = []
+                success = False
+                try:
+                    # Compile native code for this ABI with dependencies
+                    build_result = super(AndroidBuilder, self).Build(project.name)
+                    success = (build_result == 0)
+
+                    if success:
+                        # Collecter les bibliothèques natives (.so) pour cette ABI
+                        # AVANT restauration des overrides, pour lire les bons chemins ABI.
+                        app_out = self.GetTargetPath(project)
+                        if app_out.exists():
+                            native_libs.append(str(app_out))
+
+                        for dep_name in project.dependsOn:
+                            dep = self.workspace.projects.get(dep_name)
+                            if not dep:
+                                continue
+                            dep_out = self.GetTargetPath(dep)
+                            if dep.kind == ProjectKind.SHARED_LIB and dep_out.exists():
+                                native_libs.append(str(dep_out))
+                finally:
+                    # Nettoyage/restauration des overrides ABI pour cette passe.
+                    for proj_name, snapshot in per_project_restore.items():
+                        proj_ctx = self.workspace.projects.get(proj_name)
+                        if not proj_ctx:
+                            continue
+
+                        previous_target_filter = snapshot["filteredTargetDir"]
+                        if previous_target_filter is sentinel:
+                            proj_ctx._filteredTargetDir.pop(abi_filter, None)
+                        else:
+                            proj_ctx._filteredTargetDir[abi_filter] = previous_target_filter
+
+                        previous_obj_filter = snapshot["filteredObjDir"]
+                        if previous_obj_filter is sentinel:
+                            proj_ctx._filteredObjDir.pop(abi_filter, None)
+                        else:
+                            proj_ctx._filteredObjDir[abi_filter] = previous_obj_filter
+
+                        proj_ctx.targetDir = snapshot["targetDir"]
+                        proj_ctx.objDir = snapshot["objDir"]
+                        proj_ctx._jenga_applied_filter_context = snapshot["appliedContext"]
+
+                if not success:
+                    last = getattr(self, "_lastResult", None)
+                    if last is not None:
+                        if getattr(last, "command", ""):
+                            Reporter.Error(f"Last command: {last.command}")
+                        if getattr(last, "stdout", "").strip():
+                            Reporter.Error(last.stdout.rstrip())
+                        if getattr(last, "stderr", "").strip():
+                            Reporter.Error(last.stderr.rstrip())
+                    Reporter.Error(f"Failed to build for {abi}")
+                    return False
+
+                # Include NDK's C++ STL library (libc++_shared.so) for this ABI
+                host_tag = {
+                    "win32": "windows-x86_64",
+                    "linux": "linux-x86_64",
+                    "darwin": "darwin-x86_64"
+                }.get(sys.platform, "linux-x86_64")
+
+                # Map ABI to NDK lib directory name
+                abi_to_lib_dir = {
+                    "armeabi-v7a": "arm-linux-androideabi",
+                    "arm64-v8a": "aarch64-linux-android",
+                    "x86": "i686-linux-android",
+                    "x86_64": "x86_64-linux-android"
+                }
+
+                lib_dir = abi_to_lib_dir.get(abi)
+                if lib_dir:
+                    stl_lib = self.ndk_path / "toolchains" / "llvm" / "prebuilt" / host_tag / "sysroot" / "usr" / "lib" / lib_dir / "libc++_shared.so"
+                    if not stl_lib.exists():
+                        # Try alternate location (older NDKs)
+                        stl_lib = self.ndk_path / "sources" / "cxx-stl" / "llvm-libc++" / "libs" / abi / "libc++_shared.so"
+                    if stl_lib.exists():
+                        native_libs.append(str(stl_lib))
+
+                if not native_libs:
+                    Reporter.Warning(f"No native libraries found for {abi}")
+                else:
+                    all_native_libs[abi] = native_libs
+                    Reporter.Success(f"  ✓ {abi} compiled ({len(native_libs)} libs)")
+
+            if not all_native_libs:
+                Reporter.Error("No native libraries found for any ABI")
                 return False
 
-            # Collecter les bibliothèques natives (.so) pour cette ABI
-            native_libs = []
-            app_out = self.GetTargetPath(project)
-            if app_out.exists():
-                native_libs.append(str(app_out))
+            # Générer une fat APK avec toutes les ABIs
+            if self.build_aab:
+                Reporter.Warning("AAB not yet supported for universal builds, falling back to APK")
 
-            for dep_name in project.dependsOn:
-                dep = self.workspace.projects.get(dep_name)
-                if not dep:
-                    continue
-                dep_out = self.GetTargetPath(dep)
-                if dep.kind == ProjectKind.SHARED_LIB and dep_out.exists():
-                    native_libs.append(str(dep_out))
-
-            # Include NDK's C++ STL library (libc++_shared.so) for this ABI
-            host_tag = {
-                "win32": "windows-x86_64",
-                "linux": "linux-x86_64",
-                "darwin": "darwin-x86_64"
-            }.get(sys.platform, "linux-x86_64")
-
-            # Map ABI to NDK lib directory name
-            abi_to_lib_dir = {
-                "armeabi-v7a": "arm-linux-androideabi",
-                "arm64-v8a": "aarch64-linux-android",
-                "x86": "i686-linux-android",
-                "x86_64": "x86_64-linux-android"
-            }
-
-            lib_dir = abi_to_lib_dir.get(abi)
-            if lib_dir:
-                stl_lib = self.ndk_path / "toolchains" / "llvm" / "prebuilt" / host_tag / "sysroot" / "usr" / "lib" / lib_dir / "libc++_shared.so"
-                if not stl_lib.exists():
-                    # Try alternate location (older NDKs)
-                    stl_lib = self.ndk_path / "sources" / "cxx-stl" / "llvm-libc++" / "libs" / abi / "libc++_shared.so"
-                if stl_lib.exists():
-                    native_libs.append(str(stl_lib))
-
-            if not native_libs:
-                Reporter.Warning(f"No native libraries found for {abi}")
-            else:
-                all_native_libs[abi] = native_libs
-                Reporter.Success(f"  ✓ {abi} compiled ({len(native_libs)} libs)")
-
-            # Restore project.targetDir for this iteration
-            project.targetDir = original_target_dir
-
-        # Restaurer les valeurs originales
-        self.targetArch = original_arch
-        self.platform = original_platform
-        self.ndk_abi = original_ndk_abi
-        if original_ndk_triple:
-            self.ndk_triple = original_ndk_triple
-        if original_ndk_llvm_triple:
-            self.ndk_llvm_triple = original_ndk_llvm_triple
-
-        if not all_native_libs:
-            Reporter.Error(f"No native libraries found for any ABI")
-            return False
-
-        # Générer une fat APK avec toutes les ABIs
-        if self.build_aab:
-            Reporter.Warning("AAB not yet supported for universal builds, falling back to APK")
-
-        return self._BuildUniversalAPKFile(project, all_native_libs)
+            return self._BuildUniversalAPKFile(project, all_native_libs)
+        finally:
+            # Restaurer l'état global du builder/workspace
+            self.targetArch = original_arch
+            self.platform = original_platform
+            self.ndk_abi = original_ndk_abi
+            if original_ndk_triple:
+                self.ndk_triple = original_ndk_triple
+            if original_ndk_llvm_triple:
+                self.ndk_llvm_triple = original_ndk_llvm_triple
+            self.workspace._cache_status = original_cache_status
 
     def _BuildUniversalAPKFile(self, project: Project, all_native_libs: Dict[str, List[str]]) -> bool:
         """
@@ -1503,6 +1483,23 @@ class AndroidBuilder(Builder):
             activity = ET.SubElement(application, "activity")
             activity.set(f"{{{android_ns}}}name", "android.app.NativeActivity")
             activity.set(f"{{{android_ns}}}exported", "true")
+            activity.set(
+                f"{{{android_ns}}}configChanges",
+                "keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            )
+
+            # Orientation policy:
+            # - androidscreenorientation("...") force une valeur exacte.
+            # - sinon androidallowrotation(False) verrouille en portrait.
+            # - sinon rotation libre (fullSensor).
+            explicit_orientation = (getattr(project, "androidScreenOrientation", "") or "").strip()
+            if explicit_orientation:
+                activity.set(f"{{{android_ns}}}screenOrientation", explicit_orientation)
+            elif not getattr(project, "androidAllowRotation", True):
+                activity.set(f"{{{android_ns}}}screenOrientation", "portrait")
+            else:
+                activity.set(f"{{{android_ns}}}screenOrientation", "fullSensor")
+
             meta = ET.SubElement(activity, "meta-data")
             meta.set(f"{{{android_ns}}}name", "android.app.lib_name")
             lib_basename = project.targetName or project.name

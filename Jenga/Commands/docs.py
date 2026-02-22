@@ -1598,10 +1598,17 @@ class DocsCommand:
     @staticmethod
     def Execute(args: List[str]) -> int:
         """Point d'entrée principal de la commande docs."""
+        global_parser = argparse.ArgumentParser(add_help=False)
+        global_parser.add_argument(
+            "--jenga-file",
+            help="Path to the workspace .jenga file (default: auto-detected)"
+        )
+
         parser = argparse.ArgumentParser(
             prog="jenga docs",
             description='Génération de documentation pour les projets Jenga',
             formatter_class=argparse.RawDescriptionHelpFormatter,
+            parents=[global_parser],
             epilog="""
 Exemples:
   jenga docs extract                          # Tous les projets
@@ -1644,17 +1651,19 @@ Formats supportés:
         clean_parser = subparsers.add_parser('clean', help='Nettoyer la documentation générée')
         clean_parser.add_argument('--project', help='Projet spécifique')
         clean_parser.add_argument('--output', default='docs', help='Répertoire de sortie (défaut: docs/)')
-        parser.add_argument("--jenga-file", help="Path to the workspace .jenga file (default: auto-detected)")
-        parsed = parser.parse_args(args)
 
         if not args:
             parser.print_help()
             return 0
-        
+
+        global_parsed, remaining_args = global_parser.parse_known_args(args)
+
         try:
-            parsed = parser.parse_args(args)
-        except SystemExit:
-            return 1
+            parsed = parser.parse_args(remaining_args)
+        except SystemExit as e:
+            return int(e.code) if isinstance(e.code, int) else 1
+
+        parsed.jenga_file = global_parsed.jenga_file
         
         if parsed.subcommand == 'extract':
             return DocsCommand._cmd_extract(parsed)
