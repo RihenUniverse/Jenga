@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 Emscripten Builder – Compilation WebAssembly.
-Génère .wasm, .js, .html.
+Génère .wasm, .js, .html + scripts run_*.bat / run_*.sh pour serveur HTTP local
+(évite les erreurs CORS lors de l'ouverture directe du fichier .html).
 """
 
 from pathlib import Path
 from typing import List
 import shlex
+import os
 
 from Jenga.Core.Api import Project, ProjectKind
 from ...Utils import Process, FileSystem
@@ -128,7 +130,90 @@ class EmscriptenBuilder(Builder):
         use_shell = linker and (str(linker).endswith('.bat') or str(linker).endswith('.cmd'))
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False, shell=use_shell)
         self._lastResult = result
+        if result.returnCode == 0:
+            self._GenerateRunnerScripts(project, out)
         return result.returnCode == 0
+
+    def _GenerateRunnerScripts(self, project: Project, output_path: Path) -> None:
+        """
+        Génère run_<Project>.bat (Windows) et run_<Project>.sh (Linux/macOS)
+        dans le même répertoire que le .html produit.
+
+        Ces scripts démarrent un serveur HTTP local (python -m http.server),
+        ce qui évite les erreurs CORS lors de l'ouverture directe du fichier
+        .html en protocol file:// avec des assets .wasm / .js.
+
+        Usage:
+          Windows : run_<Project>.bat [port]
+          Linux   : ./run_<Project>.sh [port]
+        Port par défaut : 8080
+        """
+        if project.kind not in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE):
+            return  # Runner scripts only for executables, not libraries
+
+        html_name = output_path.name          # e.g. "WasmApp.html"
+        proj_name = project.name
+        out_dir   = output_path.parent
+        port_default = 8080
+
+        # ── Windows .bat ──────────────────────────────────────────────────
+        bat_content = (
+            "@echo off\n"
+            f"title Jenga WASM — {proj_name}\n"
+            "setlocal\n"
+            f"set PORT=%1\n"
+            f"if \"%PORT%\"==\"\" set PORT={port_default}\n"
+            "\n"
+            "echo ================================================\n"
+            f"echo  Jenga WASM Runner — {proj_name}\n"
+            "echo ================================================\n"
+            "echo.\n"
+            "echo  Serveur HTTP local demarre...\n"
+            "echo  Ouvrez votre navigateur :\n"
+            f"echo    http://localhost:%PORT%/{html_name}\n"
+            "echo  CTRL+C pour arreter le serveur.\n"
+            "echo.\n"
+            "cd /d \"%~dp0\"\n"
+            "python -m http.server %PORT% 2>nul\n"
+            "if errorlevel 1 py -m http.server %PORT% 2>nul\n"
+            "if errorlevel 1 python3 -m http.server %PORT%\n"
+            "endlocal\n"
+        )
+        bat_path = out_dir / f"run_{proj_name}.bat"
+        try:
+            bat_path.write_text(bat_content, encoding="utf-8")
+        except OSError:
+            pass  # best-effort
+
+        # ── Linux / macOS .sh ─────────────────────────────────────────────
+        sh_content = (
+            "#!/usr/bin/env bash\n"
+            f'PORT="${{1:-{port_default}}}"\n'
+            'SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"\n'
+            "\n"
+            'echo "================================================"\n'
+            f'echo " Jenga WASM Runner — {proj_name}"\n'
+            'echo "================================================"\n'
+            'echo ""\n'
+            'echo " Serveur HTTP local demarre..."\n'
+            'echo " Ouvrez votre navigateur :"\n'
+            f'echo "   http://localhost:$PORT/{html_name}"\n'
+            'echo " CTRL+C pour arreter le serveur."\n'
+            'echo ""\n'
+            'cd "$SCRIPT_DIR"\n'
+            'python3 -m http.server "$PORT" 2>/dev/null || python -m http.server "$PORT"\n'
+        )
+        sh_path = out_dir / f"run_{proj_name}.sh"
+        try:
+            sh_path.write_text(sh_content, encoding="utf-8")
+            # Make the .sh executable
+            try:
+                current_mode = sh_path.stat().st_mode
+                sh_path.chmod(current_mode | 0o111)
+            except OSError:
+                pass
+        except OSError:
+            pass  # best-effort
 
     @staticmethod
     def _IsDirectLibPath(lib: str) -> bool:

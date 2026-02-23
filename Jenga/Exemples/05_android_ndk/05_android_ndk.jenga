@@ -1,21 +1,61 @@
+#!/usr/bin/env python3
+"""
+Jenga Example 05 — Android NDK (NativeActivity)
+
+Compile une application Android native (C/C++ via NDK) pour plusieurs ABIs.
+Génère un APK universel supportant arm64-v8a et x86_64 (émulateurs + devices).
+
+Prérequis :
+  - Android SDK + NDK installés
+  - Variables d'environnement :
+      ANDROID_SDK_ROOT  (ou ANDROID_HOME)
+      ANDROID_NDK_ROOT  (ou ANDROID_NDK_HOME)
+
+Usage :
+  jenga build                  # Build APK Debug (multi-ABI)
+  jenga build --config Release # Build APK Release
+  jenga keygen                 # Générer une keystore pour signer
+  jenga sign                   # Signer l'APK Release
+"""
 import os
 from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
 
 with workspace("AndroidDemo"):
+    # RegisterJengaGlobalToolchains enregistre "android-ndk" depuis ANDROID_NDK_ROOT
+    RegisterJengaGlobalToolchains()
+
     configurations(["Debug", "Release"])
     targetoses([TargetOS.ANDROID])
     targetarchs([TargetArch.ARM64, TargetArch.X86_64])
 
-    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", os.getenv("ANDROID_HOME", "")))
     androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
 
     with project("NativeApp"):
-        windowedapp()
+        windowedapp()                     # Android NativeActivity = windowed app
         language("C++")
+        cppdialect("C++17")
         files(["src/**.cpp"])
-        androidapplicationid("com.Jenga.nativedemo")
+
+        # Toolchain NDK : défini via filter pour permettre la validation différée
+
+        with filter("system:Android"):
+            usetoolchain("android-ndk")
+
+        androidapplicationid("com.jenga.nativedemo")
         androidminsdk(24)
         androidtargetsdk(34)
         androidcompilesdk(34)
         androidabis(["arm64-v8a", "x86_64"])
         androidnativeactivity(True)
+
+        with filter("config:Debug"):
+            defines(["_DEBUG"])
+            optimize("Off")
+            symbols(True)
+
+        with filter("config:Release"):
+            defines(["NDEBUG"])
+            optimize("Speed")
+            symbols(False)

@@ -194,18 +194,23 @@ def ToolchainClangCl(msvc_base: Optional[str] = None) -> None:
                 )
 
     base_dir = Path(msvc_base)
-    bin_dir = base_dir / "bin"
 
     c_compiler_path = Platform.ResolveTool(base_dir, ["clang-cl", "clang-cl.exe"], subdir="bin")
-    cpp_compiler = c_compiler  # same executable
-    linker = c_compiler
-    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
+    # clang-cl uses the same executable for C and C++; link via lld-link or clang-cl itself
+    link_path = Platform.ResolveTool(
+        base_dir, ["lld-link", "lld-link.exe", "link", "link.exe"], subdir="bin", required=False
+    )
+    if not link_path:
+        link_path = c_compiler_path  # fallback: clang-cl can also drive linking
+    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin", required=False)
+    if not archiver_path:
+        archiver_path = c_compiler_path  # fallback
 
     with toolchain("clang-cl", "clang"):
         settarget("Windows", "x86_64", "msvc")
         ccompiler(c_compiler_path)
-        cppcompiler(cpp_compiler_path)
-        linker(linker_path)
+        cppcompiler(c_compiler_path)  # clang-cl handles both C and C++
+        linker(link_path)
         archiver(archiver_path)
 
 
@@ -229,12 +234,13 @@ def ToolchainClangNative(clang_base: Optional[str] = None) -> None:
                 )
 
     base_dir = Path(clang_base)
-    bin_dir = base_dir / "bin"
 
     c_compiler_path = Platform.ResolveTool(base_dir, ["clang", "clang.exe"], subdir="bin")
     cpp_compiler_path = Platform.ResolveTool(base_dir, ["clang++", "clang++.exe"], subdir="bin")
-    linker = cpp_compiler  # usually clang++ as linker driver
-    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
+    # clang++ is used as the linker driver (handles C++ runtime linking automatically)
+    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin", required=False)
+    if not archiver_path:
+        archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe"], subdir="bin", required=False) or "ar"
 
     # Determine target triple based on host platform
     if Platform.IsWindows():
@@ -263,7 +269,7 @@ def ToolchainClangNative(clang_base: Optional[str] = None) -> None:
         targettriple(triple)
         ccompiler(c_compiler_path)
         cppcompiler(cpp_compiler_path)
-        linker(linker_path)
+        linker(cpp_compiler_path)  # clang++ as linker driver
         archiver(archiver_path)
         # Add target flags if needed (Clang usually defaults to host, but we can be explicit)
         cflags([f"--target={triple}"])
@@ -291,19 +297,20 @@ def ToolchainClangCrossLinux(clang_base: Optional[str] = None) -> None:
                 )
 
     base_dir = Path(clang_base)
-    bin_dir = base_dir / "bin"
 
     c_compiler_path = Platform.ResolveTool(base_dir, ["clang", "clang.exe"], subdir="bin")
     cpp_compiler_path = Platform.ResolveTool(base_dir, ["clang++", "clang++.exe"], subdir="bin")
-    linker = cpp_compiler
-    archiver_path = Platform.ResolveTool(base_dir, ["ar", "ar.exe", "llvm-ar", "llvm-ar.exe"], subdir="bin")
+    # clang++ drives cross-linking; use llvm-ar for the archiver when available
+    archiver_path = Platform.ResolveTool(base_dir, ["llvm-ar", "llvm-ar.exe", "ar", "ar.exe"], subdir="bin", required=False)
+    if not archiver_path:
+        archiver_path = "ar"  # fallback to system ar
 
     with toolchain("clang-cross-linux", "clang"):
         settarget("Linux", "x86_64", "gnu")
         targettriple("x86_64-unknown-linux-gnu")
         ccompiler(c_compiler_path)
         cppcompiler(cpp_compiler_path)
-        linker(linker_path)
+        linker(cpp_compiler_path)  # clang++ as linker driver
         archiver(archiver_path)
         cflags(["--target=x86_64-unknown-linux-gnu"])
         cxxflags(["--target=x86_64-unknown-linux-gnu"])

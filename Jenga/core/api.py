@@ -1750,7 +1750,19 @@ def ipadosminsdk(sdk: str) -> None:
 def visionosminsdk(sdk: str) -> None:
     if _currentProject:
         _currentProject.visionosMinSdk = sdk
-        
+
+
+def harmonyminsdk(api_level: int) -> None:
+    """Set the minimum HarmonyOS API level (e.g. 9 for HarmonyOS 4.0)."""
+    if _currentProject:
+        _currentProject.harmonyMinSdk = str(api_level)
+
+
+def harmonysdk(path: str) -> None:
+    """Set the HarmonyOS SDK path for this workspace."""
+    if _currentWorkspace:
+        _currentWorkspace.harmonySdkPath = str(path or "").strip()
+
 
 def gdkpath(path: str) -> None:
     """Set the Microsoft GDK root path (workspace-level)."""
@@ -3324,6 +3336,7 @@ __all__ = [
     'iosbundleid', 'iosversion', 'iosminsdk', 'tvosminsdk', 'watchosminsdk', 'ipadosminsdk', 'visionosminsdk',
     'iossigningidentity', 'iosentitlements', 'iosappicon', 'iosbuildnumber',
     'iosbuildsystem', 'iosdistributiontype', 'iosteamid', 'iosprovisioningprofile',
+    'harmonyminsdk', 'harmonysdk',
     'testoptions', 'testfiles', 'testmainfile', 'testmaintemplate',
     'settarget', 'sysroot', 'targettriple', 'ccompiler', 'cppcompiler',
     'linker', 'archiver', 'addcflag', 'addcxxflag', 'addldflag',

@@ -774,3 +774,8 @@ end
         with open(plist_path, "wb") as f:
             plistlib.dump(plist, f)
         return plist_path
+
+
+# Aliases for factory compatibility (factory references 'IOSBuilder' and 'MacOSBuilder')
+IOSBuilder = XcodeMobileBuilder
+MacOSBuilder = XcodeMobileBuilder

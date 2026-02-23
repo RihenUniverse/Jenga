@@ -89,8 +89,9 @@ class HarmonyOsBuilder(Builder):
             TargetArch.X86_64: "x86_64-linux-ohos",
         }
         triple = arch_map.get(self.targetArch, "aarch64-linux-ohos")
+        arm_flags = []
         if self.targetArch == TargetArch.ARM:
-            flags += ["-march=armv7-a", "-mfloat-abi=softfp", "-mfpu=vfpv3-d16"]
+            arm_flags = ["-march=armv7-a", "-mfloat-abi=softfp", "-mfpu=vfpv3-d16"]
 
         # Créer ou mettre à jour la toolchain
         if self.toolchain:
@@ -101,6 +102,9 @@ class HarmonyOsBuilder(Builder):
             self.toolchain.stripPath = str(llvm_dir / "bin" / "llvm-strip")
             self.toolchain.targetTriple = triple
             self.toolchain.sysroot = str(self.ndk_path / "sysroot")
+            if arm_flags:
+                self.toolchain.cflags = list(getattr(self.toolchain, "cflags", [])) + arm_flags
+                self.toolchain.cxxflags = list(getattr(self.toolchain, "cxxflags", [])) + arm_flags
 
     def GetObjectExtension(self) -> str:
         return ".o"

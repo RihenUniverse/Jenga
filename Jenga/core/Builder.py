@@ -106,6 +106,8 @@ class Builder(abc.ABC):
             raise RuntimeError("tvOS builds require macOS.")
         if self.targetOs == TargetOS.WATCHOS and host_os != TargetOS.MACOS:
             raise RuntimeError("watchOS builds require macOS.")
+        if self.targetOs == TargetOS.VISIONOS and host_os != TargetOS.MACOS:
+            raise RuntimeError("visionOS builds require macOS with Xcode 15+.")
 
     def _ResolveToolchain(self) -> None:
         if self.workspace.defaultToolchain:
@@ -139,12 +141,14 @@ class Builder(abc.ABC):
             prefer = ['host-apple-clang']
         elif self.targetOs == TargetOS.WATCHOS:
             prefer = ['host-apple-clang']
+        elif self.targetOs == TargetOS.VISIONOS:
+            prefer = ['host-apple-clang']
         elif self.targetOs == TargetOS.WEB:
             prefer = ['emscripten']
         tc_name = self.toolchainManager.ResolveForTarget(self.targetOs, self.targetArch, self.targetEnv, prefer=prefer)
         # Apple mobile targets (iOS/tvOS/watchOS) are compiled with host Apple Clang.
         # Detected host toolchain is usually tagged as macOS; fallback to macOS lookup.
-        if not tc_name and self.targetOs in (TargetOS.IOS, TargetOS.TVOS, TargetOS.WATCHOS):
+        if not tc_name and self.targetOs in (TargetOS.IOS, TargetOS.TVOS, TargetOS.WATCHOS, TargetOS.VISIONOS):
             tc_name = self.toolchainManager.ResolveForTarget(TargetOS.MACOS, self.targetArch, None, prefer=prefer)
         if tc_name:
             self.toolchain = self.toolchainManager.GetToolchain(tc_name)

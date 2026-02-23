@@ -1,22 +1,52 @@
+#!/usr/bin/env python3
+"""
+Jenga Example 07 — Web / WebAssembly (Emscripten)
+
+Compile un programme C++ en WebAssembly (.wasm + .js + .html).
+Les scripts run_WasmApp.bat / run_WasmApp.sh sont générés automatiquement
+pour lancer un serveur HTTP local et éviter les erreurs CORS.
+
+Prérequis :
+  - Emscripten SDK installé (https://emscripten.org/docs/getting_started/)
+  - Variable d'environnement EMSDK définie sur le répertoire racine d'emsdk
+    OU emcc disponible dans le PATH.
+
+Usage :
+  jenga build                  # Build WebAssembly (Release)
+  jenga build --config Debug   # Build avec symboles de debug
+"""
+import os
 from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
 
 with workspace("WebDemo"):
-    configurations(["Release"])
+    # Enregistrement automatique via variables d'environnement ou PATH.
+    # Pour un chemin explicite, passer : RegisterJengaGlobalToolchains({"emsdk_root": "/chemin/emsdk"})
+    RegisterJengaGlobalToolchains()
+
+    configurations(["Debug", "Release"])
     targetoses([TargetOS.WEB])
     targetarchs([TargetArch.WASM32])
-
-    # Utiliser le toolchain Emscripten global configuré dans GlobalToolchains.py
-    # Ou définir le toolchain avec les chemins complets:
-    with toolchain("emscripten", "emscripten"):
-        settarget("Web", "wasm32")
-        ccompiler(r"C:\emsdk-4.0.22\upstream\emscripten\emcc.bat")
-        cppcompiler(r"C:\emsdk-4.0.22\upstream\emscripten\em++.bat")
-        archiver(r"C:\emsdk-4.0.22\upstream\emscripten\emar.bat")
-
-    usetoolchain("emscripten")
 
     with project("WasmApp"):
         consoleapp()
         language("C++")
+        cppdialect("C++17")
         files(["src/**.cpp"])
+
+        usetoolchain("emscripten")
+
         embedresources(["assets/**"])
+
+        emscripteninitialmemory(16)   # 16 MB RAM initiale
+        emscriptenstacksize(5)         # 5 MB stack
+
+        with filter("config:Debug"):
+            defines(["_DEBUG"])
+            optimize("Off")
+            symbols(True)
+
+        with filter("config:Release"):
+            defines(["NDEBUG"])
+            optimize("Speed")
+            symbols(False)

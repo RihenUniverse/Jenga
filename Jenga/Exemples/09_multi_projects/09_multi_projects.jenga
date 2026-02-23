@@ -41,13 +41,15 @@ with workspace("MultiProjects"):
         with filter("system:Linux"):
             usetoolchain("zig-linux-x64")
 
-        # Android
+        # Android – NativeActivity requires windowedapp()
         with filter("system:Android"):
+            windowedapp()
             usetoolchain("android-ndk")
             androidapplicationid("com.jenga.tools")
             androidminsdk(24)
             androidtargetsdk(34)
             androidabis(["arm64-v8a", "x86_64"])
+            androidnativeactivity(True)
 
         # Web
         with filter("system:Web"):
@@ -72,13 +74,15 @@ with workspace("MultiProjects"):
         with filter("system:Linux"):
             usetoolchain("zig-linux-x64")
 
-        # Android
+        # Android – NativeActivity requires windowedapp()
         with filter("system:Android"):
+            windowedapp()
             usetoolchain("android-ndk")
             androidapplicationid("com.jenga.game")
             androidminsdk(24)
             androidtargetsdk(34)
             androidabis(["arm64-v8a", "x86_64"])
+            androidnativeactivity(True)
 
         # Web
         with filter("system:Web"):

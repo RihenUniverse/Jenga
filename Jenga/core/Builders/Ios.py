@@ -525,3 +525,7 @@ class DirectIOSBuilder(Builder):
             shutil.copy2(zip_path, output_ipa)
 
         return output_ipa
+
+
+# Alias for factory compatibility (factory references 'IOSBuilder')
+IOSBuilder = DirectIOSBuilder
