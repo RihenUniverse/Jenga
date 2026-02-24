@@ -1,7 +1,7 @@
-# Jenga v2.0.0 - Rapport de Tests Production-Ready
+# Jenga v2.0.1 - Rapport de Tests Production-Ready
 
 **Date**: 2026-02-22
-**Objectif**: Valider que Jenga v2.0.0 est production-ready
+**Objectif**: Valider que Jenga v2.0.1 est production-ready
 
 ---
 
@@ -222,7 +222,7 @@ typedef GLuint (*PFNGLCREATESHADERPROC)(GLenum);
    - Configuration toolchains (zig, emscripten, NDK)
    - Troubleshooting compilation
 
-3. **CHANGELOG.md** - Documenter changements v2.0.0
+3. **CHANGELOG.md** - Documenter changements v2.0.1
 
 ---
 
@@ -266,7 +266,7 @@ androidabis(["arm64-v8a", "x86_64"])  # Compile les 2 ABIs automatiquement
 
 ## ✅ Conclusion
 
-**Jenga v2.0.0 est PRODUCTION-READY pour**:
+**Jenga v2.0.1 est PRODUCTION-READY pour**:
 - ✅ Builds Linux (native + WSL2)
 - ✅ Builds Windows (MinGW/Clang)
 - ✅ Builds Android (NDK, Fat APK)

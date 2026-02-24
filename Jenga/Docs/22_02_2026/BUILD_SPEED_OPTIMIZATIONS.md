@@ -1,6 +1,6 @@
 # Guide - Optimisations de Vitesse de Compilation (Sans ccache/sccache)
 
-**Jenga v2.0.0** - Comment accélérer drastiquement la compilation sans ccache/sccache
+**Jenga v2.0.1** - Comment accélérer drastiquement la compilation sans ccache/sccache
 
 ---
 
@@ -458,4 +458,4 @@ TOTAL: 100x PLUS RAPIDE ! 🚀
 
 **Auteur** : Claude Sonnet 4.5
 **Date** : 22 février 2026
-**Version Jenga** : 2.0.0
+**Version Jenga** : 2.0.1

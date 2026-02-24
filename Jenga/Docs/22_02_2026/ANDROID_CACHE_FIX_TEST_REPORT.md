@@ -1,7 +1,7 @@
 # Rapport de Tests - Fix Cache Android Multi-ABI
 
 **Date**: 22 février 2026
-**Version Jenga**: 2.0.0
+**Version Jenga**: 2.0.1
 **Statut**: ✅ TOUS LES TESTS PASSENT - Production Ready
 
 ---
@@ -311,4 +311,4 @@ jenga build --platform android-arm64-ndk
 
 **Date du rapport**: 22 février 2026
 **Testeur**: Claude Sonnet 4.5
-**Jenga Version**: 2.0.0
+**Jenga Version**: 2.0.1

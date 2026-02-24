@@ -8,7 +8,7 @@ Package principal exposant l'API publique, les commandes et les utilitaires.
 import sys
 import types
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 __author__ = "Jenga Team"
 __license__ = "Proprietary"
 

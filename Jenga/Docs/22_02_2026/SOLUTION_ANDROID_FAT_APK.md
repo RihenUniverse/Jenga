@@ -352,4 +352,4 @@ Voulez-vous que j'implémente la **Solution 2 (Fat APK)** dans le builder Androi
 ---
 
 **Généré par** : Claude Code
-**Build System** : Jenga v2.0.0
+**Build System** : Jenga v2.0.1

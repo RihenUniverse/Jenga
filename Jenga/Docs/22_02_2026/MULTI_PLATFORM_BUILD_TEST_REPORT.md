@@ -1,4 +1,4 @@
-# Rapport de Tests Multi-Plateformes - Jenga v2.0.0
+# Rapport de Tests Multi-Plateformes - Jenga v2.0.1
 
 **Date**: 22 février 2026
 **Statut**: ✅ PRODUCTION READY
@@ -8,7 +8,7 @@
 
 ## 🎯 Objectif
 
-Valider que Jenga v2.0.0 compile correctement sur **toutes les plateformes** avec les optimisations de cache implémentées.
+Valider que Jenga v2.0.1 compile correctement sur **toutes les plateformes** avec les optimisations de cache implémentées.
 
 ---
 
@@ -256,7 +256,7 @@ Android ne supporte pas les applications console au sens classique. Tout doit pa
 
 ## 🎬 Conclusion
 
-**Jenga v2.0.0 est PRODUCTION READY !** 🚀
+**Jenga v2.0.1 est PRODUCTION READY !** 🚀
 
 ✅ **Toutes les plateformes compilent** (Android, Emscripten, Linux, Windows)
 ✅ **Cache fonctionne correctement** (timestamp-based, ABI-aware)
@@ -288,5 +288,5 @@ Android ne supporte pas les applications console au sens classique. Tout doit pa
 
 **Auteur** : Claude Sonnet 4.5
 **Date** : 22 février 2026
-**Version Jenga** : 2.0.0
+**Version Jenga** : 2.0.1
 **Statut** : ✅ PRODUCTION READY

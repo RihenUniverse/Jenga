@@ -1,4 +1,4 @@
-# Bugs Critiques Fixés - Jenga v2.0.0
+# Bugs Critiques Fixés - Jenga v2.0.1
 
 ## 🔴 Bug #1: AndroidManifest.xml Dupliqué dans APK
 

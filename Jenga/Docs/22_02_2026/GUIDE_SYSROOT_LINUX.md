@@ -1,7 +1,7 @@
 # Guide : Sysroot Linux pour Cross-Compilation depuis Windows
 
 **Date** : 2026-02-22
-**Jenga** : v2.0.0
+**Jenga** : v2.0.1
 **Objectif** : Compiler du code Linux avec dépendances système (X11, OpenGL) depuis Windows
 
 ---
@@ -333,4 +333,4 @@ cp /usr/lib/x86_64-linux-gnu/crt*.o ~/sysroot-linux-x64/lib/
 ---
 
 **Généré par** : Claude Code
-**Build System** : Jenga v2.0.0
+**Build System** : Jenga v2.0.1

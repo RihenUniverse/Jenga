@@ -1,4 +1,4 @@
-# Optimisations de Compilation - Jenga v2.0.0
+# Optimisations de Compilation - Jenga v2.0.1
 
 **Date**: 22 février 2026
 **Statut**: ✅ PRODUCTION READY
@@ -322,4 +322,4 @@ jenga build
 
 ---
 
-**Conclusion**: Jenga v2.0.0 offre maintenant des performances de compilation comparables aux meilleurs build systems professionnels (Visual Studio, CMake+Ninja, Cargo) grâce au cache timestamp simple + ccache/sccache + PCH! 🚀
+**Conclusion**: Jenga v2.0.1 offre maintenant des performances de compilation comparables aux meilleurs build systems professionnels (Visual Studio, CMake+Ninja, Cargo) grâce au cache timestamp simple + ccache/sccache + PCH! 🚀

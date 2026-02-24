@@ -49,7 +49,7 @@ class DaemonInfo:
     workspace_root: str
     entry_file: str
     start_time: float
-    version: str = "2.0.0"
+    version: str = "2.0.1"
 
 
 class Daemon:
@@ -340,7 +340,7 @@ class Daemon:
             workspace_root=str(self.workspace_root),
             entry_file=str(self.entry_file),
             start_time=self._start_time,
-            version="2.0.0"
+            version="2.0.1"
         )
         info_path = self._daemon_dir / self._INFO_FILE
         FileSystem.WriteFile(info_path, json.dumps(info.__dict__, indent=2))

@@ -1,4 +1,4 @@
-# Refactoring du Système de Cache - Jenga v2.0.0
+# Refactoring du Système de Cache - Jenga v2.0.1
 
 **Date**: 22 février 2026
 **Statut**: ✅ COMPLÉTÉ - Production Ready

@@ -1,6 +1,6 @@
 # Builders Archivés (unused/)
 
-Ce dossier contient des versions obsolètes ou alternatives de builders qui ont été consolidées lors de la mise en production de Jenga v2.0.0.
+Ce dossier contient des versions obsolètes ou alternatives de builders qui ont été consolidées lors de la mise en production de Jenga v2.0.1.
 
 ## Raisons de l'archivage
 
@@ -196,7 +196,7 @@ cp unused/XcodeIOSBuilder.py ../MyCustomBuilder.py
 ## Historique de Consolidation
 
 **Date** : 22 février 2026
-**Version** : Jenga v2.0.0
+**Version** : Jenga v2.0.1
 **Raison** : Mise en production - Élimination des duplications
 **Builders consolidés** : 4 plateformes (Android, iOS, Emscripten, Xbox)
 **Builders archivés** : 14 fichiers

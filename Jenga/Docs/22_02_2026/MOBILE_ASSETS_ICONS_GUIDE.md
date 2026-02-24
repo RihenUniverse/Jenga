@@ -1,6 +1,6 @@
 # Guide - Icônes et Ressources Mobile (Android/iOS)
 
-**Jenga v2.0.0** - Documentation complète pour intégrer icônes, logos et ressources dans vos applications Android et iOS.
+**Jenga v2.0.1** - Documentation complète pour intégrer icônes, logos et ressources dans vos applications Android et iOS.
 
 ---
 
@@ -509,4 +509,4 @@ jenga build --platform ios-arm64-xcode --config Release
 
 **Auteur** : Claude Sonnet 4.5
 **Date** : 22 février 2026
-**Version Jenga** : 2.0.0
+**Version Jenga** : 2.0.1

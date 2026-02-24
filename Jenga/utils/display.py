@@ -163,7 +163,7 @@ class Display:
         print(f"{Colored.Colorize('[DEBUG]', dim=True)} {message}")
 
     @staticmethod
-    def PrintBanner(version: str = "2.0.0") -> None:
+    def PrintBanner(version: str = "2.0.1") -> None:
         """Print Jenga banner with exact design."""
         banner = f"""
 {Colored.Colorize('╔══════════════════════════════════════════════════════════════════╗', color='cyan')}
@@ -186,7 +186,7 @@ class Display:
             print(f"Jenga - Multi-platform C/C++ Build System v{version}")
 
     @staticmethod
-    def PrintVersion(version: str = "1.0.0", copyright_year: str = "2025", 
+    def PrintVersion(version: str = "2.0.1", copyright_year: str = "2025", 
                      copyright_holder: str = "Rihen", license_type: str = "Proprietary") -> None:
         """Print version information."""
         version_info = f"""
@@ -319,12 +319,12 @@ License: {license_type}
         Display.Debug(message)
 
     @staticmethod
-    def print_banner(version: str = "1.0.0") -> None:
+    def print_banner(version: str = "2.0.1") -> None:
         """Alias for PrintBanner()."""
         Display.PrintBanner(version)
 
     @staticmethod
-    def print_version(version: str = "1.0.0", copyright_year: str = "2025", 
+    def print_version(version: str = "2.0.1", copyright_year: str = "2025", 
                       copyright_holder: str = "Rihen", license_type: str = "Proprietary") -> None:
         """Alias for PrintVersion()."""
         Display.PrintVersion(version, copyright_year, copyright_holder, license_type)

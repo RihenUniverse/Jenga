@@ -1,4 +1,4 @@
-# Jenga Build System — Release v2.0.0
+# Jenga Build System — Release v2.0.1
 
 **Date de release : 23 Février 2026**
 
@@ -17,7 +17,7 @@ pip install jenga-build
 Ou depuis les artefacts de cette release :
 
 ```bash
-pip install jenga-2.0.0-py3-none-any.whl
+pip install jenga-2.0.1-py3-none-any.whl
 ```
 
 **Prérequis :** Python 3.8 ou supérieur — aucune autre dépendance obligatoire.
@@ -326,8 +326,8 @@ Module.ccall('myFunction', 'number', ['number'], [42]);
 ## 📦 Ce qui est inclus dans cette release
 
 ```
-jenga-2.0.0-py3-none-any.whl    ← Installation Python (pip)
-jenga-2.0.0.tar.gz              ← Sources (sdist)
+jenga-2.0.1-py3-none-any.whl    ← Installation Python (pip)
+jenga-2.0.1.tar.gz              ← Sources (sdist)
 ```
 
 ### Structure du package
@@ -399,7 +399,7 @@ Le cache utilise 3 niveaux : timestamp (mtime) → fichiers de dépendances (`.d
 ### 1. Installer
 
 ```bash
-pip install jenga-2.0.0-py3-none-any.whl
+pip install jenga-2.0.1-py3-none-any.whl
 ```
 
 ### 2. Créer un projet

@@ -14,7 +14,7 @@ def get_version():
         match = re.search(r"^__version__\s*=\s*['\"]([^'\"]+)['\"]", content, re.MULTILINE)
         if match:
             return match.group(1)
-    return '2.0.0'  # fallback
+    return '2.0.1'  # fallback
 
 
 def get_long_description():

@@ -222,7 +222,7 @@ class VariableExpander:
 
         mapping = {
             'root': str(self._jengaRoot),
-            'version': '2.0.0',  # À définir globalement
+            'version': '2.0.1',  # À définir globalement
             'unitest.source': str(unitest_root),
             'unitest.include': str(unitest_root / 'src'),
             'unitest.lib': str(unitest_root / 'libs' / 'Unitest.lib'),

@@ -1,6 +1,6 @@
 # Release Description (GitHub)
 
-## Jenga Build System v2.0.0
+## Jenga Build System v2.0.1
 
 Jenga est un système de build moderne pour projets natifs C/C++, piloté par une DSL Python et une CLI unifiée.
 
@@ -95,8 +95,8 @@ jenga --version
 Ces archives sont utiles comme assets "Source code" additionnels.
 
 ```bash
-git archive --format=zip    --output dist/jenga-v2.0.0-source.zip HEAD
-git archive --format=tar.gz --output dist/jenga-v2.0.0-source.tar.gz HEAD
+git archive --format=zip    --output dist/jenga-v2.0.1-source.zip HEAD
+git archive --format=tar.gz --output dist/jenga-v2.0.1-source.tar.gz HEAD
 ```
 
 ---

@@ -1,6 +1,6 @@
 # Jenga User Guide
 
-**Version 2.0.0**
+**Version 2.0.1**
 **Complete Reference for Building Native Applications**
 
 ---
@@ -85,7 +85,7 @@ Jenga --version
 
 Expected output:
 ```
-Jenga Build System v2.0.0
+Jenga Build System v2.0.1
 ```
 
 ### Installing Compilers
@@ -5779,5 +5779,5 @@ Happy building with Jenga! 🎉
 
 ---
 
-**Jenga Build System v2.0.0**
+**Jenga Build System v2.0.1**
 © 2024 Jenga Team (Rihen). All rights reserved.

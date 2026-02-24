@@ -1,6 +1,6 @@
 # Jenga Developer Guide
 
-**Version 2.0.0**
+**Version 2.0.1**
 **Complete Reference for Contributing to Jenga**
 
 ---
@@ -1089,7 +1089,7 @@ def _GetJengaVariable(self, var: str) -> str:
     if var == 'Root':
         return str(self._jengaRoot)
     elif var == 'Version':
-        return '2.0.0'
+        return '2.0.1'
     elif var == 'Unitest.Include':
         return str(self._jengaRoot / 'Jenga' / 'Unitest' / 'src' / 'Unitest')
     # ... etc
@@ -1756,5 +1756,5 @@ def _GenerateManifest(self, project, outputDir) -> Path:
 
 ---
 
-**Jenga Build System v2.0.0**
+**Jenga Build System v2.0.1**
 © 2024 Jenga Team (Rihen). All rights reserved.

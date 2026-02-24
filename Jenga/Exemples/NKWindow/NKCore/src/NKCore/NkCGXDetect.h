@@ -3,7 +3,7 @@
 // DESCRIPTION: Détection GPU, APIs graphiques et calcul (CUDA/OpenCL)
 // AUTEUR: Rihen
 // DATE: 2026-02-10
-// VERSION: 2.0.0
+// VERSION: 2.0.1
 // MODIFICATIONS: Intégration avec NkPlatformDetect.h et NkArchDetect.h
 // -----------------------------------------------------------------------------
 

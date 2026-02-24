@@ -67,7 +67,7 @@ class JengaConfig:
     def _GetDefaultConfig(self) -> Dict[str, Any]:
         """Configuration par défaut."""
         return {
-            "version": "2.0.0",
+            "version": "2.0.1",
             "toolchains_paths": [],
             "sysroots_paths": [],
             "global_cache_enabled": True,

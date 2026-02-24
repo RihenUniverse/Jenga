@@ -1,7 +1,7 @@
 # Android Universal APK - Corrections Critiques
 
 **Date**: 22 février 2026
-**Version Jenga**: 2.0.0
+**Version Jenga**: 2.0.1
 **Statut**: ✅ RÉSOLU - Production Ready
 
 ## 🐛 Bugs Critiques Corrigés

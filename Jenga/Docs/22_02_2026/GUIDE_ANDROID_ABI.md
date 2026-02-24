@@ -1,7 +1,7 @@
 # Guide : ABIs Android et Compatibilité Multi-Appareils
 
 **Date** : 2026-02-22
-**Jenga** : v2.0.0
+**Jenga** : v2.0.1
 **Problème** : APK ne s'installe pas sur MEmu ou émulateurs Android
 
 ---
@@ -330,4 +330,4 @@ androidabis(["armeabi-v7a", "arm64-v8a"])  # ✅ Couvre 95% smartphones
 ---
 
 **Généré par** : Claude Code
-**Build System** : Jenga v2.0.0
+**Build System** : Jenga v2.0.1

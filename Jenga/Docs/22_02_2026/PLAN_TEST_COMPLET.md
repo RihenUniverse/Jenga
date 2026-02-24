@@ -1,7 +1,7 @@
-# Plan de Test Complet - Jenga v2.0.0
+# Plan de Test Complet - Jenga v2.0.1
 
 **Date** : 2026-02-22
-**Objectif** : Valider tous les aspects de Jenga v2.0.0
+**Objectif** : Valider tous les aspects de Jenga v2.0.1
 
 ---
 
@@ -394,4 +394,4 @@ jenga build --platform harmonyos-arm64
 ---
 
 **Généré par** : Claude Code
-**Build System** : Jenga v2.0.0
+**Build System** : Jenga v2.0.1

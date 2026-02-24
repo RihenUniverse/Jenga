@@ -130,7 +130,7 @@ class InfoCommand:
             print(f"Host Environment: {Platform.GetHostEnvironment().value}")
             print(f"Host Triple: {Platform.GetHostTriple()}")
             print(f"Python: {sys.version}")
-            print(f"Jenga version: 2.0.0")
+            print(f"Jenga version: 2.0.1")
             print()
 
         return 0

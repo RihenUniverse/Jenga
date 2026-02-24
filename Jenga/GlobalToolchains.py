@@ -597,7 +597,7 @@ def RegisterJengaGlobalToolchains(config: Optional[Dict[str, str]] = None) -> No
 # print("   - Android NDK enregistrée.")
 # ToolchainClangNative(clang_base="/opt/llvm-14")
 # print("   - Clang native enregistrée.")
-# ToolchainEmscripten(emsdk_root="/home/user/emsdk-2.0.0")
+# ToolchainEmscripten(emsdk_root="/home/user/emsdk-2.0.1")
 # print("   - Emscripten enregistrée.\n")
 
 # # ----------------------------------------------------------------------

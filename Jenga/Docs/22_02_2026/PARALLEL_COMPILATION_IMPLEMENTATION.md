@@ -1,7 +1,7 @@
 # Implémentation - Compilation Parallèle Automatique
 
 **Date**: 22 février 2026
-**Jenga v2.0.0** - Compilation parallèle basée sur le nombre de CPU cores
+**Jenga v2.0.1** - Compilation parallèle basée sur le nombre de CPU cores
 
 ---
 
@@ -325,5 +325,5 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=num_jobs) as executor:
 
 **Auteur** : Claude Sonnet 4.5
 **Date** : 22 février 2026
-**Version Jenga** : 2.0.0
+**Version Jenga** : 2.0.1
 **Statut** : ✅ PRODUCTION READY

@@ -1,9 +1,9 @@
-# Rapport de Compilation - Exemples Jenga v2.0.0
+# Rapport de Compilation - Exemples Jenga v2.0.1
 
 **Date** : 2026-02-22
 **Système** : Windows 10 (MSYS2 Bash)
 **Python** : 3.13.9
-**Jenga** : v2.0.0 (mode éditable)
+**Jenga** : v2.0.1 (mode éditable)
 
 ---
 
@@ -492,9 +492,9 @@ Zig ne fournit pas les bibliothèques système Linux (X11). Nécessite un **sysr
 
 ---
 
-## ✅ Jenga v2.0.0 - Production Ready
+## ✅ Jenga v2.0.1 - Production Ready
 
-**Jenga v2.0.0 est PRÊT pour la production** sur les plateformes suivantes :
+**Jenga v2.0.1 est PRÊT pour la production** sur les plateformes suivantes :
 
 ### Windows (100% validé) ✅
 - ✅ Console applications
@@ -529,5 +529,5 @@ Zig ne fournit pas les bibliothèques système Linux (X11). Nécessite un **sysr
 ---
 
 **Rapport généré automatiquement par Claude Code**
-**Build System** : Jenga v2.0.0
+**Build System** : Jenga v2.0.1
 **Compilé par** : Claude Sonnet 4.5

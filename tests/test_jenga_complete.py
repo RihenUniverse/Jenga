@@ -847,12 +847,12 @@ class TestApiDSLFunctions:
                 xboxsigningmode("test")
                 xboxpackagename("TestPackage")
                 xboxpublisher("TestPublisher")
-                xboxversion("2.0.0.0")
+                xboxversion("2.0.1.0")
 
                 assert p.xboxSigningMode == "test"
                 assert p.xboxPackageName == "TestPackage"
                 assert p.xboxPublisher == "TestPublisher"
-                assert p.xboxVersion == "2.0.0.0"
+                assert p.xboxVersion == "2.0.1.0"
 
     def test_prebuild_postbuild_hooks(self):
         _reset()

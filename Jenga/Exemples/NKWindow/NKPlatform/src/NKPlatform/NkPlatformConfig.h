@@ -3,7 +3,7 @@
 // DESCRIPTION: Platform configuration and feature detection
 // AUTEUR: Rihen
 // DATE: 2026-02-12
-// VERSION: 2.0.0
+// VERSION: 2.0.1
 // MODIFICATIONS: Suppression du bridge NK_→NKENTSEU_, utilisation directe des macros NKENTSEU_
 // -----------------------------------------------------------------------------
 
