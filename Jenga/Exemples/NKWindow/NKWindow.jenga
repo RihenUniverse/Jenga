@@ -208,7 +208,6 @@ with workspace("NKWindow", location="."):
     # Contenu (src/NKCore/) :
     #   NkTypes.h           — Types fixes (NkU8, NkI32, NkVec2u, NkRect…)
     #   NkMacros.h          — Macros utilitaires (NK_UNUSED, NK_STRINGIFY…)
-    #   NkTraits.h/cpp      — Type traits C++20 (SFINAE helpers, concepts)
     #   NkBits.h/cpp        — Opérations bit (popcount, clz, byteswap…)
     #   NkLimits.h/cpp      — Limites de types scalaires
     #   NkAtomic.h          — Atomiques portables (spin-lock, flags)
