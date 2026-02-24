@@ -451,10 +451,10 @@ class TestEmscriptenRunnerScripts:
             out_path.write_text("<html></html>", encoding="utf-8")
             b._GenerateRunnerScripts(proj, out_path)
 
-            bat = Path(d) / "run_TestApp.bat"
-            sh  = Path(d) / "run_TestApp.sh"
-            assert bat.exists(), "run_TestApp.bat should be generated"
-            assert sh.exists(),  "run_TestApp.sh should be generated"
+            bat = Path(d) / "TestApp.bat"
+            sh  = Path(d) / "TestApp.sh"
+            assert bat.exists(), "TestApp.bat should be generated"
+            assert sh.exists(),  "TestApp.sh should be generated"
 
     def test_runner_scripts_contain_project_name(self):
         b = self._make_emscripten_builder()
@@ -465,8 +465,8 @@ class TestEmscriptenRunnerScripts:
             out_path.write_text("<html></html>", encoding="utf-8")
             b._GenerateRunnerScripts(proj, out_path)
 
-            bat_text = (Path(d) / "run_MyWasmGame.bat").read_text(encoding="utf-8")
-            sh_text  = (Path(d) / "run_MyWasmGame.sh").read_text(encoding="utf-8")
+            bat_text = (Path(d) / "MyWasmGame.bat").read_text(encoding="utf-8")
+            sh_text  = (Path(d) / "MyWasmGame.sh").read_text(encoding="utf-8")
 
             assert "MyWasmGame" in bat_text
             assert "MyWasmGame" in sh_text
@@ -482,8 +482,8 @@ class TestEmscriptenRunnerScripts:
             out_path.write_text("", encoding="utf-8")
             b._GenerateRunnerScripts(proj, out_path)
 
-            bat = (Path(d) / "run_App.bat").read_text(encoding="utf-8")
-            sh  = (Path(d) / "run_App.sh").read_text(encoding="utf-8")
+            bat = (Path(d) / "App.bat").read_text(encoding="utf-8")
+            sh  = (Path(d) / "App.sh").read_text(encoding="utf-8")
 
             # Must launch an HTTP server (python http.server)
             assert "http.server" in bat
@@ -497,8 +497,8 @@ class TestEmscriptenRunnerScripts:
             out_path = Path(d) / "MyLib.a"
             b._GenerateRunnerScripts(proj, out_path)
 
-            assert not (Path(d) / "run_MyLib.bat").exists()
-            assert not (Path(d) / "run_MyLib.sh").exists()
+            assert not (Path(d) / "MyLib.bat").exists()
+            assert not (Path(d) / "MyLib.sh").exists()
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Unix chmod not supported on Windows")
     def test_sh_script_is_executable(self):
@@ -510,7 +510,7 @@ class TestEmscriptenRunnerScripts:
             out_path.write_text("", encoding="utf-8")
             b._GenerateRunnerScripts(proj, out_path)
 
-            sh = Path(d) / "run_App.sh"
+            sh = Path(d) / "App.sh"
             if sh.exists():
                 mode = sh.stat().st_mode
                 assert mode & 0o111, ".sh should be executable"

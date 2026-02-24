@@ -13,6 +13,11 @@
 #include <cstdlib>
 #include <atomic>
 
+// Avoid macro/function name collision from NkPlatform.h convenience macro.
+#ifdef NkFreeAligned
+#undef NkFreeAligned
+#endif
+
 // ============================================================
 // INCLUDES PLATFORM-SPECIFIC
 // ============================================================
@@ -21,7 +26,11 @@
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
     #include <intrin.h>
-    #include <Psapi.h>
+    #if defined(__MINGW32__) || defined(__MINGW64__)
+        #include <psapi.h>
+    #else
+        #include <Psapi.h>
+    #endif
     #pragma comment(lib, "psapi.lib")
 #elif defined(NKENTSEU_PLATFORM_LINUX) || defined(NKENTSEU_PLATFORM_ANDROID)
     #include <unistd.h>

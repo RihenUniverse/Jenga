@@ -49,8 +49,14 @@
     #define NKENTSEU_BUILTIN_FILE     __builtin_FILE()
     #define NKENTSEU_BUILTIN_FUNCTION __builtin_FUNCTION()
     #define NKENTSEU_BUILTIN_LINE     __builtin_LINE()
-    
-    #if defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 9)
+
+    #if defined(__has_builtin)
+        #if __has_builtin(__builtin_COLUMN)
+            #define NKENTSEU_BUILTIN_COLUMN __builtin_COLUMN()
+        #else
+            #define NKENTSEU_BUILTIN_COLUMN 0
+        #endif
+    #elif defined(__clang__)
         #define NKENTSEU_BUILTIN_COLUMN __builtin_COLUMN()
     #else
         #define NKENTSEU_BUILTIN_COLUMN 0

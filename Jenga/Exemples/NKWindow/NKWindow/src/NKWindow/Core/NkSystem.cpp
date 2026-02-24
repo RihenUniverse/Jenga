@@ -3,11 +3,37 @@
 // =============================================================================
 
 #include "NkSystem.h"
-#include "Camera/NkCameraSystem.h"
 #include "IEventImpl.h"
 #include "NkEventSystem.h"
 #include "NkGamepadSystem.h"
 #include "NkPlatformDetect.h"
+
+#if defined(__has_include)
+#  if __has_include("Camera/NkCameraSystem.h")
+#    include "Camera/NkCameraSystem.h"
+#    define NKENTSEU_HAS_CAMERA_SYSTEM 1
+#  else
+#    define NKENTSEU_HAS_CAMERA_SYSTEM 0
+#  endif
+#else
+#  define NKENTSEU_HAS_CAMERA_SYSTEM 0
+#endif
+
+#if !NKENTSEU_HAS_CAMERA_SYSTEM
+namespace nkentseu
+{
+struct NkCameraSystemFallback
+{
+    static NkCameraSystemFallback& Instance()
+    {
+        static NkCameraSystemFallback s;
+        return s;
+    }
+    void Init() {}
+    void Shutdown() {}
+};
+} // namespace nkentseu
+#endif
 
 #if defined(NKENTSEU_PLATFORM_WIN32)
 #   include "../Platform/Win32/NkWin32EventImpl.h"
@@ -58,7 +84,11 @@ bool NkSystem::Initialise(const NkAppData& data)
 
     // --- GamepadSystem (une seule instance par NkSystem) ---
     NkGamepadSystem::Instance().Init();
+#if NKENTSEU_HAS_CAMERA_SYSTEM
     NkCameraSystem::Instance().Init();
+#else
+    NkCameraSystemFallback::Instance().Init();
+#endif
 
     mInitialised = true;
     return true;
@@ -69,7 +99,11 @@ void NkSystem::Close()
     if (!mInitialised) return;
 
     // Arrêter les gamepads d'abord
+#if NKENTSEU_HAS_CAMERA_SYSTEM
     NkCameraSystem::Instance().Shutdown();
+#else
+    NkCameraSystemFallback::Instance().Shutdown();
+#endif
     NkGamepadSystem::Instance().Shutdown();
 
     if (mEventImpl)

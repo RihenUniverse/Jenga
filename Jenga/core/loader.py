@@ -167,6 +167,7 @@ class Loader:
             # Location du projet (optionnel, peut rester relatif)
             if proj.location and not proj.location.startswith('%{'):
                 proj.location = expander.ResolvePath(proj.location, baseDir)
+            proj_base = Path(proj.location) if proj.location and not proj.location.startswith('%{') else baseDir
 
             # Chemins de sortie → absolus
             if proj.objDir:
@@ -176,9 +177,9 @@ class Loader:
 
             # PCH (fichiers spécifiques)
             if proj.pchHeader and not proj.pchHeader.startswith('%{'):
-                proj.pchHeader = expander.ResolvePath(proj.pchHeader, baseDir)
+                proj.pchHeader = expander.ResolvePath(proj.pchHeader, proj_base)
             if proj.pchSource and not proj.pchSource.startswith('%{'):
-                proj.pchSource = expander.ResolvePath(proj.pchSource, baseDir)
+                proj.pchSource = expander.ResolvePath(proj.pchSource, proj_base)
 
             # Fichiers de test (fichiers spécifiques, pas des patterns)
             if proj.testMainFile and not proj.testMainFile.startswith('%{'):

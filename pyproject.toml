@@ -38,14 +38,15 @@ Tracker = "https://github.com/RihenUniverse/Jenga/issues"
 jenga = "Jenga.jenga:main"
 
 [tool.setuptools]
-packages = {find = {exclude = ["tests", "tests.*", "examples", "examples.*"]}}
 include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["Jenga*"]
 
 [tool.setuptools.package-data]
 Jenga = [
-    "Unitest/src/Unitest/*.h",
-    "Unitest/src/Unitest/*.cpp",
-    "Unitest/Entry/*.cpp",
+    "Unitest/**/*",
+    "Exemples/**/*",
     "py.typed",
 ]
 

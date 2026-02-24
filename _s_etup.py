@@ -48,6 +48,8 @@ setup(
             'Unitest/src/Unitest/*.h',
             'Unitest/src/Unitest/*.cpp',
             'Unitest/Entry/*.cpp',
+            'Exemples/**/*.h',
+            'Exemples/**/*.cpp',
             'py.typed',
         ],
     },

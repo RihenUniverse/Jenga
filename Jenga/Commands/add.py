@@ -160,29 +160,51 @@ class AddCommand:
         Gère l'indentation automatique.
         """
         content = FileSystem.ReadFile(entry_file)
-        pattern = rf'(with\s+project\s*\(\s*["\']{project_name}["\']\s*\)\s*:\s*\n)((?:[ \t]+.*\n)*?)(?=\n\S|\Z)'
-        match = re.search(pattern, content, re.MULTILINE)
+        eol = "\r\n" if "\r\n" in content else "\n"
+        lines_raw = content.splitlines(keepends=True)
 
-        if not match:
+        decl_re = re.compile(
+            rf'^(?P<indent>[ \t]*)with\s+project\s*\(\s*["\']{re.escape(project_name)}["\']\s*\)\s*:\s*$'
+        )
+
+        start_idx = -1
+        decl_indent = ""
+        for idx, raw in enumerate(lines_raw):
+            logical = raw.rstrip("\r\n")
+            m = decl_re.match(logical)
+            if m:
+                start_idx = idx
+                decl_indent = m.group("indent")
+                break
+
+        if start_idx < 0:
             Colored.PrintError(f"Project block for '{project_name}' not found in {entry_file}.")
             return False
 
-        block_start = match.start(1)
-        block_indent = re.match(r'^([ \t]*)', match.group(2)).group(1) if match.group(2) else '    '
-        # Si le bloc est vide, l'indentation par défaut est 4 espaces
-        if not block_indent:
-            block_indent = '    '
+        decl_indent_len = len(decl_indent)
+        block_indent = None
+        end_idx = len(lines_raw)
 
-        # Préparer les lignes à insérer avec indentation
-        indented_lines = [f"{block_indent}{line}\n" for line in lines]
+        for idx in range(start_idx + 1, len(lines_raw)):
+            logical = lines_raw[idx].rstrip("\r\n")
+            stripped = logical.strip()
+            if not stripped:
+                continue
 
-        # Trouver où insérer : avant la première ligne non-vide après le `:` ?
-        # Plus simple : insérer à la fin du bloc, avant la ligne suivante.
-        # On récupère la position de fin du bloc
-        block_end = match.end(2)
-        # Insérer les lignes juste après le contenu existant, avant la ligne suivante
-        new_content = content[:block_end] + ''.join(indented_lines) + content[block_end:]
-        FileSystem.WriteFile(entry_file, new_content)
+            current_indent_len = len(logical) - len(logical.lstrip(" \t"))
+            if current_indent_len <= decl_indent_len:
+                end_idx = idx
+                break
+
+            if block_indent is None:
+                block_indent = logical[:current_indent_len]
+
+        if block_indent is None:
+            block_indent = decl_indent + "    "
+
+        inserted = [f"{block_indent}{line}{eol}" for line in lines]
+        new_lines = lines_raw[:end_idx] + inserted + lines_raw[end_idx:]
+        FileSystem.WriteFile(entry_file, "".join(new_lines))
         return True
 
     @staticmethod

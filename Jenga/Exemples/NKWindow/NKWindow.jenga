@@ -634,6 +634,7 @@ with workspace("NKWindow", location="."):
             "../NKCore/src",       # Types fondamentaux (NkTypes, NkMacros…)
             "../NKCore/pch",       # pch NKCore
             "../NKPlatform/src",   # Détection de plateforme
+            "../NKPlatform/src/NKPlatform", # NkPlatformDetect.h (include public de NkWindow.h)
             "../NKLogger/src",     # Journalisation (Logger.h, Log.h…)
             "../Externals",        # stb et autres dépendances header-only
         ])
