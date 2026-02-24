@@ -54,7 +54,9 @@ class WindowsBuilder(Builder):
             return True
 
         header_path = Path(self.ResolveProjectPath(project, project.pchHeader))
+        Colored.PrintWarning(f"[PCH] {project.name}: pchHeader={project.pchHeader!r} resolved={header_path} exists={header_path.exists()}")
         if not header_path.exists():
+            Colored.PrintError(f"[PCH] Header not found for {project.name}: {header_path}")
             return False
         header_token = header_path.name
         pch_file = objDir / f"{project.name}.pch"
@@ -97,6 +99,13 @@ class WindowsBuilder(Builder):
             args.append(f"-I{self.ResolveProjectPath(project, inc)}")
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
+        if result.returnCode != 0:
+            Colored.PrintError(f"PCH compilation failed for {project.name}:")
+            Colored.PrintError(f"  cmd: {' '.join(str(a) for a in args)}")
+            if result.stdout:
+                Colored.PrintError(f"  stdout: {result.stdout}")
+            if result.stderr:
+                Colored.PrintError(f"  stderr: {result.stderr}")
         return result.returnCode == 0
 
     # -----------------------------------------------------------------------

@@ -136,22 +136,21 @@ class EmscriptenBuilder(Builder):
 
     def _GenerateRunnerScripts(self, project: Project, output_path: Path) -> None:
         """
-        Génère run_<Project>.bat (Windows) et run_<Project>.sh (Linux/macOS)
+        Génère <Project>.bat (Windows) et <Project>.sh (Linux/macOS)
         dans le même répertoire que le .html produit.
 
         Ces scripts démarrent un serveur HTTP local (python -m http.server),
-        ce qui évite les erreurs CORS lors de l'ouverture directe du fichier
-        .html en protocol file:// avec des assets .wasm / .js.
+        puis ouvrent automatiquement le navigateur sur la page WASM.
 
         Usage:
-          Windows : run_<Project>.bat [port]
-          Linux   : ./run_<Project>.sh [port]
+          Windows : <Project>.bat [port]
+          Linux   : ./<Project>.sh [port]
         Port par défaut : 8080
         """
         if project.kind not in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE):
             return  # Runner scripts only for executables, not libraries
 
-        html_name = output_path.name          # e.g. "WasmApp.html"
+        html_name = output_path.name          # e.g. "Sandbox.html"
         proj_name = project.name
         out_dir   = output_path.parent
         port_default = 8080
@@ -159,27 +158,28 @@ class EmscriptenBuilder(Builder):
         # ── Windows .bat ──────────────────────────────────────────────────
         bat_content = (
             "@echo off\n"
-            f"title Jenga WASM — {proj_name}\n"
+            f"title {proj_name}\n"
             "setlocal\n"
             f"set PORT=%1\n"
             f"if \"%PORT%\"==\"\" set PORT={port_default}\n"
             "\n"
             "echo ================================================\n"
-            f"echo  Jenga WASM Runner — {proj_name}\n"
+            f"echo  {proj_name} — WASM Runner\n"
             "echo ================================================\n"
             "echo.\n"
-            "echo  Serveur HTTP local demarre...\n"
-            "echo  Ouvrez votre navigateur :\n"
-            f"echo    http://localhost:%PORT%/{html_name}\n"
-            "echo  CTRL+C pour arreter le serveur.\n"
+            f"echo  Server: http://localhost:%PORT%/{html_name}\n"
+            "echo  CTRL+C to stop.\n"
             "echo.\n"
             "cd /d \"%~dp0\"\n"
+            ":: Start server in background, open browser after 1s delay, then restart\n"
+            ":: server in foreground so Ctrl+C stops it cleanly.\n"
+            f"start /B cmd /c \"ping -n 2 127.0.0.1 >nul & start \\\"\\\" \\\"http://localhost:%PORT%/{html_name}\\\"\"\n"
             "python -m http.server %PORT% 2>nul\n"
             "if errorlevel 1 py -m http.server %PORT% 2>nul\n"
             "if errorlevel 1 python3 -m http.server %PORT%\n"
             "endlocal\n"
         )
-        bat_path = out_dir / f"run_{proj_name}.bat"
+        bat_path = out_dir / f"{proj_name}.bat"
         try:
             bat_path.write_text(bat_content, encoding="utf-8")
         except OSError:
@@ -192,18 +192,18 @@ class EmscriptenBuilder(Builder):
             'SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"\n'
             "\n"
             'echo "================================================"\n'
-            f'echo " Jenga WASM Runner — {proj_name}"\n'
+            f'echo " {proj_name} — WASM Runner"\n'
             'echo "================================================"\n'
             'echo ""\n'
-            'echo " Serveur HTTP local demarre..."\n'
-            'echo " Ouvrez votre navigateur :"\n'
-            f'echo "   http://localhost:$PORT/{html_name}"\n'
-            'echo " CTRL+C pour arreter le serveur."\n'
+            f'echo " Server: http://localhost:$PORT/{html_name}"\n'
+            'echo " CTRL+C to stop."\n'
             'echo ""\n'
             'cd "$SCRIPT_DIR"\n'
+            "# Open browser after 1s while server starts in foreground\n"
+            f'( sleep 1; xdg-open "http://localhost:$PORT/{html_name}" 2>/dev/null || open "http://localhost:$PORT/{html_name}" 2>/dev/null ) &\n'
             'python3 -m http.server "$PORT" 2>/dev/null || python -m http.server "$PORT"\n'
         )
-        sh_path = out_dir / f"run_{proj_name}.sh"
+        sh_path = out_dir / f"{proj_name}.sh"
         try:
             sh_path.write_text(sh_content, encoding="utf-8")
             # Make the .sh executable

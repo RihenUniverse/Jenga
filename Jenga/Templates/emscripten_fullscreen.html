@@ -104,14 +104,19 @@
             canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
         }
 
+        // The WASM runtime controls canvas pixel dimensions via
+        // emscripten_set_canvas_element_size(). Do NOT set canvas.width /
+        // canvas.height from JavaScript: changing those attributes clears
+        // the canvas content and fights with the WASM renderer.
+        // CSS "width:100%; height:100%" already makes the canvas fill the
+        // viewport at the display level.
         function resizeCanvas() {
-            var container = document.getElementById('canvas-container');
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
+            // Intentionally a no-op for pixel dimensions.
+            // Notify the WASM layer about the new viewport size so it can
+            // emit a resize event if it subscribes to window.onresize.
         }
 
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
 
         // Configuration Emscripten
         var Module = {
