@@ -16,6 +16,7 @@ from datetime import datetime
 from .Colored import Colored
 from .FileSystem import FileSystem
 from .Display import Display
+from .Process import ProcessResult
 
 # ---------------------------------------------------------------------------
 # Data classes – camelCase fields (conteneurs)
@@ -386,30 +387,72 @@ class BuildLogger:
         self.total_files = total
         Display.Info(f"Found {total} source file(s)")
 
-    def LogCompile(self, source_file: str, result=None) -> None:
-        """Log a file compilation with optional captured output."""
+    def LogCompile(self, source_file: str, result: Optional[ProcessResult]) -> None:
+        """
+        Enregistre la compilation d'un fichier et affiche le résultat de manière structurée.
+        En cas d'erreur, tout le message du compilateur est affiché dans un cadre.
+        """
         self.compiled += 1
         filename = Path(source_file).name
         progress = f"[{self.compiled}/{self.total_files}]"
 
-        if result is None or result.returnCode == 0:
-            has_warnings = result and result.stderr and self._HasWarnings(result.stderr)
+        # Cas particulier : pas de ProcessResult (modules précompilés, etc.)
+        if result is None:
+            status = Colored.Colorize(progress, color='green')
+            print(f"{Colored.Colorize('✓', color='green')}   {status} Compiled module: {filename}")
+            return
+
+        # Fusionner stdout et stderr pour avoir tout le message
+        output = (result.stderr or "") + (result.stdout or "")
+
+        if result.returnCode == 0:
+            # Compilation réussie – on vérifie les warnings
+            has_warnings = output and self._HasWarnings(output)
             if has_warnings:
-                self.warnings_count += self._CountPattern(result.stderr, r'\bwarning\b')
+                self.warnings_count += self._CountPattern(output, r'\bwarning\b')
                 status = Colored.Colorize(progress, color='yellow')
-                print(f"{Colored.Colorize('✓', color='yellow')}   {status} Compiled: {Colored.Colorize(filename, color='yellow')}")
-                self._PrintWarningBox(filename, result.stderr)
+                print(f"{Colored.Colorize('✓', color='yellow')}   {status} Compiled with warnings: {Colored.Colorize(filename, color='yellow')}")
+                self._PrintWarningBox(filename, output)
             else:
                 status = Colored.Colorize(progress, color='green')
                 print(f"{Colored.Colorize('✓', color='green')}   {status} Compiled: {filename}")
         else:
+            # Échec de compilation
             self.failed += 1
-            self.errors_count += max(1, self._CountPattern(result.stderr or result.stdout or "", r'\berror\b'))
+            self.errors_count += max(1, self._CountPattern(output, r'\berror\b'))
             status = Colored.Colorize(progress, color='red')
-            output = (result.stderr or "") + (result.stdout or "")
+
+            # Ligne vide pour séparer du contexte précédent
             print()
+            # Affiche tout le message d'erreur dans un cadre
             self._PrintErrorBox(filename, output)
+            # Récapitulatif de l'échec
             print(f"\n{Colored.Colorize('✗', color='red')} {Colored.Colorize('✗', color='red')} Compilation failed: {source_file}")
+            
+    # def LogCompile(self, source_file: str, result=None) -> None:
+    #     """Log a file compilation with optional captured output."""
+    #     self.compiled += 1
+    #     filename = Path(source_file).name
+    #     progress = f"[{self.compiled}/{self.total_files}]"
+
+    #     if result is None or result.returnCode == 0:
+    #         has_warnings = result and result.stderr and self._HasWarnings(result.stderr)
+    #         if has_warnings:
+    #             self.warnings_count += self._CountPattern(result.stderr, r'\bwarning\b')
+    #             status = Colored.Colorize(progress, color='yellow')
+    #             print(f"{Colored.Colorize('✓', color='yellow')}   {status} Compiled: {Colored.Colorize(filename, color='yellow')}")
+    #             self._PrintWarningBox(filename, result.stderr)
+    #         else:
+    #             status = Colored.Colorize(progress, color='green')
+    #             print(f"{Colored.Colorize('✓', color='green')}   {status} Compiled: {filename}")
+    #     else:
+    #         self.failed += 1
+    #         self.errors_count += max(1, self._CountPattern(result.stderr or result.stdout or "", r'\berror\b'))
+    #         status = Colored.Colorize(progress, color='red')
+    #         output = (result.stderr or "") + (result.stdout or "")
+    #         print()
+    #         self._PrintErrorBox(filename, output)
+    #         print(f"\n{Colored.Colorize('✗', color='red')} {Colored.Colorize('✗', color='red')} Compilation failed: {source_file}")
 
     def LogCached(self, source_file: str) -> None:
         """Log a cached (skipped) file."""

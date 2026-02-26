@@ -19,18 +19,16 @@ Usage :
 """
 import os
 from Jenga import *
-from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
+from Jenga.GlobalToolchains import *
 
 with workspace("AndroidDemo"):
-    # RegisterJengaGlobalToolchains enregistre "android-ndk" depuis ANDROID_NDK_ROOT
-    RegisterJengaGlobalToolchains()
-
     configurations(["Debug", "Release"])
     targetoses([TargetOS.ANDROID])
     targetarchs([TargetArch.ARM64, TargetArch.X86_64])
 
-    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", os.getenv("ANDROID_HOME", "")))
-    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
+    # Android SDK/NDK paths
+    ApplyAndroidSdkNdkJdkDefaults()          # définit androidSdkPath, androidNdkPath, javaJdkPath
+    RegisterJengaGlobalToolchains()          # détecte android-ndk, etc.
 
     with project("NativeApp"):
         windowedapp()                     # Android NativeActivity = windowed app

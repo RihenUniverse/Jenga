@@ -20,7 +20,7 @@ import glob
 import fnmatch
 
 from Jenga.Core.Api import Project, ProjectKind, TargetArch, TargetOS
-from ...Utils import Process, FileSystem, Colored, Reporter
+from ...Utils import Process, FileSystem, Colored, Reporter, ProcessResult
 from ..Builder import Builder
 from ..Toolchains import ToolchainManager
 
@@ -267,7 +267,7 @@ class AndroidBuilder(Builder):
                 continue
             pch_flags.append(f)
         args.extend(pch_flags)
-        result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         if result.returnCode != 0:
             return False
         project._jengaPchFile = str(pch_path)
@@ -300,7 +300,7 @@ class AndroidBuilder(Builder):
         # Pour les exécutables console, pas de préfixe lib
         return target_dir / f"{target_name}{ext}"
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
@@ -315,12 +315,7 @@ class AndroidBuilder(Builder):
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        if result.returnCode != 0:
-            if result.stdout.strip():
-                Reporter.Error(result.stdout.rstrip())
-            if result.stderr.strip():
-                Reporter.Error(result.stderr.rstrip())
-        return result.returnCode == 0
+        return result
 
     def _BuildNativeAppGlueObject(self, project: Project, obj_dir: Path) -> Optional[str]:
         """Compile android_native_app_glue.c from NDK sources for NativeActivity apps."""
@@ -366,7 +361,7 @@ class AndroidBuilder(Builder):
             args.append("-march=i686")
         elif self.targetArch == TargetArch.X86_64:
             args.append("-march=x86-64")
-        result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         if result.returnCode != 0:
             return None
         return str(glue_obj)
@@ -405,7 +400,7 @@ class AndroidBuilder(Builder):
         if project.kind == ProjectKind.STATIC_LIB:
             ar = self.toolchain.arPath or "llvm-ar"
             args = [ar, "rcs", str(out)] + objectFiles
-            result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+            result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
             return result.returnCode == 0
 
         # Pour les autres cas, on prépare la liste des objets finaux
@@ -491,7 +486,8 @@ class AndroidBuilder(Builder):
         # -----------------------------------------------------------------------
         # Exécution du linker
         # -----------------------------------------------------------------------
-        result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
         return result.returnCode == 0
 
     # def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
@@ -502,7 +498,7 @@ class AndroidBuilder(Builder):
     #         ar = self.toolchain.arPath or "llvm-ar"
     #         args = [ar, "rcs", str(out)]
     #         args.extend(objectFiles)
-    #         result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+    #         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
     #         return result.returnCode == 0
     #     else:
     #         linker = self.toolchain.cxxPath
@@ -564,7 +560,7 @@ class AndroidBuilder(Builder):
     #                         args.append(f"-l{lib}")
     #             else:
     #                 Colored.PrintWarning(f"crtbegin_dynamic.o not found for API {min_api}, linking may fail")
-    #         result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+    #         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
     #         return result.returnCode == 0
 
     def _GetCompilerFlags(self, project: Project) -> List[str]:
@@ -865,9 +861,10 @@ class AndroidBuilder(Builder):
         result = Process.ExecuteCommand(
             cmd,
             cwd=android_mk.parent,
-            captureOutput=False,
+            captureOutput=True,
             silent=False
         )
+        self._lastResult = result
         if result.returnCode != 0:
             raise RuntimeError(f"ndk-build failed for project '{project.name}' ({abi})")
 
@@ -1566,7 +1563,8 @@ class AndroidBuilder(Builder):
             "-source", "1.8", "-target", "1.8"  # Compatibilité Android
         ] + [str(f) for f in all_java]
 
-        result = Process.ExecuteCommand(javac_cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(javac_cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         return result.returnCode == 0
 
     def _FindProguardJar(self) -> Optional[Path]:
@@ -1629,7 +1627,8 @@ class AndroidBuilder(Builder):
             str(java), "-jar", str(self.proguard_jar),
             f"@{config_file}"
         ]
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode != 0:
             return False
 
@@ -1675,7 +1674,8 @@ class AndroidBuilder(Builder):
         if class_files:
             d8_cmd.extend(str(f) for f in class_files)
 
-        result = Process.ExecuteCommand(d8_cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(d8_cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode != 0:
             return None
 
@@ -1710,7 +1710,8 @@ class AndroidBuilder(Builder):
             cmd += ["--dir", str(res)]
         cmd += ["-o", str(output_zip)]
 
-        result = Process.ExecuteCommand(cmd, cwd=build_dir, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, cwd=build_dir, captureOutput=True, silent=False)
+        self._lastResult = result
         return result.returnCode == 0
 
     def _LinkResources(self, project: Project, res_zip: Path, r_java_dir: Path, build_dir: Path) -> bool:
@@ -1729,7 +1730,8 @@ class AndroidBuilder(Builder):
         if res_zip.exists() and res_zip.stat().st_size > 0:
             cmd.append(str(res_zip))
 
-        result = Process.ExecuteCommand(cmd, cwd=build_dir, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, cwd=build_dir, captureOutput=True, silent=False)
+        self._lastResult = result
         return result.returnCode == 0
 
     def _GenerateManifest(self, project: Project, output_dir: Path) -> Path:
@@ -1847,7 +1849,8 @@ class AndroidBuilder(Builder):
     def _Zipalign(self, input_apk: Path, output_apk: Path) -> bool:
         """Aligne l'APK sur 4 octets."""
         cmd = [str(self.zipalign), "-f", "-p", "4", str(input_apk), str(output_apk)]
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         return result.returnCode == 0
 
     def _SignApk(self, project: Project, input_apk: Path, output_apk: Path) -> bool:
@@ -1867,7 +1870,8 @@ class AndroidBuilder(Builder):
             "--out", str(output_apk),
             str(input_apk)
         ]
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         return result.returnCode == 0
 
     # -----------------------------------------------------------------------
@@ -1905,7 +1909,8 @@ class AndroidBuilder(Builder):
             "--modules", str(module_dir),
             "--output", str(aab_unsigned),
         ]
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode != 0:
             return False
 
@@ -2034,5 +2039,6 @@ class AndroidBuilder(Builder):
             "--out", str(output_aab),
             str(input_aab)
         ]
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         return result.returnCode == 0

@@ -70,86 +70,19 @@ def _IsWorkspaceFile(filepath: Path) -> bool:
                 return True
             if re.search(r'workspace\s*=\s*Workspace\s*\(', line):
                 return True
+            if re.search(r'from\s+Jenga\s+import\s+workspace', line):
+                # La présence de l'import seul ne suffit pas, mais on le garde comme indicateur
+                pass
         return False
     except Exception:
         return False
-
-def _CollectJengaFiles(directory: Path) -> List[Path]:
-    """
-    Collecte les fichiers .jenga UNIQUEMENT dans directory (non récursif),
-    en excluant :
-      - les dossiers (ex: le dossier de cache .jenga/)
-      - les fichiers dont un composant du chemin absolu est ".jenga"
-        (ex: .jenga/something.jenga dans le cache)
-
-    Cette exclusion est la clé : Path.iterdir() ne descend pas dans les
-    sous-dossiers, mais on vérifie quand même les composants pour être
-    robuste face aux symlinks ou cas exotiques.
-    """
-    candidates: List[Path] = []
-    try:
-        for entry in directory.iterdir():
-            # Fichiers uniquement — exclut le dossier .jenga/ lui-même
-            if not entry.is_file():
-                continue
-            # Extension .jenga (insensible à la casse)
-            if entry.suffix.lower() != ".jenga":
-                continue
-            # Exclure tout fichier dont l'un des composants du chemin est ".jenga"
-            # Cela protège contre les fichiers de cache dans .jenga/
-            if any(part == ".jenga" for part in entry.resolve().parts):
-                continue
-            candidates.append(entry)
-    except PermissionError:
-        pass
-    return sorted(candidates)  # tri alphabétique stable et reproductible
-
-def _PickBestJengaFile(candidates: List[Path], directory: Path) -> Optional[Path]:
-    """
-    Parmi une liste de fichiers .jenga, choisit le meilleur selon ces priorités :
-
-      1. Fichier workspace valide dont le stem == nom exact du dossier.
-         Ex : dossier NKWindow01/ → NKWindow01.jenga
-      2. Fichier workspace valide dont le stem est un préfixe/suffixe du dossier.
-         Ex : dossier NKWindow01/ → NKWindow.jenga
-      3. Unique fichier workspace valide présent.
-      4. Premier fichier valide alphabétiquement (fallback).
-
-    "Valide" signifie que _IsWorkspaceFile() retourne True.
-    """
-    if not candidates:
-        return None
-
-    dir_name = directory.name
-
-    # Séparer les fichiers workspace valides des autres
-    workspace_files = [c for c in candidates if _IsWorkspaceFile(c)]
-    if not workspace_files:
-        return None
-
-    # Priorité 1 : stem == nom exact du dossier
-    for c in workspace_files:
-        if c.stem == dir_name:
-            return c
-
-    # Priorité 2 : correspondance partielle (NKWindow dans NKWindow01, ou l'inverse)
-    for c in workspace_files:
-        if dir_name.startswith(c.stem) or c.stem.startswith(dir_name):
-            return c
-
-    # Priorité 3 : unique fichier workspace
-    if len(workspace_files) == 1:
-        return workspace_files[0]
-
-    # Fallback : premier alphabétiquement
-    return workspace_files[0]
 
 # ---------------------------------------------------------------------------
 # FileSystem class – all methods static
 # ---------------------------------------------------------------------------
 
 class FileSystem:
-
+    
     @staticmethod
     def PathExists(path: Union[str, Path]) -> bool:
         """Check if a file or directory exists."""
@@ -433,50 +366,29 @@ class FileSystem:
     @staticmethod
     def FindWorkspaceEntry(start_dir: Optional[Path] = None) -> Optional[Path]:
         """
-        Trouve le fichier d'entrée du workspace Jenga en remontant depuis start_dir.
-
-        Stratégie par niveau :
-          1. Chercher les fichiers .jenga FICHIERS uniquement (pas les dossiers),
-             en excluant tout fichier dont un composant du chemin est ".jenga"
-             (le dossier de cache Jenga).
-          2. Parmi les candidats, choisir le meilleur via _PickBestJengaFile() :
-               a. Stem == nom exact du dossier courant
-               b. Correspondance partielle stem/dossier
-               c. Unique fichier workspace valide
-               d. Premier alphabétiquement
-          3. Si rien trouvé à ce niveau, remonter d'un niveau et recommencer.
-
-        Exemple :
-          Dossier NKWindow01/ contient NKWindow.jenga et .jenga/ (cache)
-          → Retourne NKWindow.jenga  (correspondance partielle NKWindow / NKWindow01)
-
-        Args:
-            start_dir: Répertoire de départ (défaut: Path.cwd()).
-
-        Returns:
-            Path absolu du fichier .jenga workspace, ou None si introuvable.
+        Trouve le fichier d'entrée du workspace Jenga.
+        Le fichier doit contenir 'with workspace(' (non commenté).
+        Stratégie :
+          1. Cherche un fichier .jenga nommé comme le dossier courant.
+          2. Sinon, s'il y a exactement un fichier .jenga à la racine, le prend.
+          3. Sinon, remonte jusqu'à trouver un fichier .jenga valide.
         """
         if start_dir is None:
             start_dir = Path.cwd()
-
-        current = Path(start_dir).resolve()
-        visited: set = set()
-
+        current = start_dir.resolve()
         while True:
-            if current in visited:
-                break
-            visited.add(current)
-
-            candidates = _CollectJengaFiles(current)
-            if candidates:
-                result = _PickBestJengaFile(candidates, current)
-                if result is not None:
-                    return result
-
+            # 1. Fichier portant le nom du dossier
+            candidate = current / f"{current.name}.jenga"
+            if candidate.exists() and _IsWorkspaceFile(candidate):
+                return candidate
+            # 2. Fichier unique .jenga
+            jenga_files = list(current.glob("*.jenga"))
+            if len(jenga_files) == 1:
+                if _IsWorkspaceFile(jenga_files[0]):
+                    return jenga_files[0]
+            # 3. Remonter
             parent = current.parent
             if parent == current:
-                # Racine du système de fichiers atteinte
                 break
             current = parent
-
         return None

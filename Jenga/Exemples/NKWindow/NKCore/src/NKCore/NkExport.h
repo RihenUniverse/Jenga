@@ -119,27 +119,21 @@ NKENTSEU_EMBEDDED_ONLY(
  * @def NKENTSEU_SYMBOL_EXPORT
  * @ingroup CoreExportMacros
  */
-NKENTSEU_WINDOWS_ONLY(
-#define NKENTSEU_SYMBOL_EXPORT __declspec(dllexport)
-#define NKENTSEU_SYMBOL_IMPORT __declspec(dllimport)
-)
 
-NKENTSEU_UNIX_ONLY(NKENTSEU_NOT_EMSCRIPTEN(
-// Unix/Linux/macOS avec GCC/Clang
-#define NKENTSEU_SYMBOL_EXPORT __attribute__((visibility("default")))
-#define NKENTSEU_SYMBOL_IMPORT
-	))
-
-NKENTSEU_EMSCRIPTEN_ONLY(
-// WebAssembly/Emscripten
-#define NKENTSEU_SYMBOL_EXPORT __attribute__((used))
-#define NKENTSEU_SYMBOL_IMPORT
-)
-
-// Fallback si aucune plateforme détectée
 #ifndef NKENTSEU_SYMBOL_EXPORT
-#define NKENTSEU_SYMBOL_EXPORT
-#define NKENTSEU_SYMBOL_IMPORT
+    #if defined(_WIN32)
+        #define NKENTSEU_SYMBOL_EXPORT __declspec(dllexport)
+        #define NKENTSEU_SYMBOL_IMPORT __declspec(dllimport)
+    #elif defined(__EMSCRIPTEN__)
+        #define NKENTSEU_SYMBOL_EXPORT __attribute__((used))
+        #define NKENTSEU_SYMBOL_IMPORT
+    #elif defined(__GNUC__) || defined(__clang__)
+        #define NKENTSEU_SYMBOL_EXPORT __attribute__((visibility("default")))
+        #define NKENTSEU_SYMBOL_IMPORT
+    #else
+        #define NKENTSEU_SYMBOL_EXPORT
+        #define NKENTSEU_SYMBOL_IMPORT
+    #endif
 #endif
 
 /**
@@ -175,64 +169,31 @@ NKENTSEU_EMSCRIPTEN_ONLY(
  * @brief Conventions d'appel adaptées à la plateforme et l'architecture
  */
 
-NKENTSEU_WINDOWS_ONLY(
-/**
- * @brief Convention d'appel C standard
- * @ingroup CallingConventions
- */
-#define NKENTSEU_CDECL __cdecl
-
-/**
- * @brief Convention d'appel Windows standard
- * @ingroup CallingConventions
- */
-#define NKENTSEU_STDCALL __stdcall
-
-/**
- * @brief Convention d'appel optimisée
- * @ingroup CallingConventions
- */
-#define NKENTSEU_FASTCALL __fastcall
-
-	/**
-	 * @brief Convention d'appel vectorielle (SIMD)
-	 * @ingroup CallingConventions
-	 */
-	NKENTSEU_64BIT_ONLY(
-#define NKENTSEU_VECTORCALL __vectorcall
-		)
-
-		NKENTSEU_32BIT_ONLY(
-#define NKENTSEU_VECTORCALL
-			)
-
-	/**
-	 * @brief Convention d'appel par défaut pour Nkentseu
-	 * @ingroup CallingConventions
-	 *
-	 * x64: fastcall (registres)
-	 * x86: stdcall (compatibilité Win32)
-	 */
-	NKENTSEU_X86_64_ONLY(
-#define NKENTSEU_CALL __fastcall
-		)
-
-		NKENTSEU_X86_ONLY(
-#define NKENTSEU_CALL __stdcall
-			)
-
-			NKENTSEU_ARM64_ONLY(
-#define NKENTSEU_CALL
-				))
-
-NKENTSEU_NOT_WINDOWS(
-// Unix/Linux/macOS/Consoles: pas de conventions d'appel spécifiques
-#define NKENTSEU_CDECL
-#define NKENTSEU_STDCALL
-#define NKENTSEU_FASTCALL
-#define NKENTSEU_VECTORCALL
-#define NKENTSEU_CALL
-)
+#if defined(_WIN32)
+    #define NKENTSEU_CDECL __cdecl
+    #define NKENTSEU_STDCALL __stdcall
+    #define NKENTSEU_FASTCALL __fastcall
+    #if defined(NKENTSEU_ARCH_X86_64)
+        #define NKENTSEU_VECTORCALL __vectorcall
+    #else
+        #define NKENTSEU_VECTORCALL
+    #endif
+    #if defined(NKENTSEU_ARCH_X86_64)
+        #define NKENTSEU_CALL __fastcall
+    #elif defined(NKENTSEU_ARCH_X86)
+        #define NKENTSEU_CALL __stdcall
+    #elif defined(NKENTSEU_ARCH_ARM64)
+        #define NKENTSEU_CALL
+    #else
+        #define NKENTSEU_CALL
+    #endif
+#else
+    #define NKENTSEU_CDECL
+    #define NKENTSEU_STDCALL
+    #define NKENTSEU_FASTCALL
+    #define NKENTSEU_VECTORCALL
+    #define NKENTSEU_CALL
+#endif
 
 // ============================================================
 // COMPATIBILITÉ C/C++
@@ -456,7 +417,7 @@ NKENTSEU_NOT_WINDOWS(
  * @def NKENTSEU_CORE_API
  * @ingroup CoreAPI
  */
-#define NKENTSEU_CORE_API NKENTSEU_API
+// #define NKENTSEU_CORE_API NKENTSEU_API
 
 // ============================================================
 // MACROS SPÉCIFIQUES PLATEFORMES (WEBASSEMBLY, CONSOLES)
@@ -467,38 +428,17 @@ NKENTSEU_NOT_WINDOWS(
  * @brief Macros d'export pour plateformes spécifiques
  */
 
-NKENTSEU_EMSCRIPTEN_ONLY(
-/**
- * @brief Export WebAssembly avec nom
- * @ingroup PlatformSpecificExport
- */
-#define NKENTSEU_WASM_EXPORT(name) __attribute__((export_name(#name)))
-
-/**
- * @brief Import WebAssembly avec nom
- * @ingroup PlatformSpecificExport
- */
-#define NKENTSEU_WASM_IMPORT(name) __attribute__((import_name(#name)))
-
-/**
- * @brief Garde un symbole WebAssembly
- * @ingroup PlatformSpecificExport
- */
-#define NKENTSEU_WASM_KEEP __attribute__((used))
-
-/**
- * @brief Définit la fonction main pour WebAssembly
- * @ingroup PlatformSpecificExport
- */
-#define NKENTSEU_WASM_MAIN __attribute__((export_name("main")))
-)
-
-NKENTSEU_NOT_EMSCRIPTEN(
-#define NKENTSEU_WASM_EXPORT(name)
-#define NKENTSEU_WASM_IMPORT(name)
-#define NKENTSEU_WASM_KEEP
-#define NKENTSEU_WASM_MAIN
-)
+#if defined(__EMSCRIPTEN__)
+    #define NKENTSEU_WASM_EXPORT(name) __attribute__((export_name(#name)))
+    #define NKENTSEU_WASM_IMPORT(name) __attribute__((import_name(#name)))
+    #define NKENTSEU_WASM_KEEP __attribute__((used))
+    #define NKENTSEU_WASM_MAIN __attribute__((export_name("main")))
+#else
+    #define NKENTSEU_WASM_EXPORT(name)
+    #define NKENTSEU_WASM_IMPORT(name)
+    #define NKENTSEU_WASM_KEEP
+    #define NKENTSEU_WASM_MAIN
+#endif
 
 // ============================================================
 // MACROS DE DÉPRÉCIATION
@@ -508,24 +448,6 @@ NKENTSEU_NOT_EMSCRIPTEN(
  * @defgroup Deprecation Dépréciation
  * @brief Macros pour marquer les API comme dépréciées
  */
-
-#if defined(__cplusplus) && __cplusplus >= 201402L
-/**
- * @brief Marque une API comme dépréciée
- * @ingroup Deprecation
- */
-#define NKENTSEU_DEPRECATED [[deprecated]]
-#define NKENTSEU_DEPRECATED_MSG(msg) [[deprecated(msg)]]
-#elif defined(_MSC_VER)
-#define NKENTSEU_DEPRECATED __declspec(deprecated)
-#define NKENTSEU_DEPRECATED_MSG(msg) __declspec(deprecated(msg))
-#elif defined(__GNUC__) || defined(__clang__)
-#define NKENTSEU_DEPRECATED __attribute__((deprecated))
-#define NKENTSEU_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
-#else
-#define NKENTSEU_DEPRECATED
-#define NKENTSEU_DEPRECATED_MSG(msg)
-#endif
 
 /**
  * @brief Marque une API publique comme dépréciée

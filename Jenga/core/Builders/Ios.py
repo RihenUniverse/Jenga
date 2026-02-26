@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from Jenga.Core.Api import CompilerFamily, Project, ProjectKind, TargetArch, TargetEnv, TargetOS
-from ...Utils import Colored, FileSystem, Process
+from ...Utils import Colored, FileSystem, Process, ProcessResult
 from ..Builder import Builder
 from ..Platform import Platform
 
@@ -230,7 +230,7 @@ class DirectIOSBuilder(Builder):
             *self._GetTargetFlags(),
         ]
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
@@ -251,7 +251,7 @@ class DirectIOSBuilder(Builder):
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
+        return result
 
     def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
         out = Path(outputFile)
@@ -435,7 +435,8 @@ class DirectIOSBuilder(Builder):
             args.extend(["--entitlements", str(entitlements)])
         args.append(str(bundle_path))
 
-        result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode != 0:
             Colored.PrintError(f"Code signing failed for {bundle_path}")
             return False

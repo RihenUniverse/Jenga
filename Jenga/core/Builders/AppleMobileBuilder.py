@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Tuple
 from Jenga.Core.Api import (
     CompilerFamily, Project, ProjectKind, TargetArch, TargetEnv, TargetOS
 )
-from ...Utils import Colored, FileSystem, Process, Reporter
+from ...Utils import Colored, FileSystem, Process, ProcessResult, Reporter
 from ..Builder import Builder
 from ..Platform import Platform
 
@@ -302,7 +302,7 @@ class AppleMobileBuilder(Builder, abc.ABC):
     # -----------------------------------------------------------------------
 
     @abc.abstractmethod
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         pass
 
     @abc.abstractmethod

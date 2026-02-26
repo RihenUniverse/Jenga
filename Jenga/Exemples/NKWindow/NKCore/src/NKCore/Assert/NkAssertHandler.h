@@ -11,7 +11,7 @@
 #define NKENTSEU_CORE_NKCORE_SRC_NKCORE_ASSERT_NKASSERTHANDLER_H_INCLUDED
 
 #include "NkAssertion.h"
-#include "NKCore/NkExport.h"
+#include "NKCore/NkCoreExport.h"
 #include "NKCore/NkTypes.h"
 
 /**

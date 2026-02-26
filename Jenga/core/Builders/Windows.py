@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 
 from Jenga.Core.Api import Project, ProjectKind, CompilerFamily, TargetEnv, TargetOS
-from ...Utils import Process, FileSystem, Colored
+from ...Utils import Process, FileSystem, Colored, ProcessResult
 from ..Builder import Builder
 from ..Toolchains import ToolchainManager
 
@@ -93,7 +93,8 @@ class WindowsBuilder(Builder):
             args.append(f"/Yc{header_token}")
             args.append(f"/Fp{pch_file}")
             args.append(str(source_path))
-            result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+            result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+            self._lastResult = result
             return result.returnCode == 0
 
         # clang++ / mingw path
@@ -142,7 +143,7 @@ class WindowsBuilder(Builder):
         else:
             return ".exe"
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
@@ -154,7 +155,8 @@ class WindowsBuilder(Builder):
             return self._CompileMinGW(project, src, obj)
         else:
             Colored.PrintError(f"Unsupported compiler family for Windows: {self.toolchain.compilerFamily}")
-            return False
+            # Retourner un ProcessResult factice en échec
+            return ProcessResult(returnCode=1, stdout="", stderr="Unsupported compiler family")
 
     def GetModuleFlags(self, project: Project, sourceFile: str) -> List[str]:
         flags = []
@@ -199,7 +201,7 @@ class WindowsBuilder(Builder):
     # Compilation MSVC
     # -----------------------------------------------------------------------
 
-    def _CompileMSVC(self, project: Project, src: Path, obj: Path) -> bool:
+    def _CompileMSVC(self, project: Project, src: Path, obj: Path) -> ProcessResult:
         args = [self.toolchain.ccPath, "/c", f"/Fo{obj}", "/nologo"]
         for inc in project.includeDirs:
             args.append(f"/I{self.ResolveProjectPath(project, inc)}")
@@ -251,7 +253,7 @@ class WindowsBuilder(Builder):
         args.append(str(src))
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
+        return result
 
     def _LinkMSVC(self, project: Project, objectFiles: List[str], output: Path) -> bool:
         if project.kind == ProjectKind.STATIC_LIB:
@@ -265,7 +267,6 @@ class WindowsBuilder(Builder):
             if not lib.endswith(".lib"):
                 lib += ".lib"
             args.append(lib)
-        # Flags utilisateur supplémentaires
         args.extend(self.toolchain.ldflags)
         args.extend(project.ldflags)
         args.extend(objectFiles)
@@ -278,9 +279,8 @@ class WindowsBuilder(Builder):
         if not lib_path.exists():
             lib_path = self.toolchain.arPath
         args = [str(lib_path), f"/OUT:{output}", "/nologo"]
-        args.extend(self.toolchain.arflags)   # après "/nologo"
+        args.extend(self.toolchain.arflags)
         args.extend(objectFiles)
-        # Les flags d'archiveur peuvent être ajoutés ici si nécessaire
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
         return result.returnCode == 0
@@ -289,7 +289,7 @@ class WindowsBuilder(Builder):
     # Compilation Clang/LLVM (clang-cl ou clang++)
     # -----------------------------------------------------------------------
 
-    def _CompileClang(self, project: Project, src: Path, obj: Path) -> bool:
+    def _CompileClang(self, project: Project, src: Path, obj: Path) -> ProcessResult:
         if self.is_clang_cl:
             args = [self.toolchain.ccPath, "/c", f"/Fo{obj}"]
             opt = self._EnumValue(project.optimize)
@@ -343,15 +343,13 @@ class WindowsBuilder(Builder):
             args.append(str(src))
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
+        return result
 
     def _LinkClang(self, project: Project, objectFiles: List[str], output: Path) -> bool:
         if self.is_clang_cl:
             if project.kind == ProjectKind.STATIC_LIB:
                 return self._CreateStaticLibClang(project, objectFiles, output)
 
-            # clang-cl is a compiler driver, not link.exe. Use /Fe for output and
-            # pass linker-specific options after /link.
             driver = self.toolchain.cxxPath or self.toolchain.ccPath
             args = [driver]
             if project.kind == ProjectKind.SHARED_LIB:
@@ -394,13 +392,10 @@ class WindowsBuilder(Builder):
             args = [ld, "-o", str(output)]
             if project.kind == ProjectKind.SHARED_LIB:
                 args.append("-shared")
-            # Object files first for GNU-like linkers.
             args.extend(objectFiles)
             for libdir in project.libDirs:
                 args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
             for lib in project.links:
-                # If lib is a full path (e.g., Build/Lib/Debug/Foo/Foo.lib), pass it directly
-                # Otherwise, treat it as a library name and use -l prefix
                 if Path(lib).is_absolute() or ('/' in lib or '\\' in lib):
                     args.append(lib)
                 else:
@@ -415,7 +410,7 @@ class WindowsBuilder(Builder):
     # Compilation MinGW (GCC)
     # -----------------------------------------------------------------------
 
-    def _CompileMinGW(self, project: Project, src: Path, obj: Path) -> bool:
+    def _CompileMinGW(self, project: Project, src: Path, obj: Path) -> ProcessResult:
         args = [self.toolchain.ccPath, "-c", "-o", str(obj)]
         args.extend(self.GetDependencyFlags(str(obj)))
         args.extend(self._GetGCCCommonFlags(project))
@@ -431,7 +426,7 @@ class WindowsBuilder(Builder):
         args.append(str(src))
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
+        return result
 
     def _LinkMinGW(self, project: Project, objectFiles: List[str], output: Path) -> bool:
         if project.kind == ProjectKind.STATIC_LIB:
@@ -439,12 +434,10 @@ class WindowsBuilder(Builder):
         args = [self.toolchain.cxxPath, "-o", str(output)]
         if project.kind == ProjectKind.SHARED_LIB:
             args.append("-shared")
-        # Object files first for GNU-like linkers.
         args.extend(objectFiles)
         for libdir in project.libDirs:
             args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
         for lib in project.links:
-            # If lib is a full path, pass it directly; otherwise use -l prefix
             if Path(lib).is_absolute() or ('/' in lib or '\\' in lib):
                 args.append(lib)
             else:

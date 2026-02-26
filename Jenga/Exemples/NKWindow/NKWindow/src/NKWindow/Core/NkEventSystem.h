@@ -29,126 +29,129 @@
 #include <vector>
 #include <algorithm>
 
-/**
- * @brief Namespace nkentseu.
- */
-namespace nkentseu {
+namespace nkentseu
+{
 
-using NkGlobalEventCallback = std::function<void(NkEvent *)>;
-using NkTypedEventCallback = std::function<void(NkEvent *)>;
+using NkGlobalEventCallback = std::function<void(NkEvent*)>;
+using NkTypedEventCallback  = std::function<void(NkEvent*)>;
 
 // ---------------------------------------------------------------------------
 // EventSystem
 // ---------------------------------------------------------------------------
 
-/**
- * @brief Central event dispatcher and polling queue.
- *
- * EventSystem aggregates platform event implementations, dispatches global
- * and typed callbacks, and optionally exposes a queue API via PollEvent().
- */
-class EventSystem {
+class EventSystem
+{
 public:
-	// --- Singleton ---
+    // --- Singleton ---
 
-	/// @brief Access singleton instance.
-	static EventSystem &Instance();
+    static EventSystem& Instance();
 
-	EventSystem(const EventSystem &) = delete;
-	EventSystem &operator=(const EventSystem &) = delete;
+    EventSystem(const EventSystem&)            = delete;
+    EventSystem& operator=(const EventSystem&) = delete;
 
-	// --- Attacher / détacher des implémentations de plateforme ---
+    // --- Attacher / détacher des implémentations de plateforme ---
 
-	/**
-	 * @brief Lie une IEventImpl concrète (appelé par Window::Create).
-	 *        Plusieurs implémentations peuvent être liées simultanément
-	 *        (plusieurs fenêtres).
-	 */
-	void AttachImpl(IEventImpl *impl);
+    /**
+     * @brief Lie une IEventImpl concrète (appelé par Window::Create).
+     *        Plusieurs implémentations peuvent être liées simultanément
+     *        (plusieurs fenêtres).
+     */
+    void AttachImpl(IEventImpl* impl);
 
-	/** @brief Détache une implémentation (appelé quand la fenêtre est fermée). */
-	void DetachImpl(IEventImpl *impl);
+    /** @brief Détache une implémentation (appelé quand la fenêtre est fermée). */
+    void DetachImpl(IEventImpl* impl);
 
-	// --- Pompe d'événements ---
+    // --- Pompe d'événements ---
 
-	/**
-	 * @brief Pompe les événements OS et exécute uniquement les callbacks.
-	 *
-	 * Ce mode ne fournit pas de batch lisible par PollEvent().
-	 * Ne pas combiner avec while(PollEvent()) dans la même trame.
-	 */
-	void PollEvents();
+    /**
+     * @brief Pompe les événements OS et exécute uniquement les callbacks.
+     *
+     * Ce mode ne fournit pas de batch lisible par PollEvent().
+     * Ne pas combiner avec while(PollEvent()) dans la même trame.
+     */
+    void PollEvents();
 
-	/**
-	 * @brief Retourne le prochain événement de la queue, ou nullptr si vide.
-	 *
-	 * Le pointeur est valide jusqu'au prochain appel de PollEvent ou PollEvents.
-	 * Ne pas stocker ce pointeur.
-	 *
-	 * Si la queue est vide, PollEvent() pompe automatiquement les événements
-	 * (callbacks + queue) en interne.
-	 * À utiliser seul (sans PollEvents() juste avant).
-	 */
-	NkEvent *PollEvent();
+    /**
+     * @brief Retourne le prochain événement de la queue, ou nullptr si vide.
+     *
+     * Le pointeur est valide jusqu'au prochain appel de PollEvent ou PollEvents.
+     * Ne pas stocker ce pointeur.
+     *
+     * Si la queue est vide, PollEvent() pompe automatiquement les événements
+     * (callbacks + queue) en interne.
+     * À utiliser seul (sans PollEvents() juste avant).
+     */
+    NkEvent* PollEvent();
 
-	/**
-	 * @brief Variante style SFML: copie le prochain événement dans @p event.
-	 * @return true si un événement a été lu, sinon false.
-	 */
-	bool PollEvent(NkEvent &event);
+    /**
+     * @brief Variante style SFML: copie le prochain événement dans @p event.
+     * @return true si un événement a été lu, sinon false.
+     */
+    bool PollEvent(NkEvent& event);
 
-	// --- Callbacks global et typés ---
+    // --- Callbacks global et typés ---
 
-	/** @brief Callback reçoit TOUS les événements (avant la queue). */
-	void SetGlobalEventCallback(NkGlobalEventCallback callback);
+    /** @brief Callback reçoit TOUS les événements (avant la queue). */
+    void SetGlobalEventCallback(NkGlobalEventCallback callback);
 
-	/**
-	 * @brief Callback typé — déclenché uniquement pour le type T.
-	 *
-	 * @code
-	 *   es.SetEventCallback<NkWindowCloseEvent>([&](NkWindowCloseEvent* ev) {
-	 *       ev->GetWindow()->Close();
-	 *   });
-	 * @endcode
-	 */
-	template <typename T>
-	/// @brief Register callback for event type T.
-	void SetEventCallback(std::function<void(T *)> callback) {
-		mTypedCallbacks[std::type_index(typeid(T))] = [callback](NkEvent *ev) {
-			if (auto *typed = ev->As<T>())
-				callback(typed);
-		};
-	}
+    /**
+     * @brief Callback typé — déclenché uniquement pour le type T.
+     *
+     * @code
+     *   es.SetEventCallback<NkWindowCloseEvent>([&](NkWindowCloseEvent* ev) {
+     *       ev->GetWindow()->Close();
+     *   });
+     * @endcode
+     */
+    // template<typename T>
+    // void SetEventCallback(std::function<void(T*)> callback)
+    // {
+    //     mTypedCallbacks[std::type_index(typeid(T))] = [callback](NkEvent* ev)
+    //     {
+    //         if (auto* typed = ev->As<T>())
+    //             callback(typed);
+    //     };
+    // }
 
-	/** @brief Supprime le callback typé pour T. */
-	template <typename T>
-	/// @brief Remove callback bound to event type T.
-	void RemoveEventCallback() {
-		mTypedCallbacks.erase(std::type_index(typeid(T)));
-	}
+    template<typename T>
+    void SetEventCallback(std::function<void(T*)> callback)
+    {
+        mTypedCallbacks[T::TYPE].push_back([callback](NkEvent* ev) {
+            if (auto* typed = ev->As<T>())
+                callback(typed);
+        });
+    }
 
-	// --- Dispatch manuel ---
+    /** @brief Supprime le callback typé pour T. */
+    template<typename T>
+    void RemoveEventCallback()
+    {
+        mTypedCallbacks.erase(T::TYPE);
+    }
 
-	/**
-	 * @brief Envoie manuellement un événement dans la chaîne de callbacks.
-	 *        Utile pour injecter des événements synthétiques.
-	 */
-	void DispatchEvent(NkEvent &event);
+    // --- Dispatch manuel ---
+
+    /**
+     * @brief Envoie manuellement un événement dans la chaîne de callbacks.
+     *        Utile pour injecter des événements synthétiques.
+     */
+    void DispatchEvent(NkEvent& event);
 
 private:
-	EventSystem() = default;
+    EventSystem() = default;
 
-	void PumpEventsOnce(bool queueEvents);
-	void FireTypedCallback(NkEvent *ev);
+    void PumpEventsOnce(bool queueEvents);
+    void FireTypedCallback(NkEvent* ev);
 
-	// --- Données membres ---
+    // --- Données membres ---
 
-	std::vector<IEventImpl *> mImpls;
-	NkGlobalEventCallback mGlobalCallback;
-	std::unordered_map<std::type_index, NkTypedEventCallback> mTypedCallbacks;
-	std::vector<NkEvent> mEventBuffer;
-	std::size_t mReadHead = 0;
-	bool mAutoBatchActive = false;
+    std::vector<IEventImpl*>                                      mImpls;
+    NkGlobalEventCallback                                          mGlobalCallback;
+    // std::unordered_map<std::type_index, NkTypedEventCallback>      mTypedCallbacks;
+    std::unordered_map<NkEventType, std::vector<NkTypedEventCallback>> mTypedCallbacks;
+    std::vector<NkEvent>                                           mEventBuffer;
+    std::size_t                                                    mReadHead = 0;
+    bool                                                           mAutoBatchActive = false;
 };
 
 } // namespace nkentseu

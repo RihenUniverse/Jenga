@@ -10,7 +10,7 @@ from typing import List
 import shlex
 
 from Jenga.Core.Api import Project, ProjectKind
-from ...Utils import Process, FileSystem
+from ...Utils import Process, FileSystem, ProcessResult
 from ..Builder import Builder
 
 
@@ -43,7 +43,7 @@ class ZigBuilder(Builder):
             return ".exe"
         return ""
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
@@ -72,7 +72,7 @@ class ZigBuilder(Builder):
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
+        return result
 
     def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
         out = Path(outputFile)
@@ -83,7 +83,8 @@ class ZigBuilder(Builder):
             zig_exe = str(self.toolchain.arPath or self.toolchain.cxxPath)
             args = [zig_exe, "ar", "rcs", str(out)]
             args.extend(objectFiles)
-            result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+            result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+            self._lastResult = result
             return result.returnCode == 0
 
         # Linking: zig c++ -target <triple> obj1.o obj2.o -o output

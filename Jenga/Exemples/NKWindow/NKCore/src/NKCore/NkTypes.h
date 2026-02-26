@@ -15,7 +15,7 @@
 // INCLUDES
 // ============================================================
 
-#include "NkCompilerDetect.h"
+#include "NkArchDetect.h"
 
 // ============================================================
 // DÉFINITIONS DE BASE

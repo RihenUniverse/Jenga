@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <iostream>
 
 #ifndef NK_SANDBOX_RENDERER_API
 #define NK_SANDBOX_RENDERER_API nkentseu::NkRendererApi::NK_SOFTWARE
@@ -233,6 +234,8 @@ int nkmain(const nkentseu::NkEntryState & /*state*/) {
 		} else {
 			NkClock::YieldThread();
 		}
+
+		std::cout << "Continue\n";
 	}
 
 	if (renderer) {

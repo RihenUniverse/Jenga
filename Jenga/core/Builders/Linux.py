@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List
 
 from Jenga.Core.Api import Project, ProjectKind, CompilerFamily
-from ...Utils import Process, FileSystem
+from ...Utils import Process, FileSystem, ProcessResult
 from ..Builder import Builder
 
 
@@ -56,7 +56,8 @@ class LinuxBuilder(Builder):
                 continue
             filtered.append(f)
         args.extend(filtered)
-        result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode != 0:
             return False
 
@@ -82,7 +83,7 @@ class LinuxBuilder(Builder):
         else:
             return ""  # exécutable sans extension
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
@@ -97,8 +98,8 @@ class LinuxBuilder(Builder):
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
-    
+        return result
+
     def GetModuleFlags(self, project: Project, sourceFile: str) -> List[str]:
         flags = []
         if not self.IsModuleFile(sourceFile):

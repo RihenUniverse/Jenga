@@ -117,7 +117,7 @@ public:
     template<typename T>
     void RemoveEventCallback()
     {
-        mTypedCallbacks.erase(std::type_index(typeid(T)));
+        mTypedCallbacks.erase(T::TYPE);
     }
 
     // --- Dispatch manuel ---

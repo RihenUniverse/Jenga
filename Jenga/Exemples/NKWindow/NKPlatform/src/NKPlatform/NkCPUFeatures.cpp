@@ -6,6 +6,7 @@
 // -----------------------------------------------------------------------------
 
 #include "NkCPUFeatures.h"
+#include "NkArchDetect.h"
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>

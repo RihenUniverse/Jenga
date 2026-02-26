@@ -484,20 +484,6 @@
 #endif
 
 /**
- * @brief Alignement mémoire
- * @def NKENTSEU_ALIGN(x)
- * @param x Alignement en octets (puissance de 2)
- * @ingroup CompilerAttributes
- */
-#if defined(NKENTSEU_COMPILER_MSVC)
-#define NKENTSEU_ALIGN(x) __declspec(align(x))
-#elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-#define NKENTSEU_ALIGN(x) __attribute__((aligned(x)))
-#else
-#define NKENTSEU_ALIGN(x)
-#endif
-
-/**
  * @brief Structure packed (sans padding)
  * @def NKENTSEU_PACKED
  * @ingroup CompilerAttributes

@@ -21,7 +21,7 @@ from pathlib import Path
 
 from Jenga.Core import Api
 from Jenga.Core.Api import Workspace, Project, Toolchain, ProjectKind, TargetOS, TargetArch, TargetEnv, CompilerFamily
-from ..Utils import FileSystem, Process, Colored, Reporter, BuildLogger, ProcessResult
+from ..Utils import FileSystem, Process, Colored, Reporter, BuildLogger
 from .State import BuildState
 from .DependencyResolver import DependencyResolver
 from .Toolchains import ToolchainManager
@@ -232,11 +232,7 @@ class Builder(abc.ABC):
     # -----------------------------------------------------------------------
 
     @abc.abstractmethod
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
-        """
-        Compile un fichier source.
-        Retourne un ProcessResult contenant le code de retour, stdout et stderr.
-        """
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
         pass
 
     @abc.abstractmethod
@@ -265,98 +261,6 @@ class Builder(abc.ABC):
           - project._jengaPchSourceResolved
         """
         return True
-
-    # -----------------------------------------------------------------------
-    # Hook : copie des bibliothèques dynamiques dans le dossier de l'application
-    # -----------------------------------------------------------------------
-
-    def GetSharedLibExtensions(self) -> List[str]:
-        """
-        Retourne la liste des extensions de bibliothèques dynamiques
-        pour le système cible courant.
-        Peut être surchargée par les sous-classes (ex: EmscriptenBuilder → .wasm).
-        """
-        if self.targetOs == TargetOS.WINDOWS:
-            return [".dll"]
-        elif self.targetOs == TargetOS.MACOS:
-            return [".dylib"]
-        elif self.targetOs == TargetOS.IOS:
-            return [".dylib"]
-        elif self.targetOs == TargetOS.ANDROID:
-            return [".so"]
-        elif self.targetOs == TargetOS.WEB:
-            return [".wasm"]
-        else:
-            # Linux, et tous les autres Unix-like
-            return [".so"]
-
-    def CopyRuntimeDependencies(self, project: Project, appOutputPath: Path) -> None:
-        """
-        Copie toutes les bibliothèques dynamiques (SHARED_LIB) dont dépend
-        un projet CONSOLE_APP / WINDOWED_APP / TEST_SUITE dans le même dossier
-        que l'exécutable/application généré.
-
-        Appelé systématiquement après chaque build de projet application,
-        y compris en build incrémental (quand le link est skipé), afin de
-        garantir que les fichiers runtime sont toujours présents.
-
-        IMPORTANT : on itère sur project.dependsOn et non project.links, car
-        project.links est réécrit avec des chemins absolus par dep_link_map
-        dans BuildProject — workspace.projects.get(chemin_absolu) retourne None.
-
-        Les sous-classes peuvent surcharger cette méthode pour un comportement
-        spécifique (ex: EmscriptenBuilder pour les side modules WASM).
-        """
-        if project.kind not in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE):
-            return
-
-        dest_dir = appOutputPath.parent
-        shared_exts = self.GetSharedLibExtensions()
-
-        # Utiliser dependsOn (noms symboliques stables) plutôt que links
-        # (qui peut contenir des chemins absolus après résolution par dep_link_map)
-        dep_names_to_check = list(project.dependsOn)
-
-        # Fallback : inclure aussi les links originaux (snapshot avant réécriture)
-        base_links = list(getattr(project, "_jenga_filter_base_state", {}).get("links", []))
-        for name in base_links:
-            if name not in dep_names_to_check:
-                dep_names_to_check.append(name)
-
-        for dep_name in dep_names_to_check:
-            dep_proj = self.workspace.projects.get(dep_name)
-            if not dep_proj or dep_proj.kind != ProjectKind.SHARED_LIB:
-                continue
-
-            dep_out = self.GetTargetPath(dep_proj)
-
-            # Chercher le fichier avec l'extension attendue pour cette plateforme
-            candidate = dep_out
-            if not candidate.exists():
-                # Essayer toutes les extensions connues pour ce système
-                found = False
-                for ext in shared_exts:
-                    alt = dep_out.with_suffix(ext)
-                    if alt.exists():
-                        candidate = alt
-                        found = True
-                        break
-                if not found:
-                    print(f"[WARNING] Shared lib not found for '{dep_name}': {dep_out}")
-                    continue
-
-            dest = dest_dir / candidate.name
-
-            # Copie seulement si absent ou source plus récent
-            if not dest.exists() or candidate.stat().st_mtime > dest.stat().st_mtime:
-                try:
-                    shutil.copy2(candidate, dest)
-                    print(f"[INFO] Copied {candidate} → {dest}")
-                except Exception as e:
-                    print(f"[WARNING] Could not copy {candidate} to {dest}: {e}")
-            else:
-                if self.verbose:
-                    print(f"[INFO] Up to date: {dest}")
 
     # -----------------------------------------------------------------------
     # Méthodes communes
@@ -1190,257 +1094,6 @@ class Builder(abc.ABC):
 
         return flags
 
-    # def BuildProject(self, project: Project) -> bool:
-    #     # Check if project is already compiled for this platform/arch context
-    #     if self.state.IsProjectCompiled(project.name, self.platform, self.targetArch.value if self.targetArch else ""):
-    #         return True
-
-    #     # Apply filter(system/config) materialization before any build decision.
-    #     self._ApplyProjectFilters(project)
-
-    #     # Re-resolve toolchain if filter changed project.toolchain
-    #     if project._explicitToolchain and project.toolchain:
-    #         tc = self.workspace.toolchains.get(project.toolchain)
-    #         if not tc:
-    #             tc = self.toolchainManager.GetToolchain(project.toolchain)
-    #         if tc:
-    #             self.toolchain = tc
-    #             # Re-run platform-specific toolchain preparation if available
-    #             if hasattr(self, '_PrepareNDKToolchain'):
-    #                 self._PrepareNDKToolchain()
-
-    #     # Create logger with project info
-    #     kind_str = project.kind.name if hasattr(project.kind, 'name') else str(project.kind)
-    #     workspace_root = self.workspace.location if self.workspace else None
-    #     logger = BuildLogger(project.name, kind_str, workspace_root)
-
-    #     # Print beautiful project header
-    #     logger.PrintProjectHeader()
-
-    #     obj_dir = self.GetObjectDir(project)
-    #     FileSystem.MakeDirectory(obj_dir)
-    #     sources = self._CollectSourceFiles(project)
-    #     if not sources:
-    #         Colored.PrintWarning(f"No source files found for project {project.name}")
-    #         self.state.MarkProjectCompiled(project.name, success=True, platform=self.platform,
-    #                                       targetArch=self.targetArch.value if self.targetArch else "")
-    #         return True
-    #     if not self.PreparePCH(project, obj_dir):
-    #         self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-    #                                       targetArch=self.targetArch.value if self.targetArch else "")
-    #         return False
-    #     pch_source = getattr(project, "_jengaPchSourceResolved", "")
-    #     if pch_source:
-    #         pch_src_norm = str(Path(pch_source).resolve())
-    #         sources = [s for s in sources if str(Path(s).resolve()) != pch_src_norm]
-
-    #     # ===== Support modules C++20 =====
-    #     module_files = [s for s in sources if self.IsModuleFile(s)]
-    #     regular_files = [s for s in sources if not self.IsModuleFile(s)]
-
-    #     project._jengaModuleBMIs = {}
-
-    #     # Set total for logger
-    #     logger.SetTotal(len(module_files) + len(regular_files))
-
-    #     # Precompile modules
-    #     if module_files:
-    #         Reporter.Info(f"Precompiling {len(module_files)} C++20 module(s)...")
-    #         if not self._PrecompileModules(project, module_files, obj_dir):
-    #             self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-    #                                           targetArch=self.targetArch.value if self.targetArch else "")
-    #             logger.PrintResultBox(False)
-    #             return False
-
-    #     object_files = []
-    #     success = True
-
-    #     # Compile modules to object files
-    #     for mod_file in module_files:
-    #         src_path = Path(mod_file)
-    #         obj_name = src_path.with_suffix(self.GetObjectExtension()).name
-    #         obj_path = obj_dir / obj_name
-
-    #         self._lastResult = None
-    #         if self._CompileModuleToObject(project, str(src_path), str(obj_path), obj_dir):
-    #             object_files.append(str(obj_path))
-    #             self.state.AddProjectOutput(project.name, str(obj_path))
-    #             logger.LogCompile(str(src_path), self._lastResult)
-    #         else:
-    #             logger.LogCompile(str(src_path), self._lastResult)
-    #             success = False
-    #             break
-
-    #     if not success:
-    #         self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-    #                                       targetArch=self.targetArch.value if self.targetArch else "")
-    #         logger.PrintStats()
-    #         return False
-
-    #     # Compile regular sources (with parallel compilation support)
-    #     num_jobs = self._GetEffectiveJobs()
-
-    #     # Sequential compilation (jobs == 1) or parallel compilation (jobs > 1)
-    #     if num_jobs == 1:
-    #         for src in regular_files:
-    #             src_path = Path(src)
-    #             obj_name = src_path.with_suffix(self.GetObjectExtension()).name
-    #             obj_path = obj_dir / obj_name
-
-    #             if not self._NeedsCompileSource(project, str(src_path), str(obj_path)):
-    #                 object_files.append(str(obj_path))
-    #                 self.state.AddProjectOutput(project.name, str(obj_path))
-    #                 logger.LogCached(str(src_path))
-    #                 continue
-
-    #             self._lastResult = None
-    #             if self.Compile(project, str(src_path), str(obj_path)):
-    #                 signature = self._ComputeCompileSignature(project, str(src_path), str(obj_path))
-    #                 self._WriteCompileSignature(str(obj_path), signature)
-    #                 object_files.append(str(obj_path))
-    #                 self.state.AddProjectOutput(project.name, str(obj_path))
-    #                 logger.LogCompile(str(src_path), self._lastResult)
-    #             else:
-    #                 logger.LogCompile(str(src_path), self._lastResult)
-    #                 # Afficher l'erreur détaillée
-    #                 if self._lastResult and self._lastResult.stderr:
-    #                     Reporter.Error(self._lastResult.stderr.strip())
-    #                 elif self._lastResult and self._lastResult.stdout:
-    #                     Reporter.Error(self._lastResult.stdout.strip())
-    #                 else:
-    #                     Reporter.Error(f"Compilation failed for {src_path}")
-    #                 success = False
-    #                 break
-    #     else:
-    #         # Parallel compilation using ThreadPoolExecutor
-    #         with concurrent.futures.ThreadPoolExecutor(max_workers=num_jobs) as executor:
-    #             # Prepare compilation tasks
-    #             compile_tasks = []
-    #             cached_files = []
-
-    #             for src in regular_files:
-    #                 src_path = Path(src)
-    #                 obj_name = src_path.with_suffix(self.GetObjectExtension()).name
-    #                 obj_path = obj_dir / obj_name
-
-    #                 # Check if compilation needed
-    #                 if not self._NeedsCompileSource(project, str(src_path), str(obj_path)):
-    #                     cached_files.append((str(src_path), str(obj_path)))
-    #                     continue
-
-    #                 # Submit compilation task
-    #                 future = executor.submit(self.Compile, project, str(src_path), str(obj_path))
-    #                 compile_tasks.append((future, str(src_path), str(obj_path)))
-
-    #             # Log cached files immediately
-    #             for src_path, obj_path in cached_files:
-    #                 object_files.append(obj_path)
-    #                 self.state.AddProjectOutput(project.name, obj_path)
-    #                 logger.LogCached(src_path)
-
-    #             # Wait for parallel compilations and collect results
-    #             for future, src_path, obj_path in compile_tasks:
-    #                 try:
-    #                     compile_success = future.result()
-    #                     if compile_success:
-    #                         signature = self._ComputeCompileSignature(project, src_path, obj_path)
-    #                         self._WriteCompileSignature(obj_path, signature)
-    #                         object_files.append(obj_path)
-    #                         self.state.AddProjectOutput(project.name, obj_path)
-    #                         logger.LogCompile(src_path, None)
-    #                     else:
-    #                         logger.LogCompile(src_path, None)
-    #                         # Récupérer l'erreur (difficile avec ThreadPoolExecutor, on peut stocker l'erreur dans un attribut)
-    #                         if self._lastResult and self._lastResult.stderr:
-    #                             Reporter.Error(self._lastResult.stderr.strip())
-    #                         elif self._lastResult and self._lastResult.stdout:
-    #                             Reporter.Error(self._lastResult.stdout.strip())
-    #                         else:
-    #                             Reporter.Error(f"Compilation failed for {src_path}")
-    #                         success = False
-    #                 except Exception as e:
-    #                     logger.LogCompile(src_path, None)
-    #                     Reporter.Error(f"Compilation exception for {src_path}: {e}")
-    #                     success = False
-
-    #     if not success:
-    #         self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-    #                                       targetArch=self.targetArch.value if self.targetArch else "")
-    #         logger.PrintStats()
-    #         return False
-
-    #     # Helpful visibility for incremental builds: all regular sources were
-    #     # cache hits, so no compile command was executed for this project.
-    #     if regular_files and logger.cached == len(regular_files):
-    #         logger.LogUpToDate()
-
-    #     # Auto-wire local library dependencies for link phase while preserving
-    #     # the user-declared link order (important for GNU-like linkers).
-    #     dep_link_map: Dict[str, str] = {}
-    #     for dep_name in project.dependsOn:
-    #         dep_proj = self.workspace.projects.get(dep_name)
-    #         if not dep_proj:
-    #             continue
-    #         if dep_proj.kind not in (ProjectKind.STATIC_LIB, ProjectKind.SHARED_LIB):
-    #             continue
-    #         dep_dir = str(self.GetTargetDir(dep_proj))
-    #         dep_out = str(self.GetTargetPath(dep_proj))
-    #         if dep_dir not in project.libDirs:
-    #             project.libDirs.append(dep_dir)
-    #         dep_link_map[dep_name] = dep_out
-
-    #     if dep_link_map:
-    #         new_links: List[str] = []
-    #         seen: set[str] = set()
-
-    #         for link in project.links:
-    #             resolved = dep_link_map.get(link, link)
-    #             if resolved not in seen:
-    #                 new_links.append(resolved)
-    #                 seen.add(resolved)
-
-    #         # Ensure dependencies are present even if not explicitly listed in links().
-    #         missing_dep_outputs: List[str] = []
-    #         for dep_out in dep_link_map.values():
-    #             if dep_out not in seen:
-    #                 missing_dep_outputs.append(dep_out)
-    #                 seen.add(dep_out)
-
-    #         # Missing auto-wired dependency archives are prepended so that
-    #         # GNU-like linkers resolve their symbols before system/provider libs.
-    #         project.links = missing_dep_outputs + new_links
-
-    #     if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP,
-    #                         ProjectKind.SHARED_LIB, ProjectKind.STATIC_LIB,
-    #                         ProjectKind.TEST_SUITE):
-    #         target_path = self.GetTargetPath(project)
-    #         FileSystem.MakeDirectory(target_path.parent)
-
-    #         self._lastResult = None
-    #         link_ok = self.Link(project, object_files, str(target_path))
-    #         logger.LogLink(str(target_path), self._lastResult)
-
-    #         # Copier les bibliothèques dynamiques dans le dossier de l'application.
-    #         # Appelé SYSTEMATIQUEMENT (pas seulement si link effectué) pour garantir
-    #         # que les fichiers runtime sont présents même en build incrémental.
-    #         self.CopyRuntimeDependencies(project, target_path)
-
-    #         if link_ok:
-    #             self.state.AddProjectOutput(project.name, str(target_path))
-    #             self.state.MarkProjectCompiled(project.name, success=True, platform=self.platform,
-    #                                           targetArch=self.targetArch.value if self.targetArch else "")
-    #             logger.PrintResultBox(True)
-    #             return True
-    #         else:
-    #             self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-    #                                       targetArch=self.targetArch.value if self.targetArch else "")
-    #             logger.PrintResultBox(False)
-    #             return False
-    #     else:
-    #         self.state.MarkProjectCompiled(project.name, success=True)
-    #         logger.PrintResultBox(True)
-    #         return True
-
     def BuildProject(self, project: Project) -> bool:
         # Check if project is already compiled for this platform/arch context
         if self.state.IsProjectCompiled(project.name, self.platform, self.targetArch.value if self.targetArch else ""):
@@ -1474,11 +1127,11 @@ class Builder(abc.ABC):
         if not sources:
             Colored.PrintWarning(f"No source files found for project {project.name}")
             self.state.MarkProjectCompiled(project.name, success=True, platform=self.platform,
-                                        targetArch=self.targetArch.value if self.targetArch else "")
+                                          targetArch=self.targetArch.value if self.targetArch else "")
             return True
         if not self.PreparePCH(project, obj_dir):
             self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-                                        targetArch=self.targetArch.value if self.targetArch else "")
+                                          targetArch=self.targetArch.value if self.targetArch else "")
             return False
         pch_source = getattr(project, "_jengaPchSourceResolved", "")
         if pch_source:
@@ -1499,7 +1152,7 @@ class Builder(abc.ABC):
             Reporter.Info(f"Precompiling {len(module_files)} C++20 module(s)...")
             if not self._PrecompileModules(project, module_files, obj_dir):
                 self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-                                            targetArch=self.targetArch.value if self.targetArch else "")
+                                              targetArch=self.targetArch.value if self.targetArch else "")
                 logger.PrintResultBox(False)
                 return False
 
@@ -1512,27 +1165,28 @@ class Builder(abc.ABC):
             obj_name = src_path.with_suffix(self.GetObjectExtension()).name
             obj_path = obj_dir / obj_name
 
-            # _CompileModuleToObject retourne bool pour l'instant, on garde
+            self._lastResult = None
             if self._CompileModuleToObject(project, str(src_path), str(obj_path), obj_dir):
                 object_files.append(str(obj_path))
                 self.state.AddProjectOutput(project.name, str(obj_path))
-                logger.LogCompile(str(src_path), None)  # Pas de ProcessResult pour module
+                logger.LogCompile(str(src_path), self._lastResult)
             else:
-                logger.LogCompile(str(src_path), None)
+                logger.LogCompile(str(src_path), self._lastResult)
                 success = False
                 break
 
         if not success:
             self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-                                        targetArch=self.targetArch.value if self.targetArch else "")
+                                          targetArch=self.targetArch.value if self.targetArch else "")
             logger.PrintStats()
             return False
 
         # Compile regular sources (with parallel compilation support)
         num_jobs = self._GetEffectiveJobs()
 
+        # Sequential compilation (jobs == 1) or parallel compilation (jobs > 1)
         if num_jobs == 1:
-            # Sequential compilation
+            # Sequential compilation (original behavior)
             for src in regular_files:
                 src_path = Path(src)
                 obj_name = src_path.with_suffix(self.GetObjectExtension()).name
@@ -1544,21 +1198,22 @@ class Builder(abc.ABC):
                     logger.LogCached(str(src_path))
                     continue
 
-                result = self.Compile(project, str(src_path), str(obj_path))
-                if result.returnCode == 0:
+                self._lastResult = None
+                if self.Compile(project, str(src_path), str(obj_path)):
                     signature = self._ComputeCompileSignature(project, str(src_path), str(obj_path))
                     self._WriteCompileSignature(str(obj_path), signature)
                     object_files.append(str(obj_path))
                     self.state.AddProjectOutput(project.name, str(obj_path))
-                    logger.LogCompile(str(src_path), result)
+                    logger.LogCompile(str(src_path), self._lastResult)
                 else:
-                    logger.LogCompile(str(src_path), result)
+                    logger.LogCompile(str(src_path), self._lastResult)
                     success = False
                     break
         else:
             # Parallel compilation using ThreadPoolExecutor
             with concurrent.futures.ThreadPoolExecutor(max_workers=num_jobs) as executor:
-                compile_futures = []
+                # Prepare compilation tasks
+                compile_tasks = []
                 cached_files = []
 
                 for src in regular_files:
@@ -1566,12 +1221,14 @@ class Builder(abc.ABC):
                     obj_name = src_path.with_suffix(self.GetObjectExtension()).name
                     obj_path = obj_dir / obj_name
 
+                    # Check if compilation needed
                     if not self._NeedsCompileSource(project, str(src_path), str(obj_path)):
                         cached_files.append((str(src_path), str(obj_path)))
                         continue
 
+                    # Submit compilation task
                     future = executor.submit(self.Compile, project, str(src_path), str(obj_path))
-                    compile_futures.append((future, str(src_path), str(obj_path)))
+                    compile_tasks.append((future, str(src_path), str(obj_path)))
 
                 # Log cached files immediately
                 for src_path, obj_path in cached_files:
@@ -1579,34 +1236,37 @@ class Builder(abc.ABC):
                     self.state.AddProjectOutput(project.name, obj_path)
                     logger.LogCached(src_path)
 
-                # Wait for parallel compilations
-                for future, src_path, obj_path in compile_futures:
+                # Wait for parallel compilations and collect results
+                for future, src_path, obj_path in compile_tasks:
                     try:
-                        result = future.result()
-                        if result.returnCode == 0:
+                        compile_success = future.result()
+                        if compile_success:
                             signature = self._ComputeCompileSignature(project, src_path, obj_path)
                             self._WriteCompileSignature(obj_path, signature)
                             object_files.append(obj_path)
                             self.state.AddProjectOutput(project.name, obj_path)
-                            logger.LogCompile(src_path, result)
+                            logger.LogCompile(src_path, None)
                         else:
-                            logger.LogCompile(src_path, result)
+                            logger.LogCompile(src_path, None)
                             success = False
                     except Exception as e:
                         logger.LogCompile(src_path, None)
+                        Reporter.Error(f"Compilation exception for {src_path}: {e}")
                         success = False
 
         if not success:
             self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-                                        targetArch=self.targetArch.value if self.targetArch else "")
+                                          targetArch=self.targetArch.value if self.targetArch else "")
             logger.PrintStats()
             return False
 
-        # Helpful visibility for incremental builds: all regular sources were cache hits
+        # Helpful visibility for incremental builds: all regular sources were
+        # cache hits, so no compile command was executed for this project.
         if regular_files and logger.cached == len(regular_files):
             logger.LogUpToDate()
 
-        # Auto-wire local library dependencies for link phase
+        # Auto-wire local library dependencies for link phase while preserving
+        # the user-declared link order (important for GNU-like linkers).
         dep_link_map: Dict[str, str] = {}
         for dep_name in project.dependsOn:
             dep_proj = self.workspace.projects.get(dep_name)
@@ -1630,12 +1290,15 @@ class Builder(abc.ABC):
                     new_links.append(resolved)
                     seen.add(resolved)
 
+            # Ensure dependencies are present even if not explicitly listed in links().
             missing_dep_outputs: List[str] = []
             for dep_out in dep_link_map.values():
                 if dep_out not in seen:
                     missing_dep_outputs.append(dep_out)
                     seen.add(dep_out)
 
+            # Missing auto-wired dependency archives are prepended so that
+            # GNU-like linkers resolve their symbols before system/provider libs.
             project.links = missing_dep_outputs + new_links
 
         if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP,
@@ -1644,21 +1307,18 @@ class Builder(abc.ABC):
             target_path = self.GetTargetPath(project)
             FileSystem.MakeDirectory(target_path.parent)
 
-            # Link (retourne bool pour l'instant, mais on pourra plus tard utiliser ProcessResult)
-            link_ok = self.Link(project, object_files, str(target_path))
-            logger.LogLink(str(target_path), None)  # Pas de ProcessResult pour link
-
-            self.CopyRuntimeDependencies(project, target_path)
-
-            if link_ok:
+            self._lastResult = None
+            if self.Link(project, object_files, str(target_path)):
                 self.state.AddProjectOutput(project.name, str(target_path))
                 self.state.MarkProjectCompiled(project.name, success=True, platform=self.platform,
-                                            targetArch=self.targetArch.value if self.targetArch else "")
+                                              targetArch=self.targetArch.value if self.targetArch else "")
+                logger.LogLink(str(target_path), self._lastResult)
                 logger.PrintResultBox(True)
                 return True
             else:
+                logger.LogLink(str(target_path), self._lastResult)
                 self.state.MarkProjectCompiled(project.name, success=False, platform=self.platform,
-                                            targetArch=self.targetArch.value if self.targetArch else "")
+                                          targetArch=self.targetArch.value if self.targetArch else "")
                 logger.PrintResultBox(False)
                 return False
         else:

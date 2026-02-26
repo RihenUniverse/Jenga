@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from Jenga.Core.Api import Project, ProjectKind, TargetOS, TargetArch
-from ...Utils import Colored, FileSystem, Process, Reporter
+from ...Utils import Colored, FileSystem, Process, Reporter, ProcessResult
 from .AppleMobileBuilder import AppleMobileBuilder
 
 
@@ -49,9 +49,10 @@ class XcodeMobileBuilder(AppleMobileBuilder):
             return ".a"
         return ".app"
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         # Non utilisé en mode Xcode (tout est géré par xcodebuild)
-        raise NotImplementedError("Direct compilation not used in Xcode mode")
+        # Retourner un ProcessResult de succès pour éviter les erreurs si jamais appelé
+        return ProcessResult(returnCode=0, stdout="", stderr="")
 
     def GetModuleFlags(self, project: Project, sourceFile: str) -> List[str]:
         # Non utilisé
@@ -119,7 +120,8 @@ class XcodeMobileBuilder(AppleMobileBuilder):
         if not podfile.exists():
             return
         Reporter.Info("Installing CocoaPods dependencies...")
-        result = Process.ExecuteCommand(["pod", "install"], cwd=podfile.parent, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(["pod", "install"], cwd=podfile.parent, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode != 0:
             Reporter.Warning("pod install failed, continuing without pods.")
 
@@ -165,7 +167,8 @@ class XcodeMobileBuilder(AppleMobileBuilder):
             "-archivePath", str(archive_path),
             "archive",
         ]
-        result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode == 0:
             return archive_path
         return None
@@ -182,7 +185,8 @@ class XcodeMobileBuilder(AppleMobileBuilder):
             "-exportOptionsPlist", str(export_plist),
             "-allowProvisioningUpdates",
         ]
-        result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode != 0:
             return None
         ipa_files = list(export_dir.glob("*.ipa"))

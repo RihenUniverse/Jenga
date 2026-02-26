@@ -663,3 +663,115 @@ class BuildCommand:
             return builder.Build(parsed.target)
 
         return result
+
+    """
+    Patch pour BuildCommand.py
+    Remplacer le bloc de détection du fichier workspace dans Execute() :
+
+        AVANT (lignes ~310-318) :
+        ─────────────────────────────────────────────────────────────────
+            if parsed.jenga_file:
+                entry_file = Path(parsed.jenga_file).resolve()
+                if not entry_file.exists():
+                    Colored.PrintError(f"Jenga file not found: {entry_file}")
+                    return 1
+            else:
+                entry_file = FileSystem.FindWorkspaceEntry(workspace_root)
+                if not entry_file:
+                    Colored.PrintError("No .jenga workspace file found.")
+                    return 1
+            workspace_root = entry_file.parent
+
+        APRÈS :
+        ─────────────────────────────────────────────────────────────────
+            if parsed.jenga_file:
+                entry_file = Path(parsed.jenga_file).resolve()
+                if not entry_file.exists():
+                    Colored.PrintError(f"Jenga file not found: {entry_file}")
+                    return 1
+            else:
+                entry_file = BuildCommand._FindWorkspaceEntry(workspace_root)
+                if not entry_file:
+                    Colored.PrintError(
+                        f"No .jenga workspace file found in '{workspace_root}' or its parents.\n"
+                        f"  Tip: Make sure you are inside a Jenga project directory.\n"
+                        f"  Tip: Use --jenga-file <path> to specify the file explicitly."
+                    )
+                    return 1
+            workspace_root = entry_file.parent
+
+    Ajouter aussi la méthode statique _FindWorkspaceEntry dans BuildCommand :
+    """
+
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Méthode à ajouter dans la classe BuildCommand (avec les autres @staticmethod)
+    # ─────────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _FindWorkspaceEntry(start_dir: Path) -> Optional[Path]:
+        """
+        Trouve le fichier .jenga workspace en remontant depuis start_dir.
+
+        Règles :
+          - Seuls les FICHIERS sont considérés (pas les dossiers).
+          - Les fichiers dont un composant du chemin est ".jenga" sont ignorés
+            (évite de confondre le dossier de cache .jenga/ avec un workspace).
+          - Si plusieurs fichiers .jenga coexistent, on préfère celui dont le
+            stem correspond au nom du dossier parent, sinon le premier alphabétiquement.
+          - Remonte jusqu'à la racine du système de fichiers.
+
+        Args:
+            start_dir: Répertoire de départ.
+
+        Returns:
+            Path absolu du fichier .jenga, ou None si introuvable.
+        """
+        current = Path(start_dir).resolve()
+        visited: set = set()
+
+        while True:
+            if current in visited:
+                break
+            visited.add(current)
+
+            # Collecter les fichiers .jenga dans ce dossier
+            candidates = []
+            try:
+                for entry in current.iterdir():
+                    # Fichiers uniquement
+                    if not entry.is_file():
+                        continue
+                    # Extension .jenga (insensible à la casse)
+                    if entry.suffix.lower() != ".jenga":
+                        continue
+                    # Ignorer si le fichier est à l'intérieur du dossier de cache .jenga/
+                    if any(part == ".jenga" for part in entry.parts):
+                        continue
+                    candidates.append(entry)
+            except PermissionError:
+                pass
+
+            if candidates:
+                candidates.sort()  # tri alphabétique stable
+
+                # Priorité 1 : stem == nom exact du dossier courant
+                dir_name = current.name
+                for c in candidates:
+                    if c.stem == dir_name:
+                        return c
+
+                # Priorité 2 : correspondance partielle (NKWindow dans NKWindow01)
+                for c in candidates:
+                    if dir_name.startswith(c.stem) or c.stem.startswith(dir_name):
+                        return c
+
+                # Fallback : premier alphabétiquement
+                return candidates[0]
+
+            # Remonter d'un niveau
+            parent = current.parent
+            if parent == current:
+                break  # racine atteinte
+            current = parent
+
+        return None

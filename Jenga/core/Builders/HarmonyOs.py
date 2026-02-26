@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from Jenga.Core.Api import Project, ProjectKind, TargetArch, TargetOS, TargetEnv, CompilerFamily
-from ...Utils import Process, FileSystem, Colored
+from ...Utils import Process, FileSystem, Colored, ProcessResult
 from ..Builder import Builder
 from ..Platform import Platform
 from ..Toolchains import ToolchainManager
@@ -117,7 +117,7 @@ class HarmonyOsBuilder(Builder):
         else:
             return ""  # exécutable (pas d'extension)
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
@@ -130,7 +130,7 @@ class HarmonyOsBuilder(Builder):
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
+        return result
 
     def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
         out = Path(outputFile)
@@ -207,8 +207,9 @@ class HarmonyOsBuilder(Builder):
         else:
             flags.append(f"-std={project.cdialect.lower()}")
 
-        # PIC
-        flags.append(f"-D__OHOS_API__={project.harmonyMinSdk}")
+        # API level
+        if hasattr(project, 'harmonyMinSdk') and project.harmonyMinSdk:
+            flags.append(f"-D__OHOS_API__={project.harmonyMinSdk}")
 
         # PIC
         flags.append("-fPIC")

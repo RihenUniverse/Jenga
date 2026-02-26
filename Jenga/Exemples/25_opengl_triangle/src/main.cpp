@@ -142,6 +142,7 @@ void android_main(struct android_app* app) {
 #include <cstdio>
 
 static GLuint g_prog = 0;
+static GLuint g_vbo = 0;                     // <-- nouveau VBO
 static GLint  g_aPos = -1, g_aColor = -1;
 
 static GLuint compileShader(GLenum type, const char* src) {
@@ -163,6 +164,13 @@ static GLuint createProgram() {
     return p;
 }
 
+static void setupGeometry() {
+    // Création du VBO et chargement des données
+    glGenBuffers(1, &g_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(kTriangle), kTriangle, GL_STATIC_DRAW);
+}
+
 static void mainLoop() {
     int w, h;
     emscripten_get_canvas_element_size("#canvas", &w, &h);
@@ -171,10 +179,14 @@ static void mainLoop() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(g_prog);
-    glVertexAttribPointer(g_aPos,   2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), kTriangle);
+    glBindBuffer(GL_ARRAY_BUFFER, g_vbo);    // <-- liaison du VBO
+
+    // Les pointeurs deviennent des offsets dans le buffer
+    glVertexAttribPointer(g_aPos,   2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(g_aPos);
-    glVertexAttribPointer(g_aColor, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), kTriangle + 2);
+    glVertexAttribPointer(g_aColor, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(g_aColor);
+
     glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
@@ -188,6 +200,8 @@ int main() {
     g_prog   = createProgram();
     g_aPos   = glGetAttribLocation(g_prog, "aPos");
     g_aColor = glGetAttribLocation(g_prog, "aColor");
+
+    setupGeometry();                         // <-- initialisation du VBO
 
     std::printf("WebGL triangle running\n");
     emscripten_set_main_loop(mainLoop, 0, 1);

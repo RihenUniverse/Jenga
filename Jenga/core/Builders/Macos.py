@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List
 
 from Jenga.Core.Api import Project, ProjectKind, CompilerFamily, TargetArch
-from ...Utils import Process, FileSystem
+from ...Utils import Process, FileSystem, ProcessResult
 from ..Builder import Builder
 
 
@@ -71,7 +71,7 @@ class MacOSBuilder(Builder):
         self._objcxxProbeCache[key] = needs_objcpp
         return needs_objcpp
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
@@ -87,7 +87,7 @@ class MacOSBuilder(Builder):
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
+        return result
 
     def GetModuleFlags(self, project: Project, sourceFile: str) -> List[str]:
         if not self.IsModuleFile(sourceFile):

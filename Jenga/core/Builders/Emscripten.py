@@ -2,23 +2,27 @@
 # -*- coding: utf-8 -*-
 """
 Emscripten Builder – Compilation WebAssembly.
-Génère .wasm, .js, .html + scripts run_*.bat / run_*.sh pour serveur HTTP local
-(évite les erreurs CORS lors de l'ouverture directe du fichier .html).
+Gère les bibliothèques partagées (SIDE_MODULE) et les applications (MAIN_MODULE).
 """
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import shlex
 import os
+import shutil
 
 from Jenga.Core.Api import Project, ProjectKind
-from ...Utils import Process, FileSystem
+from ...Utils import Process, FileSystem, ProcessResult
 from ..Builder import Builder
 
 
 class EmscriptenBuilder(Builder):
     """
     Builder pour WebAssembly via Emscripten.
+    Supporte :
+      - STATIC_LIB  → archive .a
+      - SHARED_LIB  → side module .wasm (avec -sSIDE_MODULE=1)
+      - CONSOLE_APP / WINDOWED_APP → main module .html/.js/.wasm (avec -sMAIN_MODULE=1 si dépendances partagées)
     """
 
     def GetObjectExtension(self) -> str:
@@ -27,6 +31,10 @@ class EmscriptenBuilder(Builder):
     @staticmethod
     def _EnumValue(v):
         return v.value if hasattr(v, "value") else v
+
+    def GetSharedLibExtensions(self) -> List[str]:
+        """Sur Emscripten, les bibliothèques dynamiques sont des side modules .wasm."""
+        return [".wasm"]
 
     def PreparePCH(self, project: Project, objDir: Path) -> bool:
         project._jengaPchFile = ""
@@ -51,7 +59,8 @@ class EmscriptenBuilder(Builder):
                 continue
             pch_flags.append(f)
         args.extend(pch_flags)
-        result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode != 0:
             return False
         project._jengaPchFile = str(pch_path)
@@ -65,10 +74,17 @@ class EmscriptenBuilder(Builder):
             return ".a"
         if project.kind == ProjectKind.SHARED_LIB:
             return ".wasm"
-        # For apps, emit launcher html (which references .js and .wasm).
+        # Pour les applications, on génère un .html (qui référence .js et .wasm)
         return ".html"
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def GetTargetPath(self, project: Project) -> Path:
+        """Retourne le chemin complet du fichier de sortie du projet."""
+        target_dir = self.GetTargetDir(project)
+        target_name = project.targetName or project.name
+        ext = self.GetOutputExtension(project)
+        return target_dir / f"{target_name}{ext}"
+
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
@@ -80,11 +96,10 @@ class EmscriptenBuilder(Builder):
         args.extend(self.GetModuleFlags(project, sourceFile))
         args.append(str(src))
 
-        # Sur Windows, les fichiers .bat nécessitent shell=True
         use_shell = compiler and (str(compiler).endswith('.bat') or str(compiler).endswith('.cmd'))
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False, shell=use_shell)
         self._lastResult = result
-        return result.returnCode == 0
+        return result
 
     def GetModuleFlags(self, project: Project, sourceFile: str) -> List[str]:
         flags = []
@@ -97,47 +112,89 @@ class EmscriptenBuilder(Builder):
         flags.append(f"-o{str(pcm_path)}")
         return flags
 
+    def _CollectSideModuleNames(self, project: Project) -> List[str]:
+        """Collecte les noms de fichiers des side modules (.wasm) dont dépend le projet."""
+        names = []
+        for dep_name in project.links:
+            dep_proj = self.workspace.projects.get(dep_name)
+            if dep_proj and dep_proj.kind == ProjectKind.SHARED_LIB:
+                names.append(dep_proj.targetName or dep_proj.name)
+        return names
+
+    def _CollectSideModulePaths(self, project: Project) -> List[Path]:
+        """Collecte les chemins des side modules (.wasm) compilés dont dépend le projet."""
+        paths = []
+        for dep_name in project.links:
+            dep_proj = self.workspace.projects.get(dep_name)
+            if dep_proj and dep_proj.kind == ProjectKind.SHARED_LIB:
+                dep_out = self.GetTargetPath(dep_proj)
+                if dep_out.exists():
+                    paths.append(dep_out)
+                else:
+                    print(f"[WARNING] Side module not found: {dep_out}")
+        return paths
+
     def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
         out = Path(outputFile)
         FileSystem.MakeDirectory(out.parent)
 
         if project.kind == ProjectKind.STATIC_LIB:
             ar = self.toolchain.arPath or "emar"
-            args = [ar, "rcs", str(out)]
-            args.extend(objectFiles)
-            # Sur Windows, les fichiers .bat nécessitent shell=True
+            args = [ar, "rcs", str(out)] + objectFiles
             use_shell = ar and (str(ar).endswith('.bat') or str(ar).endswith('.cmd'))
             result = Process.ExecuteCommand(args, captureOutput=True, silent=False, shell=use_shell)
             self._lastResult = result
             return result.returnCode == 0
 
         linker = self.toolchain.cxxPath or self.toolchain.ccPath
-        args = [linker, "-o", str(out)]
+        args = [linker]
+
+        if project.kind == ProjectKind.SHARED_LIB:
+            args.append("-sSIDE_MODULE=1")
+            args.append("-sEXPORT_ALL=1")
+        elif project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+            args.append("-sMAIN_MODULE=1")
+            args.append("-sERROR_ON_UNDEFINED_SYMBOLS=0")
+
+            # RUNTIME_LINKED_LIBS : indique à Emscripten quels .wasm charger au démarrage
+            side_module_names = self._CollectSideModuleNames(project)
+            if side_module_names:
+                libs_list = ",".join(f'"{name}.wasm"' for name in side_module_names)
+                args.append(f"-sRUNTIME_LINKED_LIBS=[{libs_list}]")
+
+            # Passer les .wasm au linker pour résoudre les symboles à la compilation
+            # (sans ça, Emscripten génère "external symbol is missing" au runtime)
+            for wasm_path in self._CollectSideModulePaths(project):
+                args.append(str(wasm_path))
+
+        args += ["-o", str(out)]
         args.extend(self._GetLinkerFlags(project))
-        # Object files first; static archives are order-sensitive.
         args.extend(objectFiles)
 
         for libdir in project.libDirs:
             args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
         for lib in project.links:
+            # Ne pas re-passer les side modules WASM via -l (déjà passés en chemin direct ci-dessus)
+            dep_proj = self.workspace.projects.get(lib)
+            if dep_proj and dep_proj.kind == ProjectKind.SHARED_LIB:
+                continue
             if self._IsDirectLibPath(lib):
                 args.append(self.ResolveProjectPath(project, lib))
             else:
                 args.append(f"-l{lib}")
         args.extend(self.toolchain.ldflags)
 
-        # Sur Windows, les fichiers .bat nécessitent shell=True
         use_shell = linker and (str(linker).endswith('.bat') or str(linker).endswith('.cmd'))
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False, shell=use_shell)
         self._lastResult = result
+
         if result.returnCode == 0:
             self._GenerateRunnerScripts(project, out)
+
         return result.returnCode == 0
 
     def _GenerateRunnerScripts(self, project: Project, output_path: Path) -> None:
-        """
-        Génère des scripts de lancement robustes pour Windows (.bat) et Unix (.sh).
-        """
+        """Génère les scripts de lancement pour le serveur HTTP local."""
         if project.kind not in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE):
             return
 
@@ -148,99 +205,99 @@ class EmscriptenBuilder(Builder):
 
         # --- Script Windows (.bat) ---
         bat_content = f'''@echo off
-    title {proj_name}
-    setlocal enabledelayedexpansion
+title {proj_name}
+setlocal enabledelayedexpansion
 
-    set PORT=%1
-    if "%PORT%"=="" set PORT={port_default}
+set PORT=%1
+if "%PORT%"=="" set PORT={port_default}
 
-    echo ================================================
-    echo  {proj_name} — WASM Runner
-    echo ================================================
-    echo.
-    echo  Server: http://localhost:!PORT!/{html_name}
-    echo  CTRL+C to stop.
-    echo.
+echo ================================================
+echo  {proj_name} — WASM Runner
+echo ================================================
+echo.
+echo  Server: http://localhost:!PORT!/{html_name}
+echo  CTRL+C to stop.
+echo.
 
-    :: Se placer dans le répertoire du script
-    pushd "%~dp0" || (
-        echo Erreur : impossible d'accéder au répertoire "%~dp0"
-        pause
-        exit /b 1
-    )
+:: Se placer dans le répertoire du script
+pushd "%~dp0" || (
+    echo Erreur : impossible d'accéder au répertoire "%~dp0"
+    pause
+    exit /b 1
+)
 
-    :: Vérifier que le fichier HTML existe
-    if not exist "{html_name}" (
-        echo Erreur : fichier {html_name} introuvable dans "%~dp0"
-        echo Assurez-vous que la compilation WebAssembly a réussi.
-        pause
-        exit /b 1
-    )
+:: Vérifier que le fichier HTML existe
+if not exist "{html_name}" (
+    echo Erreur : fichier {html_name} introuvable dans "%~dp0"
+    echo Assurez-vous que la compilation WebAssembly a réussi.
+    pause
+    exit /b 1
+)
 
-    :: Lancer le navigateur après un délai (1 seconde)
-    start /B "" cmd /c "timeout /t 1 /nobreak >nul & start \"\" \"http://localhost:!PORT!/{html_name}\""
+:: Lancer le navigateur après un délai (1 seconde)
+start /B "" cmd /c "timeout /t 1 /nobreak >nul & start \"\" \"http://localhost:!PORT!/{html_name}\""
 
-    :: Démarrer le serveur HTTP
-    python -m http.server !PORT!
+:: Démarrer le serveur HTTP
+python -m http.server !PORT!
+if errorlevel 1 (
+    py -m http.server !PORT!
     if errorlevel 1 (
-        py -m http.server !PORT!
+        python3 -m http.server !PORT!
         if errorlevel 1 (
-            python3 -m http.server !PORT!
-            if errorlevel 1 (
-                echo Erreur : impossible de démarrer le serveur HTTP.
-                pause
-                exit /b 1
-            )
+            echo Erreur : impossible de démarrer le serveur HTTP.
+            pause
+            exit /b 1
         )
     )
-    popd
-    endlocal
-    '''
+)
+popd
+endlocal
+'''
         bat_path = out_dir / f"{proj_name}.bat"
         try:
             bat_path.write_text(bat_content, encoding="utf-8")
         except OSError:
-            pass  # ignore les erreurs d'écriture
+            pass
 
         # --- Script Unix (.sh) ---
         sh_content = f'''#!/usr/bin/env bash
-    PORT="${{1:-{port_default}}}"
-    SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+PORT="${{1:-{port_default}}}"
+SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 
-    echo "================================================"
-    echo " {proj_name} — WASM Runner"
-    echo "================================================"
-    echo ""
-    echo " Server: http://localhost:$PORT/{html_name}"
-    echo " CTRL+C to stop."
-    echo ""
+echo "================================================"
+echo " {proj_name} — WASM Runner"
+echo "================================================"
+echo ""
+echo " Server: http://localhost:$PORT/{html_name}"
+echo " CTRL+C to stop."
+echo ""
 
-    cd "$SCRIPT_DIR" || {{ echo "Erreur : impossible d'accéder à $SCRIPT_DIR"; exit 1; }}
+cd "$SCRIPT_DIR" || {{ echo "Erreur : impossible d'accéder à $SCRIPT_DIR"; exit 1; }}
 
-    # Vérifier que le fichier HTML existe
-    if [ ! -f "{html_name}" ]; then
-        echo "Erreur : fichier {html_name} introuvable dans $SCRIPT_DIR"
-        echo "Assurez-vous que la compilation WebAssembly a réussi."
-        exit 1
-    fi
+# Vérifier que le fichier HTML existe
+if [ ! -f "{html_name}" ]; then
+    echo "Erreur : fichier {html_name} introuvable dans $SCRIPT_DIR"
+    echo "Assurez-vous que la compilation WebAssembly a réussi."
+    exit 1
+fi
 
-    # Lancer le navigateur après un délai
-    ( sleep 1; xdg-open "http://localhost:$PORT/{html_name}" 2>/dev/null || open "http://localhost:$PORT/{html_name}" 2>/dev/null ) &
+# Lancer le navigateur après un délai
+( sleep 1; xdg-open "http://localhost:$PORT/{html_name}" 2>/dev/null || open "http://localhost:$PORT/{html_name}" 2>/dev/null ) &
 
-    # Démarrer le serveur HTTP
-    if command -v python3 &>/dev/null; then
-        python3 -m http.server "$PORT"
-    elif command -v python &>/dev/null; then
-        python -m http.server "$PORT"
-    else
-        echo "Erreur : Python introuvable."
-        exit 1
-    fi
-    '''
+# Démarrer le serveur HTTP
+if command -v python3 &>/dev/null; then
+    python3 -m http.server "$PORT"
+elif command -v python &>/dev/null; then
+    python -m http.server "$PORT"
+else
+    echo "Erreur : Python introuvable."
+    exit 1
+fi
+'''
         sh_path = out_dir / f"{proj_name}.sh"
         try:
             sh_path.write_text(sh_content, encoding="utf-8")
-            sh_path.chmod(sh_path.stat().st_mode | 0o111)  # rendre exécutable
+            sh_path.chmod(sh_path.stat().st_mode | 0o111)
         except OSError:
             pass
 
@@ -250,15 +307,7 @@ class EmscriptenBuilder(Builder):
         return p.suffix in (".a", ".bc", ".o", ".so", ".dylib", ".lib") or "/" in lib or "\\" in lib or p.is_absolute()
 
     def _ResolveOptionBool(self, *names: str):
-        """
-        Resolve a boolean custom option from builder option tokens.
-        Supports:
-          - token          -> true  (e.g. emscripten-fullscreen-shell)
-          - token=true     -> true
-          - token=false    -> false
-        Returns:
-          True / False / None (not provided)
-        """
+        """Résout une option booléenne depuis la ligne de commande."""
         tokens = [str(opt).strip().lower() for opt in getattr(self, "options", []) if str(opt).strip()]
         for raw_name in names:
             name = str(raw_name).strip().lower()
@@ -278,14 +327,7 @@ class EmscriptenBuilder(Builder):
         return None
 
     def _ResolveShellFile(self, project: Project) -> str:
-        """
-        Resolve the Emscripten shell file with this precedence:
-          1) project.emscriptenShellFile (explicit)
-          2) CLI custom option
-             --emscripten-fullscreen-shell / --no-emscripten-fullscreen-shell
-          3) project.emscriptenUseFullscreenShell
-          4) workspace.emscriptenDefaultFullscreenShell
-        """
+        """Détermine le fichier shell HTML à utiliser."""
         explicit = str(getattr(project, 'emscriptenShellFile', '') or '').strip()
         if explicit:
             return explicit
@@ -321,10 +363,14 @@ class EmscriptenBuilder(Builder):
             flags.append(f"-D{define}")
         flags.append("-D__EMSCRIPTEN__")
 
+        # PIC pour les bibliothèques partagées (obligatoire pour les side modules)
+        if project.kind == ProjectKind.SHARED_LIB:
+            flags.append("-fPIC")
+
         # Debug
         if project.symbols:
             flags.append("-g")
-            flags.append("-gsource-map")  # pour debug
+            flags.append("-gsource-map")
 
         # Optimisation
         opt = self._EnumValue(project.optimize)
@@ -362,41 +408,48 @@ class EmscriptenBuilder(Builder):
     def _GetLinkerFlags(self, project: Project) -> List[str]:
         flags = []
 
-        # Mode de sortie
+        # Mode de sortie : toujours WASM
         flags.extend(["-s", "WASM=1"])
-        flags.extend(["-s", "ALLOW_MEMORY_GROWTH=1"])
 
-        # Custom HTML template (shell file) / fullscreen shell option
-        shell_file = self._ResolveShellFile(project)
-        if shell_file:
-            shell_path = Path(self.ResolveProjectPath(project, shell_file))
-            if shell_path.exists():
-                flags.extend(["--shell-file", str(shell_path)])
-            else:
-                # Try template directory
-                template_path = Path(__file__).parent.parent.parent / "Templates" / shell_file
-                if template_path.exists():
-                    flags.extend(["--shell-file", str(template_path)])
+        # ALLOW_MEMORY_GROWTH n'est pas compatible avec les side modules
+        if project.kind != ProjectKind.SHARED_LIB:
+            flags.extend(["-s", "ALLOW_MEMORY_GROWTH=1"])
 
-        # Canvas ID
-        canvas_id = getattr(project, 'emscriptenCanvasId', 'canvas')
-        if canvas_id != 'canvas':
-            flags.extend(["-s", f"CANVAS_ID='{canvas_id}'"])
+        # Shell file (uniquement pour les applications)
+        if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+            shell_file = self._ResolveShellFile(project)
+            if shell_file:
+                shell_path = Path(self.ResolveProjectPath(project, shell_file))
+                if shell_path.exists():
+                    flags.extend(["--shell-file", str(shell_path)])
+                else:
+                    template_path = Path(__file__).parent.parent.parent / "Templates" / shell_file
+                    if template_path.exists():
+                        flags.extend(["--shell-file", str(template_path)])
 
-        # Initial memory
-        initial_memory = getattr(project, 'emscriptenInitialMemory', 16)
-        if initial_memory > 0:
-            flags.extend(["-s", f"INITIAL_MEMORY={initial_memory}MB"])
+        # Canvas ID (applications)
+        if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+            canvas_id = getattr(project, 'emscriptenCanvasId', 'canvas')
+            if canvas_id != 'canvas':
+                flags.extend(["-s", f"CANVAS_ID='{canvas_id}'"])
 
-        # Stack size
-        stack_size = getattr(project, 'emscriptenStackSize', 5)
-        if stack_size > 0:
-            flags.extend(["-s", f"STACK_SIZE={stack_size}MB"])
+        # Initial memory (applications)
+        if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+            initial_memory = getattr(project, 'emscriptenInitialMemory', 16)
+            if initial_memory > 0:
+                flags.extend(["-s", f"INITIAL_MEMORY={initial_memory}MB"])
 
-        # Export name
-        export_name = getattr(project, 'emscriptenExportName', 'Module')
-        if export_name != 'Module':
-            flags.extend(["-s", f"EXPORT_NAME='{export_name}'"])
+        # Stack size (applications)
+        if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+            stack_size = getattr(project, 'emscriptenStackSize', 5)
+            if stack_size > 0:
+                flags.extend(["-s", f"STACK_SIZE={stack_size}MB"])
+
+        # Export name (applications)
+        if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+            export_name = getattr(project, 'emscriptenExportName', 'Module')
+            if export_name != 'Module':
+                flags.extend(["-s", f"EXPORT_NAME='{export_name}'"])
 
         # Extra flags
         extra_flags = getattr(project, 'emscriptenExtraFlags', [])
@@ -406,6 +459,8 @@ class EmscriptenBuilder(Builder):
         # Optimisation de la taille
         if self._EnumValue(project.optimize) == "Size":
             flags.append("-Oz")
+
+        # Flags utilisateur
         for f in project.ldflags:
             if isinstance(f, str):
                 flags.extend(shlex.split(f))
@@ -413,4 +468,3 @@ class EmscriptenBuilder(Builder):
                 flags.append(str(f))
 
         return flags
-    

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from Jenga.Core.Api import Project, ProjectKind, TargetArch, TargetEnv, TargetOS, CompilerFamily, Toolchain
-from ...Utils import Process, FileSystem, Reporter
+from ...Utils import Process, FileSystem, Reporter, ProcessResult
 from ..Builder import Builder
 from ..Toolchains import ToolchainManager
 from ..Platform import Platform
@@ -376,7 +376,7 @@ class XboxBuilder(Builder):
             return ".lib"
         return ".exe"
 
-    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
+    def Compile(self, project: Project, sourceFile: str, objectFile: str) -> ProcessResult:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
@@ -436,7 +436,7 @@ class XboxBuilder(Builder):
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
+        return result
 
     def GetModuleFlags(self, project: Project, sourceFile: str) -> List[str]:
         if not self.IsModuleFile(sourceFile):
@@ -682,7 +682,8 @@ class XboxBuilder(Builder):
                 cmd.extend(["/gameos", str(gameos_path.parent)])
 
         Reporter.Info(f"Creating XVC package: {xvc_filename}")
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode == 0:
             self._RunSubmissionValidator(package_dir, xvc_path)
             Reporter.Success(f"XVC package created: {xvc_path}")
@@ -734,7 +735,8 @@ class XboxBuilder(Builder):
 
         log_path = package_dir / "submission_validation.xml"
         cmd = ["dotnet", str(validator_path), "validate", "-p", str(package_path), "-o", str(log_path)]
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
 
         if result.returnCode == 0:
             Reporter.Success("Submission validation passed")
@@ -764,7 +766,8 @@ class XboxBuilder(Builder):
 
         lekb_path = key_dir / f"{project.name}_secret.lekb"
         cmd = [str(makepkg_path), "genkey", "/ekb", str(lekb_path)]
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
 
         if result.returnCode == 0:
             Reporter.Warning(f"LEKB generated at {lekb_path}. Keep this file secret.")
@@ -787,7 +790,8 @@ class XboxBuilder(Builder):
         if console_ip:
             cmd.extend(["/s", console_ip])
 
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         if result.returnCode == 0:
             Reporter.Success("Deployed to console")
             return True
@@ -806,5 +810,6 @@ class XboxBuilder(Builder):
         if console_ip:
             cmd.extend(["/s", console_ip])
 
-        result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        self._lastResult = result
         return result.returnCode == 0

@@ -3,10 +3,9 @@
 
 import os
 from Jenga import *
-from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
+from Jenga.GlobalToolchains import *
 
 with workspace("SharedLibraryExample"):
-    RegisterJengaGlobalToolchains()
     configurations(["Debug", "Release"])
     targetoses([
         TargetOS.WINDOWS,
@@ -17,8 +16,8 @@ with workspace("SharedLibraryExample"):
     targetarchs([TargetArch.X86_64, TargetArch.ARM64, TargetArch.WASM32])
 
     # Android SDK/NDK paths
-    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
-    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
+    ApplyAndroidSdkNdkJdkDefaults()          # définit androidSdkPath, androidNdkPath, javaJdkPath
+    RegisterJengaGlobalToolchains()          # détecte android-ndk, etc.
 
     # Greeter - Shared Library
     with project("Greeter"):
