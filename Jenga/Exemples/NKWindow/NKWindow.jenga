@@ -1,54 +1,54 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-NKWindow.jenga — Workspace principal du framework NKWindow
+NKWindow.jenga â€” Workspace principal du framework NKWindow
 =============================================================================
 
-NKWindow est un framework C++ multi-plateforme de gestion de fenêtres,
-d'événements et de rendu pixel. Il fonctionne à l'image de SDL3/SFML3
-mais entièrement en C++ moderne (C++17/C++20), sous le namespace nkentseu.
+NKWindow est un framework C++ multi-plateforme de gestion de fenÃªtres,
+d'Ã©vÃ©nements et de rendu pixel. Il fonctionne Ã  l'image de SDL3/SFML3
+mais entiÃ¨rement en C++ moderne (C++17/C++20), sous le namespace nkentseu.
 
-Architecture et ordre de dépendances :
+Architecture et ordre de dÃ©pendances :
 
-  ┌──────────────────────────────────────────────────────────────────────┐
-  │                                                                      │
-  │  NKPlatform  — Détection OS/arch/compilateur/CPU         (C++20)    │
-  │       ↓                                                              │
-  │  NKCore      — Types, macros, assertions, bits            (C++20)    │
-  │       ↓                                                              │
-  │  NKLogger    — Journalisation asynchrone multi-sink       (C++17)    │
-  │       ↓                                                              │
-  │  NKWindow    — Fenêtrage, événements, caméra, rendu pxl   (C++17)    │
-  │       ↓                                                              │
-  │  Sandbox     — Application de démonstration (tous OS)     (C++17)    │
-  │                                                                      │
-  └──────────────────────────────────────────────────────────────────────┘
+  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+  â”‚                                                                      â”‚
+  â”‚  NKPlatform  â€” DÃ©tection OS/arch/compilateur/CPU         (C++20)    â”‚
+  â”‚       â†“                                                              â”‚
+  â”‚  NKCore      â€” Types, macros, assertions, bits            (C++20)    â”‚
+  â”‚       â†“                                                              â”‚
+  â”‚  NKLogger    â€” Journalisation asynchrone multi-sink       (C++17)    â”‚
+  â”‚       â†“                                                              â”‚
+  â”‚  NKWindow    â€” FenÃªtrage, Ã©vÃ©nements, camÃ©ra, rendu pxl   (C++17)    â”‚
+  â”‚       â†“                                                              â”‚
+  â”‚  Sandbox     â€” Application de dÃ©monstration (tous OS)     (C++17)    â”‚
+  â”‚                                                                      â”‚
+  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
-  Rendu : seul le rendu pixel (software) est implémenté pour l'instant.
-          Les autres backends (OpenGL, Vulkan…) seront développés ensuite.
+  Rendu : seul le rendu pixel (software) est implÃ©mentÃ© pour l'instant.
+          Les autres backends (OpenGL, Vulkanâ€¦) seront dÃ©veloppÃ©s ensuite.
 
-Plateformes supportées :
-  Windows     — Backend Win32                   (clang-mingw)
-  Linux XLib  — Backend X11/XLib (défaut)       (clang-native / WSL2)
-  Linux XCB   — Backend X11/XCB                 (clang-native / WSL2)
-  Linux Wayland — Backend Wayland + xdg-shell   (clang-native / WSL2)
-  Linux NOOP  — Backend headless (CI/WSL)        (clang-native / WSL2)
-  macOS       — Backend Cocoa                   (clang-native)
-  Android     — NativeActivity+EGL              (android-ndk)
-  iOS         — Backend UIKit
-  Web         — Emscripten+Canvas               (emscripten)
-  HarmonyOS   — ArkUI Native
-  XboxSeries  — UWP GameCore                    (xbox-clang)
-  XboxOne     — UWP GameCore                    (xbox-clang)
+Plateformes supportÃ©es :
+  Windows     â€” Backend Win32                   (clang-mingw)
+  Linux XLib  â€” Backend X11/XLib (dÃ©faut)       (clang-native / WSL2)
+  Linux XCB   â€” Backend X11/XCB                 (clang-native / WSL2)
+  Linux Wayland â€” Backend Wayland + xdg-shell   (clang-native / WSL2)
+  Linux NOOP  â€” Backend headless (CI/WSL)        (clang-native / WSL2)
+  macOS       â€” Backend Cocoa                   (clang-native)
+  Android     â€” NativeActivity+EGL              (android-ndk)
+  iOS         â€” Backend UIKit
+  Web         â€” Emscripten+Canvas               (emscripten)
+  HarmonyOS   â€” ArkUI Native
+  XboxSeries  â€” UWP GameCore                    (xbox-clang)
+  XboxOne     â€” UWP GameCore                    (xbox-clang)
 
 Namespace : nkentseu
 Nomenclature : voir NOMENCLATURE_ET_DOCUMENTATION.md
 
 Usage :
-  jenga build                                            # Hôte (XLib)
+  jenga build                                            # HÃ´te (XLib)
   jenga build --platform windows                         # Windows
-  jenga build --platform linux                           # Linux XLib (défaut)
+  jenga build --platform linux                           # Linux XLib (dÃ©faut)
   jenga build --platform linux --options linux-backend=xcb      # Linux XCB
   jenga build --platform linux --options linux-backend=wayland   # Linux Wayland
   jenga build --platform linux --options headless                # Linux headless
@@ -62,8 +62,8 @@ Usage :
   jenga build --config Release                           # Build Release
 
   Notes Wayland :
-    Prérequis : libwayland-dev, libxkbcommon-dev, wayland-protocols
-    Générer xdg-shell-client-protocol.h :
+    PrÃ©requis : libwayland-dev, libxkbcommon-dev, wayland-protocols
+    GÃ©nÃ©rer xdg-shell-client-protocol.h :
       wayland-scanner client-header \\
         /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml \\
         NKWindow/src/NKWindow/Platform/Wayland/xdg-shell-client-protocol.h
@@ -77,37 +77,68 @@ Date   : 2026
 """
 
 import os
+import shutil
 from Jenga import *
 from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
 
 with workspace("NKWindow", location="."):
     RegisterJengaGlobalToolchains()
 
+    # Platform-specific toolchain names to avoid ambiguity/collisions.
+    TC_WINDOWS = "nk-windows-clang-mingw"
+
+    # Register a local Windows toolchain with explicit host resolution.
+    # This avoids machine-specific absolute paths from global toolchain files.
+    if os.name == "nt":
+        _clang = shutil.which("clang")
+        _clangxx = shutil.which("clang++")
+        _llvm_ar = shutil.which("llvm-ar") or shutil.which("ar")
+        if not _clang and os.path.exists(r"C:\msys64\ucrt64\bin\clang.exe"):
+            _clang = r"C:\msys64\ucrt64\bin\clang.exe"
+        if not _clangxx and os.path.exists(r"C:\msys64\ucrt64\bin\clang++.exe"):
+            _clangxx = r"C:\msys64\ucrt64\bin\clang++.exe"
+        if not _llvm_ar and os.path.exists(r"C:\msys64\ucrt64\bin\llvm-ar.exe"):
+            _llvm_ar = r"C:\msys64\ucrt64\bin\llvm-ar.exe"
+        if not _llvm_ar and os.path.exists(r"C:\msys64\ucrt64\bin\ar.exe"):
+            _llvm_ar = r"C:\msys64\ucrt64\bin\ar.exe"
+
+        with toolchain(TC_WINDOWS, "clang"):
+            settarget("Windows", "x86_64", "mingw")
+            targettriple(r"x86_64-w64-windows-gnu")
+            ccompiler(_clang or "clang")
+            cppcompiler(_clangxx or "clang++")
+            linker(_clangxx or "clang++")
+            if _llvm_ar:
+                archiver(_llvm_ar)
+            cflags(["--target=x86_64-w64-windows-gnu"])
+            cxxflags(["--target=x86_64-w64-windows-gnu"])
+            ldflags(["--target=x86_64-w64-windows-gnu"])
+
     configurations(["Debug", "Release"])
 
-    # ── Options Linux : choix du backend de fenêtrage ─────────────────────────
-    # Par défaut : xlib
+    # â”€â”€ Options Linux : choix du backend de fenÃªtrage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # Par dÃ©faut : xlib
     # Autres valeurs : xcb, wayland, headless
     newoption(
         trigger="linux-backend",
         value="BACKEND",
         allowed=[
-            ["xlib",     "X11/XLib  (défaut, le plus compatible)"],
-            ["xcb",      "X11/XCB   (plus léger, asynchrone)"],
+            ["xlib",     "X11/XLib  (dÃ©faut, le plus compatible)"],
+            ["xcb",      "X11/XCB   (plus lÃ©ger, asynchrone)"],
             ["wayland",  "Wayland   (compositeurs modernes, sans X11)"],
-            ["headless", "Pas de fenêtre (CI, serveurs, WSL sans écran)"],
+            ["headless", "Pas de fenÃªtre (CI, serveurs, WSL sans Ã©cran)"],
         ],
         default="xlib",
-        description="Backend de fenêtrage Linux"
+        description="Backend de fenÃªtrage Linux"
     )
 
-    # Alias court pour la compatibilité avec l'ancienne syntaxe
+    # Alias court pour la compatibilitÃ© avec l'ancienne syntaxe
     newoption(
         trigger="headless",
-        description="[Obsolète] Utiliser --options linux-backend=headless"
+        description="[ObsolÃ¨te] Utiliser --options linux-backend=headless"
     )
 
-    # ── Toutes les plateformes cibles ──────────────────────────────────────────
+    # â”€â”€ Toutes les plateformes cibles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     targetoses([
         TargetOS.WINDOWS,
         TargetOS.LINUX,
@@ -120,14 +151,14 @@ with workspace("NKWindow", location="."):
         TargetOS.XBOX_ONE,
     ])
 
-    # ── Architectures cibles ───────────────────────────────────────────────────
+    # â”€â”€ Architectures cibles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     targetarchs([
         TargetArch.X86_64,   # Desktop (Windows, Linux, macOS, Xbox)
         TargetArch.ARM64,    # Mobile  (Android, iOS)
         TargetArch.WASM32,   # Web     (Emscripten)
     ])
 
-    # Shell plein écran pour les builds Web
+    # Shell plein Ã©cran pour les builds Web
     emscriptenfullscreenshell(True)
 
     # Chemins Android SDK/NDK depuis l'environnement
@@ -139,18 +170,18 @@ with workspace("NKWindow", location="."):
         u.Compile()
 
     # =========================================================================
-    # NKPlatform — Détection OS, architecture, compilateur, CPU (C++20)
+    # NKPlatform â€” DÃ©tection OS, architecture, compilateur, CPU (C++20)
     # =========================================================================
-    # NKPlatform est la fondation sans dépendances. Elle fournit des macros
-    # et des informations compilées sur l'environnement d'exécution.
+    # NKPlatform est la fondation sans dÃ©pendances. Elle fournit des macros
+    # et des informations compilÃ©es sur l'environnement d'exÃ©cution.
     #
     # Contenu (src/NKPlatform/) :
-    #   NkPlatformDetect.h    — OS (Windows, Linux, macOS, Android, iOS, Web…)
-    #   NkArchDetect.h        — Architecture (x86_64, ARM64, WASM32)
-    #   NkCompilerDetect.h    — Compilateur (MSVC, GCC, Clang, MinGW, Zig…)
-    #   NkCPUFeatures.h/cpp   — Capacités CPU (SSE2, AVX2, NEON, WASM SIMD)
-    #   NkEndianness.h        — Endianness (little / big)
-    #   NkPlatformConfig.h/cpp — Configuration compilée de la plateforme
+    #   NkPlatformDetect.h    â€” OS (Windows, Linux, macOS, Android, iOS, Webâ€¦)
+    #   NkArchDetect.h        â€” Architecture (x86_64, ARM64, WASM32)
+    #   NkCompilerDetect.h    â€” Compilateur (MSVC, GCC, Clang, MinGW, Zigâ€¦)
+    #   NkCPUFeatures.h/cpp   â€” CapacitÃ©s CPU (SSE2, AVX2, NEON, WASM SIMD)
+    #   NkEndianness.h        â€” Endianness (little / big)
+    #   NkPlatformConfig.h/cpp â€” Configuration compilÃ©e de la plateforme
     # =========================================================================
 
     with project("NKPlatform"):
@@ -159,7 +190,13 @@ with workspace("NKWindow", location="."):
         cppdialect("C++20")
         location("NKPlatform")
 
-        includedirs(["src", "pch"])
+        includedirs([
+            "src",
+            "src/NKPlatform",
+            "pch",
+            "../NKCore/src",
+            "../NKCore/src/NKCore",
+        ])
         pchheader("pch/pch.h")
         pchsource("pch/pch.cpp")
 
@@ -168,18 +205,12 @@ with workspace("NKWindow", location="."):
             "src/NKPlatform/**.h",
         ])
 
-        # NkCPUFeatures dépend de NkString (absent) → exclu
-        excludefiles([
-            "src/NKPlatform/NkCPUFeatures.cpp",
-            "src/NKPlatform/NkCPUFeatures.h",
-        ])
-
         objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
         targetdir("%{wks.location}/Build/Lib/%{cfg.buildcfg}-%{cfg.system}")
 
-        # ── Toolchains ────────────────────────────────────────────────────
+        # â”€â”€ Toolchains â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Windows"):
-            usetoolchain("clang-mingw")
+            usetoolchain(TC_WINDOWS)
         with filter("system:macOS"):
             usetoolchain("clang-native")
         with filter("system:Android"):
@@ -189,7 +220,7 @@ with workspace("NKWindow", location="."):
         with filter("system:XboxSeries || system:XboxOne"):
             usetoolchain("xbox-clang")
 
-        # ── Debug / Release ───────────────────────────────────────────────
+        # â”€â”€ Debug / Release â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("config:Debug"):
             defines(["_DEBUG", "DEBUG"])
             optimize("Off")
@@ -200,22 +231,22 @@ with workspace("NKWindow", location="."):
             symbols(False)
 
     # =========================================================================
-    # NKCore — Types, macros, assertions, opérations bit (C++20)
+    # NKCore â€” Types, macros, assertions, opÃ©rations bit (C++20)
     # =========================================================================
     # NKCore s'appuie sur NKPlatform pour les types fixes et les macros
-    # fondamentaux réutilisés par toutes les couches supérieures.
+    # fondamentaux rÃ©utilisÃ©s par toutes les couches supÃ©rieures.
     #
     # Contenu (src/NKCore/) :
-    #   NkTypes.h           — Types fixes (NkU8, NkI32, NkVec2u, NkRect…)
-    #   NkMacros.h          — Macros utilitaires (NK_UNUSED, NK_STRINGIFY…)
-    #   NkBits.h/cpp        — Opérations bit (popcount, clz, byteswap…)
-    #   NkLimits.h/cpp      — Limites de types scalaires
-    #   NkAtomic.h          — Atomiques portables (spin-lock, flags)
-    #   NkConfig.h          — Configuration globale du build
-    #   NkInline.h          — Macros NK_INLINE / NK_FORCE_INLINE
-    #   NkBuiltin.h         — Détection __builtin_* de GCC/Clang
-    #   NkVersion.h         — Version du framework (NK_VERSION_MAJOR/MINOR…)
-    #   Assert/             — Assertions configurables + debug break
+    #   NkTypes.h           â€” Types fixes (NkU8, NkI32, NkVec2u, NkRectâ€¦)
+    #   NkMacros.h          â€” Macros utilitaires (NK_UNUSED, NK_STRINGIFYâ€¦)
+    #   NkBits.h/cpp        â€” OpÃ©rations bit (popcount, clz, byteswapâ€¦)
+    #   NkLimits.h/cpp      â€” Limites de types scalaires
+    #   NkAtomic.h          â€” Atomiques portables (spin-lock, flags)
+    #   NkConfig.h          â€” Configuration globale du build
+    #   NkInline.h          â€” Macros NK_INLINE / NK_FORCE_INLINE
+    #   NkBuiltin.h         â€” DÃ©tection __builtin_* de GCC/Clang
+    #   NkVersion.h         â€” Version du framework (NK_VERSION_MAJOR/MINORâ€¦)
+    #   Assert/             â€” Assertions configurables + debug break
     # =========================================================================
 
     with project("NKCore"):
@@ -233,7 +264,7 @@ with workspace("NKWindow", location="."):
         pchheader("pch/pch.h")
         pchsource("pch/pch.cpp")
 
-        # NKCore dépend de NKPlatform
+        # NKCore dÃ©pend de NKPlatform
         dependson(["NKPlatform"])
 
         files([
@@ -246,9 +277,9 @@ with workspace("NKWindow", location="."):
 
         defines(["NKENTSEU_CORE_STATIC"])
 
-        # ── Toolchains ────────────────────────────────────────────────────
+        # â”€â”€ Toolchains â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Windows"):
-            usetoolchain("clang-mingw")
+            usetoolchain(TC_WINDOWS)
         with filter("system:macOS"):
             usetoolchain("clang-native")
         with filter("system:Android"):
@@ -258,7 +289,7 @@ with workspace("NKWindow", location="."):
         with filter("system:XboxSeries || system:XboxOne"):
             usetoolchain("xbox-clang")
 
-        # ── Debug / Release ───────────────────────────────────────────────
+        # â”€â”€ Debug / Release â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("config:Debug"):
             defines(["_DEBUG", "DEBUG", "NKENTSEU_DEBUG"])
             optimize("Off")
@@ -269,33 +300,33 @@ with workspace("NKWindow", location="."):
             symbols(False)
 
     # =========================================================================
-    # NKLogger — Journalisation asynchrone multi-sink (C++17)
+    # NKLogger â€” Journalisation asynchrone multi-sink (C++17)
     # =========================================================================
-    # NKLogger fournit un système de journalisation thread-safe avec filtres,
+    # NKLogger fournit un systÃ¨me de journalisation thread-safe avec filtres,
     # formatage configurable et plusieurs destinations (console, fichier, etc.)
     #
     # Contenu (src/Logger/) :
-    #   Logger.h/cpp          — Logger principal (point d'entrée)
-    #   Log.h/cpp             — Macros NK_LOG_*, fonctions de log globales
-    #   AsyncLogger.h/cpp     — Logger asynchrone (file d'attente thread-safe)
-    #   LogLevel.h/cpp        — Niveaux (TRACE, DEBUG, INFO, WARN, ERROR…)
-    #   LogMessage.h/cpp      — Message de log (timestamp, thread, niveau…)
-    #   Formatter.h/cpp       — Formatage des messages (patterns)
-    #   Pattern.h             — Syntaxe des patterns de format
-    #   Registry.h/cpp        — Registre global des loggers nommés
-    #   Sink.h                — Interface ISink (destinations)
+    #   Logger.h/cpp          â€” Logger principal (point d'entrÃ©e)
+    #   Log.h/cpp             â€” Macros NK_LOG_*, fonctions de log globales
+    #   AsyncLogger.h/cpp     â€” Logger asynchrone (file d'attente thread-safe)
+    #   LogLevel.h/cpp        â€” Niveaux (TRACE, DEBUG, INFO, WARN, ERRORâ€¦)
+    #   LogMessage.h/cpp      â€” Message de log (timestamp, thread, niveauâ€¦)
+    #   Formatter.h/cpp       â€” Formatage des messages (patterns)
+    #   Pattern.h             â€” Syntaxe des patterns de format
+    #   Registry.h/cpp        â€” Registre global des loggers nommÃ©s
+    #   Sink.h                â€” Interface ISink (destinations)
     #   Sinks/
-    #     ConsoleSink         — Sortie console (ANSI couleurs)
-    #     FileSink            — Fichier texte simple
-    #     RotatingFileSink    — Fichier avec rotation par taille
-    #     DailyFileSink       — Fichier avec rotation quotidienne
-    #     AsyncSink           — Sink asynchrone (wraps un sink sync)
-    #     DistributingSink    — Dispatche vers plusieurs sinks
-    #     NullSink            — Sink /dev/null (tests, benchmarks)
+    #     ConsoleSink         â€” Sortie console (ANSI couleurs)
+    #     FileSink            â€” Fichier texte simple
+    #     RotatingFileSink    â€” Fichier avec rotation par taille
+    #     DailyFileSink       â€” Fichier avec rotation quotidienne
+    #     AsyncSink           â€” Sink asynchrone (wraps un sink sync)
+    #     DistributingSink    â€” Dispatche vers plusieurs sinks
+    #     NullSink            â€” Sink /dev/null (tests, benchmarks)
     #   Filters/
-    #     LevelFilter         — Filtre par niveau minimum
-    #     PatternFilter       — Filtre par pattern (regex)
-    #     ThreadFilter        — Filtre par thread ID
+    #     LevelFilter         â€” Filtre par niveau minimum
+    #     PatternFilter       â€” Filtre par pattern (regex)
+    #     ThreadFilter        â€” Filtre par thread ID
     # =========================================================================
 
     with project("NKLogger"):
@@ -325,9 +356,9 @@ with workspace("NKWindow", location="."):
         objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
         targetdir("%{wks.location}/Build/Lib/%{cfg.buildcfg}-%{cfg.system}")
 
-        # Liaison des bibliothèques système pour le threading
+        # Liaison des bibliothÃ¨ques systÃ¨me pour le threading
         with filter("system:Windows"):
-            usetoolchain("clang-mingw")
+            usetoolchain(TC_WINDOWS)
         with filter("system:Linux"):
             links(["pthread"])
         with filter("system:macOS"):
@@ -350,48 +381,48 @@ with workspace("NKWindow", location="."):
             symbols(False)
 
     # =========================================================================
-    # NKWindow — Fenêtrage, événements, caméra 2D, rendu pixel (C++17)
+    # NKWindow â€” FenÃªtrage, Ã©vÃ©nements, camÃ©ra 2D, rendu pixel (C++17)
     # =========================================================================
-    # NKWindow est la bibliothèque principale du framework. Elle gère tout ce
-    # qui touche à la fenêtre, aux entrées et au rendu pixel.
+    # NKWindow est la bibliothÃ¨que principale du framework. Elle gÃ¨re tout ce
+    # qui touche Ã  la fenÃªtre, aux entrÃ©es et au rendu pixel.
     #
     # Contenu (src/NKWindow/) :
     #
     #   Core/
-    #     NkWindow.h/cpp          — Fenêtre principale (façade PIMPL → IWindowImpl)
-    #     NkEvent.h/cpp           — Événement générique polymorphe
-    #     NkEventSystem.h/cpp     — Dispatcher d'événements (singleton)
-    #     NkRenderer.h/cpp        — Renderer pixels (façade PIMPL → IRendererImpl)
-    #     NkSystem.h/cpp          — Initialisation/destruction du framework
-    #     NkGamepadSystem.h/cpp   — Gestion des manettes / joysticks
-    #     NkCamera2D.h            — Caméra 2D (pan, zoom, shake, view matrix)
-    #     NkDialogs.h/cpp         — Boîtes de dialogue fichiers cross-platform
-    #     NkSurface.h             — Surface de rendu (taille, DPI, handle)
-    #     NkSafeArea.h            — Safe area mobile (encoches, bords)
-    #     NkEntry.h / NkMain.h    — Point d'entrée cross-platform (nkmain)
-    #     NkTypes.h               — Types géométriques (NkVec2, NkRect, NkColor…)
-    #     Events/                 — Types d'événements typés (clavier, souris…)
-    #     Camera/                 — Interface + backends caméra par plateforme
+    #     NkWindow.h/cpp          â€” FenÃªtre principale (faÃ§ade PIMPL â†’ IWindowImpl)
+    #     NkEvent.h/cpp           â€” Ã‰vÃ©nement gÃ©nÃ©rique polymorphe
+    #     NkEventSystem.h/cpp     â€” Dispatcher d'Ã©vÃ©nements (singleton)
+    #     NkRenderer.h/cpp        â€” Renderer pixels (faÃ§ade PIMPL â†’ IRendererImpl)
+    #     NkSystem.h/cpp          â€” Initialisation/destruction du framework
+    #     NkGamepadSystem.h/cpp   â€” Gestion des manettes / joysticks
+    #     NkCamera2D.h            â€” (deprecated temporairement)
+    #     NkDialogs.h/cpp         â€” BoÃ®tes de dialogue fichiers cross-platform
+    #     NkSurface.h             â€” Surface de rendu (taille, DPI, handle)
+    #     NkSafeArea.h            â€” Safe area mobile (encoches, bords)
+    #     NkEntry.h / NkMain.h    â€” Point d'entrÃ©e cross-platform (nkmain)
+    #     NkTypes.h               â€” Types gÃ©omÃ©triques (NkVec2, NkRect, NkColorâ€¦)
+    #     Events/                 â€” Types d'Ã©vÃ©nements typÃ©s (clavier, sourisâ€¦)
+    #     Camera/                 â€” (deprecated temporairement)
     #
     #   Platform/
-    #     Win32/      — Backend Windows (HWND, WndProc, DirectInput, XInput)
-    #     XLib/       — Backend Linux X11 (Xlib, XInput2)
-    #     XCB/        — Backend Linux XCB (alternatif à XLib)
-    #     Noop/       — Backend headless (tests, CI, WSL sans affichage)
-    #     Cocoa/      — Backend macOS (.mm Objective-C++)
-    #     UIKit/      — Backend iOS   (.mm Objective-C++)
-    #     Android/    — Backend Android (NativeActivity + EGL + camera2ndk)
-    #     WASM/       — Backend Web (Emscripten + Canvas API)
-    #     UWP/        — Backend Universal Windows Platform (Xbox)
+    #     Win32/      â€” Backend Windows (HWND, WndProc, DirectInput, XInput)
+    #     XLib/       â€” Backend Linux X11 (Xlib, XInput2)
+    #     XCB/        â€” Backend Linux XCB (alternatif Ã  XLib)
+    #     Noop/       â€” Backend headless (tests, CI, WSL sans affichage)
+    #     Cocoa/      â€” Backend macOS (.mm Objective-C++)
+    #     UIKit/      â€” Backend iOS   (.mm Objective-C++)
+    #     Android/    â€” Backend Android (NativeActivity + EGL)
+    #     WASM/       â€” Backend Web (Emscripten + Canvas API)
+    #     UWP/        â€” Backend Universal Windows Platform (Xbox)
     #
     #   Renderer/
-    #     Software/   — Rendu pixel software (NkSoftwareRendererImpl)
-    #                   SetPixel, DrawLine, FillRect, DrawCircle, FillTriangle…
-    #                   C'est le seul système de rendu disponible pour l'instant.
-    #                   Les étudiants ajouteront OpenGL, Vulkan, Metal…
+    #     Software/   â€” Rendu pixel software (NkSoftwareRendererImpl)
+    #                   SetPixel, DrawLine, FillRect, DrawCircle, FillTriangleâ€¦
+    #                   C'est le seul systÃ¨me de rendu disponible pour l'instant.
+    #                   Les Ã©tudiants ajouteront OpenGL, Vulkan, Metalâ€¦
     #
     #   EntryPoints/
-    #     Macros et adaptateurs d'entrée pour chaque plateforme (main → nkmain)
+    #     Macros et adaptateurs d'entrÃ©e pour chaque plateforme (main â†’ nkmain)
     # =========================================================================
 
     with project("NKWindow"):
@@ -406,8 +437,8 @@ with workspace("NKWindow", location="."):
             "../Externals",                 # stb, etc.
             "../NKCore/src",                # Types + macros fondamentaux
             "../NKCore/pch",                # pch NKCore
-            "../NKPlatform/src",            # Détection plateforme/architecture
-            "../NKPlatform/src/NKPlatform", # NkPlatformDetect.h, NkCompilerDetect.h…
+            "../NKPlatform/src",            # DÃ©tection plateforme/architecture
+            "../NKPlatform/src/NKPlatform", # NkPlatformDetect.h, NkCompilerDetect.hâ€¦
             "../NKLogger/src",              # Journalisation
         ])
         pchheader("pch/pch.h")
@@ -415,7 +446,7 @@ with workspace("NKWindow", location="."):
 
         dependson(["NKPlatform", "NKCore", "NKLogger"])
 
-        # Fichiers communs (Core + Renderer — partagés par toutes les plateformes)
+        # Fichiers communs (Core + Renderer â€” partagÃ©s par toutes les plateformes)
         files([
             "src/NKWindow/Core/**.cpp",
             "src/NKWindow/Core/**.h",
@@ -426,9 +457,9 @@ with workspace("NKWindow", location="."):
         objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
         targetdir("%{wks.location}/Build/Lib/%{cfg.buildcfg}-%{cfg.system}")
 
-        # ── Windows (Win32 backend) ────────────────────────────────────────
+        # â”€â”€ Windows (Win32 backend) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Windows"):
-            usetoolchain("clang-mingw")
+            usetoolchain(TC_WINDOWS)
             defines([
                 "NKENTSEU_PLATFORM_WIN32=1",
                 "NKENTSEU_FAMILY_WINDOWS=1",
@@ -446,7 +477,7 @@ with workspace("NKWindow", location="."):
                 "uuid", "ole32",
             ])
 
-        # ── Linux headless / NOOP (CI, serveurs, WSL sans écran) ─────────────
+        # â”€â”€ Linux headless / NOOP (CI, serveurs, WSL sans Ã©cran) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Linux && options:linux-backend=headless || system:Linux && options:headless"):
             defines(["NKENTSEU_PLATFORM_NOOP=1", "NKENTSEU_FAMILY_LINUX=1"])
             objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}-headless/%{prj.name}")
@@ -457,7 +488,7 @@ with workspace("NKWindow", location="."):
             ])
             links(["pthread"])
 
-        # ── Linux XLib (X11/XLib — défaut) ────────────────────────────────
+        # â”€â”€ Linux XLib (X11/XLib â€” dÃ©faut) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Linux && options:linux-backend=xlib || system:Linux && !options:linux-backend && !options:headless"):
             defines(["NKENTSEU_PLATFORM_XLIB=1", "NKENTSEU_FAMILY_LINUX=1"])
             files([
@@ -467,7 +498,7 @@ with workspace("NKWindow", location="."):
             ])
             links(["pthread", "X11"])
 
-        # ── Linux XCB (X11/XCB — asynchrone) ──────────────────────────────
+        # â”€â”€ Linux XCB (X11/XCB â€” asynchrone) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Linux && options:linux-backend=xcb"):
             defines(["NKENTSEU_PLATFORM_XCB=1", "NKENTSEU_FAMILY_LINUX=1"])
             files([
@@ -477,9 +508,9 @@ with workspace("NKWindow", location="."):
             ])
             links(["pthread", "xcb", "xcb-icccm", "xcb-randr", "X11-xcb"])
 
-        # ── Linux Wayland (compositeurs modernes sans X11) ─────────────────
-        # Prérequis : libwayland-dev, libxkbcommon-dev, wayland-protocols
-        # Générer xdg-shell-client-protocol.h avant de compiler :
+        # â”€â”€ Linux Wayland (compositeurs modernes sans X11) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # PrÃ©requis : libwayland-dev, libxkbcommon-dev, wayland-protocols
+        # GÃ©nÃ©rer xdg-shell-client-protocol.h avant de compiler :
         #   wayland-scanner client-header \
         #     /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml \
         #     NKWindow/src/NKWindow/Platform/Wayland/xdg-shell-client-protocol.h
@@ -493,7 +524,7 @@ with workspace("NKWindow", location="."):
             ])
             links(["pthread", "wayland-client", "xkbcommon"])
 
-        # ── macOS (Cocoa backend) ──────────────────────────────────────────
+        # â”€â”€ macOS (Cocoa backend) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:macOS"):
             usetoolchain("clang-native")
             defines([
@@ -507,7 +538,7 @@ with workspace("NKWindow", location="."):
             ])
             frameworks(["Cocoa", "QuartzCore", "OpenGL", "Metal"])
 
-        # ── Android (NativeActivity + EGL + caméra) ────────────────────────
+        # â”€â”€ Android (NativeActivity + EGL) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Android"):
             usetoolchain("android-ndk")
             defines([
@@ -518,16 +549,16 @@ with workspace("NKWindow", location="."):
                 "src/NKWindow/Platform/Android/**.cpp",
                 "src/NKWindow/Platform/Android/**.h",
             ])
-            links(["android", "log", "EGL", "GLESv3", "camera2ndk", "mediandk"])
+            links(["android", "log", "EGL", "GLESv3"])
             androidapplicationid("com.nkentseu.nkwindow")
             androidminsdk(24)
             androidtargetsdk(34)
             androidcompilesdk(34)
-            # Couvre physiques ARM + émulateurs x86
+            # Couvre physiques ARM + Ã©mulateurs x86
             androidabis(["armeabi-v7a", "arm64-v8a", "x86", "x86_64"])
             androidnativeactivity(True)
 
-        # ── iOS (UIKit backend) ────────────────────────────────────────────
+        # â”€â”€ iOS (UIKit backend) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:iOS"):
             defines([
                 "NKENTSEU_PLATFORM_UIKIT=1",
@@ -544,7 +575,7 @@ with workspace("NKWindow", location="."):
             iosminsdk("14.0")
             iosbuildnumber(1)
 
-        # ── Web (Emscripten + Canvas) ──────────────────────────────────────
+        # â”€â”€ Web (Emscripten + Canvas) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Web"):
             usetoolchain("emscripten")
             defines([
@@ -557,8 +588,8 @@ with workspace("NKWindow", location="."):
             ])
             emscripteninitialmemory(32)  # 32 MB initial
 
-        # ── HarmonyOS (ArkUI Native — backend NOOP en attendant) ───────────
-        # Le backend dédié HarmonyOS est à implémenter.
+        # â”€â”€ HarmonyOS (ArkUI Native â€” backend NOOP en attendant) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Le backend dÃ©diÃ© HarmonyOS est Ã  implÃ©menter.
         with filter("system:HarmonyOS"):
             defines([
                 "NKENTSEU_PLATFORM_HARMONYOS=1",
@@ -569,9 +600,9 @@ with workspace("NKWindow", location="."):
             ])
             links(["log", "EGL", "GLESv3"])
 
-        # ── Xbox Series X/S et Xbox One (UWP / GameCore backend) ──────────
-        # Le backend UWP fournit la fenêtre et les manettes via XInput/GameInput.
-        # Le rendu pixel est géré par le software renderer (NkSoftwareRendererImpl).
+        # â”€â”€ Xbox Series X/S et Xbox One (UWP / GameCore backend) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # Le backend UWP fournit la fenÃªtre et les manettes via XInput/GameInput.
+        # Le rendu pixel est gÃ©rÃ© par le software renderer (NkSoftwareRendererImpl).
         with filter("system:XboxSeries || system:XboxOne"):
             usetoolchain("xbox-clang")
             defines([
@@ -585,7 +616,7 @@ with workspace("NKWindow", location="."):
             ])
             links(["d3d12", "dxgi", "dxguid", "xgameruntime"])
 
-        # ── Configurations Debug / Release ─────────────────────────────────
+        # â”€â”€ Configurations Debug / Release â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("config:Debug"):
             defines(["_DEBUG", "DEBUG"])
             optimize("Off")
@@ -601,19 +632,19 @@ with workspace("NKWindow", location="."):
                 testfiles(["tests/**.cpp"])
 
     # =========================================================================
-    # Sandbox — Application de démonstration multi-plateformes
+    # Sandbox â€” Application de dÃ©monstration multi-plateformes
     # =========================================================================
-    # La Sandbox illustre l'utilisation complète du framework NKWindow :
-    #   • Création de fenêtre et boucle principale cross-platform
-    #   • Gestion des événements : clavier, souris, touch, drag & drop
-    #   • Rendu pixel software : pixels, lignes, cercles, rectangles, triangles
-    #   • Caméra 2D : pan, zoom, shake, view matrix
-    #   • Gamepad : boutons, axes, rumble (XInput / Linux / HID)
-    #   • Safe area : gestion des encoches et bords mobiles
-    #   • Transforms 2D : rotation, scale, translation avec matrice
+    # La Sandbox illustre l'utilisation complÃ¨te du framework NKWindow :
+    #   â€¢ CrÃ©ation de fenÃªtre et boucle principale cross-platform
+    #   â€¢ Gestion des Ã©vÃ©nements : clavier, souris, touch, drag & drop
+    #   â€¢ Rendu pixel software : pixels, lignes, cercles, rectangles, triangles
+    #   â€¢ CamÃ©ra 2D : retirÃ©e du workflow par dÃ©faut
+    #   â€¢ Gamepad : boutons, axes, rumble (XInput / Linux / HID)
+    #   â€¢ Safe area : gestion des encoches et bords mobiles
+    #   â€¢ Transforms 2D : retirÃ©s pour simplifier l'API de base
     #
     # Un seul fichier src/main.cpp compile pour TOUTES les plateformes.
-    # Le point d'entrée natif (WinMain, main, android_main, etc.) est
+    # Le point d'entrÃ©e natif (WinMain, main, android_main, etc.) est
     # abstrait par les macros NkEntry.h / NkMain.h de NKWindow.
     # =========================================================================
 
@@ -630,27 +661,28 @@ with workspace("NKWindow", location="."):
 
         includedirs([
             "../NKWindow/src",     # API publique NKWindow (NkWindow.h, etc.)
-            "../NKCore/src",       # Types fondamentaux (NkTypes, NkMacros…)
+            "../NKCore/src",       # Types fondamentaux (NkTypes, NkMacrosâ€¦)
             "../NKCore/pch",       # pch NKCore
-            "../NKPlatform/src",   # Détection de plateforme
+            "../NKPlatform/src",   # DÃ©tection de plateforme
             "../NKPlatform/src/NKPlatform", # NkPlatformDetect.h (include public de NkWindow.h)
-            "../NKLogger/src",     # Journalisation (Logger.h, Log.h…)
-            "../Externals",        # stb et autres dépendances header-only
+            "../NKLogger/src",     # Journalisation (Logger.h, Log.hâ€¦)
+            "../Externals",        # stb et autres dÃ©pendances header-only
         ])
 
-        # Lier toutes les bibliothèques du framework
+        # Lier toutes les bibliothÃ¨ques du framework
         links(["NKWindow", "NKLogger", "NKCore", "NKPlatform"])
         dependson(["NKWindow", "NKLogger", "NKCore", "NKPlatform"])
 
         objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
         targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
 
-        # ── Windows ────────────────────────────────────────────────────────
+        # â”€â”€ Windows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Windows"):
             windowedapp()
-            usetoolchain("clang-mingw")
+            usetoolchain(TC_WINDOWS)
             defines([
                 "NKENTSEU_PLATFORM_WIN32=1",
+                "NKENTSEU_FAMILY_WINDOWS=1",
                 "WIN32_LEAN_AND_MEAN",
                 "_UNICODE", "UNICODE",
             ])
@@ -660,7 +692,7 @@ with workspace("NKWindow", location="."):
                 "uuid", "ole32",
             ])
 
-        # ── Linux headless ─────────────────────────────────────────────────
+        # â”€â”€ Linux headless â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Linux && options:linux-backend=headless || system:Linux && options:headless"):
             windowedapp()
             usetoolchain("clang-native")
@@ -669,40 +701,40 @@ with workspace("NKWindow", location="."):
             targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}-headless/%{prj.name}")
             links(["pthread"])
 
-        # ── Linux XLib ─────────────────────────────────────────────────────
+        # â”€â”€ Linux XLib â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Linux && options:linux-backend=xlib || system:Linux && !options:linux-backend && !options:headless"):
             windowedapp()
             usetoolchain("clang-native")
             defines(["NKENTSEU_PLATFORM_XLIB=1"])
             links(["pthread", "X11"])
 
-        # ── Linux XCB ──────────────────────────────────────────────────────
+        # â”€â”€ Linux XCB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Linux && options:linux-backend=xcb"):
             windowedapp()
             usetoolchain("clang-native")
             defines(["NKENTSEU_PLATFORM_XCB=1"])
             links(["pthread", "xcb", "xcb-icccm", "xcb-randr", "X11-xcb"])
 
-        # ── Linux Wayland ──────────────────────────────────────────────────
+        # â”€â”€ Linux Wayland â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Linux && options:linux-backend=wayland"):
             windowedapp()
             usetoolchain("clang-native")
             defines(["NKENTSEU_PLATFORM_WAYLAND=1"])
             links(["pthread", "wayland-client", "xkbcommon"])
 
-        # ── macOS ──────────────────────────────────────────────────────────
+        # â”€â”€ macOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:macOS"):
             windowedapp()
             usetoolchain("clang-native")
             defines(["NKENTSEU_PLATFORM_COCOA=1"])
             frameworks(["Cocoa", "QuartzCore", "OpenGL"])
 
-        # ── Android ────────────────────────────────────────────────────────
+        # â”€â”€ Android â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Android"):
             windowedapp()
             usetoolchain("android-ndk")
             defines(["NKENTSEU_PLATFORM_ANDROID=1"])
-            links(["android", "log", "EGL", "GLESv3", "camera2ndk", "mediandk"])
+            links(["android", "log", "EGL", "GLESv3"])
             androidapplicationid("com.nkentseu.sandbox")
             androidminsdk(24)
             androidtargetsdk(34)
@@ -710,7 +742,7 @@ with workspace("NKWindow", location="."):
             androidabis(["armeabi-v7a", "arm64-v8a", "x86", "x86_64"])
             androidnativeactivity(True)
 
-        # ── iOS ────────────────────────────────────────────────────────────
+        # â”€â”€ iOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:iOS"):
             windowedapp()
             defines(["NKENTSEU_PLATFORM_UIKIT=1"])
@@ -720,7 +752,7 @@ with workspace("NKWindow", location="."):
             iosminsdk("14.0")
             iosbuildnumber(1)
 
-        # ── Web ────────────────────────────────────────────────────────────
+        # â”€â”€ Web â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:Web"):
             consoleapp()
             usetoolchain("emscripten")
@@ -730,13 +762,13 @@ with workspace("NKWindow", location="."):
             # Boucle principale synchrone (style SDL_Delay) sur le navigateur
             emscriptenextraflags(["-s", "ASYNCIFY"])
 
-        # ── HarmonyOS ──────────────────────────────────────────────────────
+        # â”€â”€ HarmonyOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:HarmonyOS"):
             windowedapp()
             defines(["NKENTSEU_PLATFORM_HARMONYOS=1"])
             links(["log", "EGL", "GLESv3"])
 
-        # ── Xbox Series X/S et Xbox One ─────────────────────────────────────
+        # â”€â”€ Xbox Series X/S et Xbox One â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("system:XboxSeries || system:XboxOne"):
             windowedapp()
             usetoolchain("xbox-clang")
@@ -747,7 +779,7 @@ with workspace("NKWindow", location="."):
             ])
             links(["d3d12", "dxgi", "dxguid", "xgameruntime"])
 
-        # ── Configurations Debug / Release ─────────────────────────────────
+        # â”€â”€ Configurations Debug / Release â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         with filter("config:Debug"):
             defines(["_DEBUG"])
             optimize("Off")
@@ -756,3 +788,4 @@ with workspace("NKWindow", location="."):
             defines(["NDEBUG"])
             optimize("Speed")
             symbols(False)
+

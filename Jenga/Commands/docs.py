@@ -1700,7 +1700,22 @@ Formats supportés:
                 return 1
         workspace_root = entry_file.parent
         loader = Loader()
-        return loader.LoadWorkspace(str(entry_file))
+        workspace = loader.LoadWorkspace(str(entry_file))
+        if not workspace:
+            return workspace
+
+        # Normalize workspace location for path comparisons. Some loaders keep
+        # "." in workspace.location, which incorrectly marks all projects as
+        # external in docs extraction.
+        try:
+            ws_loc = Path(getattr(workspace, "location", "") or "")
+            if not ws_loc.is_absolute():
+                ws_loc = (entry_file.parent / ws_loc).resolve()
+            workspace.location = ws_loc
+        except Exception:
+            workspace.location = entry_file.parent.resolve()
+
+        return workspace
 
     @staticmethod
     def _cmd_extract(args):
@@ -1726,21 +1741,22 @@ Formats supportés:
         print()
         
         stats = {'success': 0, 'failed': 0, 'skipped': 0}
+        workspace_dir = Path(workspace.location).resolve()
         
         for project_name in projects:
             project = workspace.projects[project_name]
             project_dir = Path(project.location)
             if not project_dir.is_absolute():
-                project_dir = workspace.location / project_dir
+                project_dir = workspace_dir / project_dir
             
             try:
-                project_dir.relative_to(workspace.location)
+                project_dir.resolve().relative_to(workspace_dir)
             except ValueError:
                 Display.Warning(f"⚠️  Externe: {project_name}")
                 stats['skipped'] += 1
                 continue
             
-            result = DocsCommand._extract_project(project_name, project, workspace.location, args)
+            result = DocsCommand._extract_project(project_name, project, workspace_dir, args)
             if result:
                 stats['success'] += 1
             else:

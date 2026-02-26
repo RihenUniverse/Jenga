@@ -97,7 +97,7 @@ class BenchCommand:
             return 1
 
         # Build le projet
-        from .build import BuildCommand
+        from .Build import BuildCommand
         build_args = ["--config", parsed.config, "--action", "bench", "--target", project_name]
         if parsed.platform:
             build_args += ["--platform", parsed.platform]

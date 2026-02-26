@@ -1,22 +1,20 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Toolchains – Détection automatique et gestion des toolchains.
-Fournit des méthodes pour :
-  - Détecter les compilateurs installés (MSVC, GCC, Clang, Android NDK, Emscripten, MinGW)
-  - Créer des objets Toolchain correspondants
-  - Résoudre la toolchain à utiliser pour une cible donnée
+Toolchains â€“ DÃ©tection automatique et gestion des toolchains.
+Fournit des mÃ©thodes pour :
+  - DÃ©tecter les compilateurs installÃ©s (MSVC, GCC, Clang, Android NDK, Emscripten, MinGW)
+  - CrÃ©er des objets Toolchain correspondants
+  - RÃ©soudre la toolchain Ã  utiliser pour une cible donnÃ©e
 """
 
 import os
 import sys
-import shutil
-import re
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any
 
 from Jenga.Core.Api import Toolchain, CompilerFamily, TargetOS, TargetArch, TargetEnv
-from ..Utils import Process, FileSystem
+from ..Utils import Process
 from .Platform import Platform
 from .GlobalToolchains import GetJengaRoot
 
@@ -24,7 +22,7 @@ from .GlobalToolchains import GetJengaRoot
 class ToolchainManager:
     """
     Gestionnaire global de toolchains.
-    Peut être instancié pour un workspace ou utilisé statiquement.
+    Peut Ãªtre instanciÃ© pour un workspace ou utilisÃ© statiquement.
     """
 
     def __init__(self, workspace: Optional[Any] = None):
@@ -64,36 +62,72 @@ class ToolchainManager:
             deduped.append(p)
         return deduped
 
-    # -----------------------------------------------------------------------
-    # Détection des compilateurs hôtes – priorité : Clang > GCC > MSVC
-    # -----------------------------------------------------------------------
+    @staticmethod
+    def _FirstRunnable(candidates: List[str], version_arg: str = "--version") -> Optional[str]:
+        for name in candidates:
+            path = Process.Which(name)
+            if not path:
+                continue
+            try:
+                probe = Process.ExecuteCommand([path, version_arg], captureOutput=True, silent=True)
+                if probe.returnCode == 0:
+                    return path
+            except Exception:
+                continue
+        return None
 
     @staticmethod
-    def DetectHostCC() -> Optional[Toolchain]:
-        """Détecte le compilateur C par défaut sur le système."""
-        def _first_runnable(candidates: List[str]) -> Optional[str]:
-            for name in candidates:
-                p = Process.Which(name)
-                if not p:
-                    continue
-                try:
-                    probe = Process.ExecuteCommand([p, "--version"], captureOutput=True, silent=True)
-                    if probe.returnCode == 0:
-                        return p
-                except Exception:
-                    continue
-            return None
+    def _AddToolchainIfValid(toolchains: Dict[str, Toolchain], tc: Optional[Toolchain]) -> None:
+        if tc is None or not tc.name:
+            return
+        if tc.name not in toolchains:
+            toolchains[tc.name] = tc
 
-        cc_path = _first_runnable(["clang", "gcc", "cc", "zig-cc"])
+    @staticmethod
+    def _CloneToolchainWithName(base: Toolchain, name: str) -> Toolchain:
+        clone = Toolchain(
+            name=name,
+            compilerFamily=base.compilerFamily,
+            targetOs=base.targetOs,
+            targetArch=base.targetArch,
+            targetEnv=base.targetEnv,
+            targetTriple=base.targetTriple,
+            sysroot=base.sysroot,
+            ccPath=base.ccPath,
+            cxxPath=base.cxxPath,
+            arPath=base.arPath,
+            ldPath=base.ldPath,
+            stripPath=base.stripPath,
+            ranlibPath=base.ranlibPath,
+            asmPath=base.asmPath,
+            toolchainDir=base.toolchainDir,
+        )
+        clone.defines = list(base.defines or [])
+        clone.cflags = list(base.cflags or [])
+        clone.cxxflags = list(base.cxxflags or [])
+        clone.asmflags = list(base.asmflags or [])
+        clone.ldflags = list(base.ldflags or [])
+        clone.arflags = list(base.arflags or [])
+        clone.frameworks = list(base.frameworks or [])
+        clone.frameworkPaths = list(base.frameworkPaths or [])
+        clone.perConfigFlags = dict(base.perConfigFlags or {})
+        return clone
+
+    # -----------------------------------------------------------------------
+    # DÃ©tection des compilateurs hÃ´tes â€“ prioritÃ© : Clang > GCC > MSVC
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def _BuildHostToolchain(name: str, cc_path: str, cxx_candidates: List[str]) -> Optional[Toolchain]:
         if not cc_path:
             return None
-
-        cxx_path = _first_runnable(["clang++", "g++", "c++", "zig-c++"]) or cc_path
-        ar_path = Process.Which("llvm-ar") or Process.Which("ar")
-        ld_path = Process.Which("ld") or cc_path
+        cxx_path = ToolchainManager._FirstRunnable(cxx_candidates) or cc_path
+        if Platform.GetHostOS() == TargetOS.MACOS:
+            ar_path = Process.Which("ar") or Process.Which("llvm-ar")
+        else:
+            ar_path = Process.Which("llvm-ar") or Process.Which("ar")
+        ld_path = Process.Which("ld") or cxx_path or cc_path
 
         family = ToolchainManager._DetectCompilerFamily(cc_path)
-        name = f"host-{family.value}"
         tc = Toolchain(
             name=name,
             compilerFamily=family,
@@ -104,75 +138,141 @@ class ToolchainManager:
         )
         tc.targetOs = Platform.GetHostOS()
         tc.targetArch = Platform.GetHostArchitecture()
+        tc.targetEnv = Platform.GetHostEnvironment()
 
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             if family == CompilerFamily.GCC:
                 tc.targetEnv = TargetEnv.MINGW
             elif family == CompilerFamily.CLANG:
                 cc_low = (cc_path or "").lower()
-                # MSYS2/UCRT/MinGW clang should default to MinGW ABI.
                 if any(token in cc_low for token in ("msys64", "mingw", "ucrt")):
                     tc.targetEnv = TargetEnv.MINGW
-                elif not Process.Which("clang-cl"):
-                    tc.targetEnv = TargetEnv.MINGW
-                else:
+                elif Process.Which("clang-cl"):
                     tc.targetEnv = TargetEnv.MSVC
-            else:
-                tc.targetEnv = Platform.GetHostEnvironment()
-        else:
-            tc.targetEnv = Platform.GetHostEnvironment()
+                else:
+                    tc.targetEnv = TargetEnv.MINGW
+            elif family == CompilerFamily.MSVC:
+                tc.targetEnv = TargetEnv.MSVC
         return tc
 
     @staticmethod
+    def DetectHostClang() -> Optional[Toolchain]:
+        cc_path = ToolchainManager._FirstRunnable(["clang", "clang-18", "clang-17", "cc"])
+        if not cc_path:
+            return None
+        family = ToolchainManager._DetectCompilerFamily(cc_path)
+        if family not in (CompilerFamily.CLANG, CompilerFamily.APPLE_CLANG):
+            return None
+        return ToolchainManager._BuildHostToolchain(
+            name=f"host-{family.value}",
+            cc_path=cc_path,
+            cxx_candidates=["clang++", "c++"],
+        )
+
+    @staticmethod
+    def DetectHostGCC() -> Optional[Toolchain]:
+        cc_path = ToolchainManager._FirstRunnable(["gcc"])
+        if not cc_path:
+            return None
+        family = ToolchainManager._DetectCompilerFamily(cc_path)
+        if family != CompilerFamily.GCC:
+            return None
+        return ToolchainManager._BuildHostToolchain(
+            name="host-gcc",
+            cc_path=cc_path,
+            cxx_candidates=["g++", "c++"],
+        )
+
+    @staticmethod
+    def DetectHostCC() -> Optional[Toolchain]:
+        """Detect the default host C/C++ toolchain."""
+        return (
+            ToolchainManager.DetectHostClang()
+            or ToolchainManager.DetectHostGCC()
+            or ToolchainManager._BuildHostToolchain(
+                name="host-cc",
+                cc_path=ToolchainManager._FirstRunnable(["cc", "zig-cc"]) or "",
+                cxx_candidates=["c++", "zig-c++"],
+            )
+        )
+    @staticmethod
     def DetectMSVC() -> Optional[Toolchain]:
-        """Détecte Visual Studio / MSVC (Windows uniquement). Retourne une toolchain incomplète."""
+        """Detect MSVC from the active environment or Visual Studio installation."""
         if sys.platform != "win32":
             return None
-        vswhere_path = Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) \
-                       / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
-        if vswhere_path.exists():
-            try:
-                result = Process.Capture([str(vswhere_path), "-latest", "-property", "installationPath"])
-                install_path = Path(result.strip())
-                vcvars = install_path / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
-                if vcvars.exists():
-                    tc = Toolchain(
-                        name="msvc",
-                        compilerFamily=CompilerFamily.MSVC,
-                        toolchainDir=str(vcvars.parent),
-                    )
-                    tc.targetOs = TargetOS.WINDOWS
-                    tc.targetArch = Platform.GetHostArchitecture()
-                    tc.targetEnv = TargetEnv.MSVC
-                    return tc
-            except:
-                pass
-        editions = ["Community", "Professional", "Enterprise", "BuildTools"]
-        years = ["2022", "2019", "2017"]
-        base = Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "Microsoft Visual Studio"
-        for year in years:
-            for edition in editions:
-                vcvars = base / year / edition / "VC" / "Auxiliary" / "Build" / "vcvarsall.bat"
-                if vcvars.exists():
-                    tc = Toolchain(
-                        name="msvc",
-                        compilerFamily=CompilerFamily.MSVC,
-                        toolchainDir=str(vcvars.parent),
-                    )
-                    tc.targetOs = TargetOS.WINDOWS
-                    tc.targetArch = Platform.GetHostArchitecture()
-                    tc.targetEnv = TargetEnv.MSVC
-                    return tc
+
+        cl_path = ToolchainManager._FirstRunnable(["cl", "cl.exe"], version_arg="/?")
+        link_path = Process.Which("link") or Process.Which("link.exe")
+        lib_path = Process.Which("lib") or Process.Which("lib.exe")
+
+        if cl_path:
+            tc = Toolchain(
+                name="msvc",
+                compilerFamily=CompilerFamily.MSVC,
+                ccPath=cl_path,
+                cxxPath=cl_path,
+                arPath=lib_path,
+                ldPath=link_path or cl_path,
+                toolchainDir=str(Path(cl_path).parent),
+            )
+            tc.targetOs = TargetOS.WINDOWS
+            tc.targetArch = Platform.GetHostArchitecture()
+            tc.targetEnv = TargetEnv.MSVC
+            return tc
+
+        vswhere_path = Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
+        if not vswhere_path.exists():
+            return None
+
+        try:
+            install_root = Process.Capture([str(vswhere_path), "-latest", "-property", "installationPath"]).strip()
+        except Exception:
+            return None
+
+        if not install_root:
+            return None
+
+        install_path = Path(install_root)
+        msvc_root = install_path / "VC" / "Tools" / "MSVC"
+        if not msvc_root.exists():
+            return None
+
+        host_arch = Platform.GetHostArchitecture()
+        host_bin = "Hostx64/x64" if host_arch == TargetArch.X86_64 else "Hostx86/x86"
+
+        versions = sorted([p for p in msvc_root.iterdir() if p.is_dir()], reverse=True)
+        for version_dir in versions:
+            bin_dir = version_dir / "bin" / Path(host_bin)
+            cl_candidate = bin_dir / "cl.exe"
+            if not cl_candidate.exists():
+                continue
+            link_candidate = bin_dir / "link.exe"
+            lib_candidate = bin_dir / "lib.exe"
+            tc = Toolchain(
+                name="msvc",
+                compilerFamily=CompilerFamily.MSVC,
+                ccPath=str(cl_candidate),
+                cxxPath=str(cl_candidate),
+                arPath=str(lib_candidate) if lib_candidate.exists() else None,
+                ldPath=str(link_candidate) if link_candidate.exists() else str(cl_candidate),
+                toolchainDir=str(version_dir),
+            )
+            tc.targetOs = TargetOS.WINDOWS
+            tc.targetArch = host_arch
+            tc.targetEnv = TargetEnv.MSVC
+            return tc
+
         return None
+
 
     @staticmethod
     def DetectClangOnWindows() -> Optional[Toolchain]:
-        """Détecte Clang sur Windows. clang-cl -> MSVC ABI, clang -> MinGW ABI."""
+        """DÃ©tecte Clang sur Windows. clang-cl -> MSVC ABI, clang -> MinGW ABI."""
         if sys.platform != "win32":
             return None
         # Prefer clang/clang++ MinGW-style toolchain (MSYS2/UCRT) when present.
-        clang_path = Process.Which("clang")
-        clangpp_path = Process.Which("clang++")
+        clang_path = ToolchainManager._FirstRunnable(["clang"])
+        clangpp_path = ToolchainManager._FirstRunnable(["clang++"])
         if clang_path and clangpp_path:
             tc = Toolchain(
                 name="clang-mingw",
@@ -187,7 +287,7 @@ class ToolchainManager:
             tc.targetEnv = TargetEnv.MINGW
             return tc
 
-        clang_cl_path = Process.Which("clang-cl")
+        clang_cl_path = ToolchainManager._FirstRunnable(["clang-cl"], version_arg="/?")
         if clang_cl_path:
             tc = Toolchain(
                 name="clang-cl",
@@ -205,13 +305,15 @@ class ToolchainManager:
 
     @staticmethod
     def DetectMinGW() -> Optional[Toolchain]:
-        """Détecte MinGW-w64 (gcc/g++ sous Windows)."""
+        """DÃ©tecte MinGW-w64 (gcc/g++ sous Windows)."""
         if sys.platform != "win32":
             return None
-        gcc_path = Process.Which("x86_64-w64-mingw32-gcc") or Process.Which("gcc")
+        gcc_path = ToolchainManager._FirstRunnable(["x86_64-w64-mingw32-gcc", "gcc"])
         if not gcc_path:
             return None
-        gpp_path = Process.Which("x86_64-w64-mingw32-g++") or Process.Which("g++")
+        if ToolchainManager._DetectCompilerFamily(gcc_path) != CompilerFamily.GCC:
+            return None
+        gpp_path = ToolchainManager._FirstRunnable(["x86_64-w64-mingw32-g++", "g++"])
         ar_path = Process.Which("x86_64-w64-mingw32-ar") or Process.Which("ar")
         tc = Toolchain(
             name="mingw",
@@ -229,8 +331,8 @@ class ToolchainManager:
     @staticmethod
     def DetectCrossWindows() -> Optional[Toolchain]:
         """
-        Détecte une toolchain de cross-compilation Windows depuis un hôte non-Windows.
-        Priorité :
+        DÃ©tecte une toolchain de cross-compilation Windows depuis un hÃ´te non-Windows.
+        PrioritÃ© :
           1) MinGW-w64 GCC (x86_64-w64-mingw32-*)
           2) Clang avec --target=x86_64-w64-windows-gnu
         """
@@ -255,7 +357,7 @@ class ToolchainManager:
             tc.targetTriple = "x86_64-w64-mingw32"
             return tc
 
-        # 2) Clang cross (si le target GNU Windows est supporté).
+        # 2) Clang cross (si le target GNU Windows est supportÃ©).
         clang_path = Process.Which("clang")
         clangxx_path = Process.Which("clang++")
         if clang_path and clangxx_path:
@@ -294,7 +396,7 @@ class ToolchainManager:
 
     @staticmethod
     def _DetectCompilerFamily(compiler_path: str) -> CompilerFamily:
-        """Détermine la famille du compilateur à partir de --version."""
+        """DÃ©termine la famille du compilateur Ã  partir de --version."""
         try:
             out = Process.Capture([compiler_path, "--version"])
             out_lower = out.lower()
@@ -316,7 +418,7 @@ class ToolchainManager:
 
     @staticmethod
     def DetectAndroidNDK(ndkPath: Optional[Path] = None) -> Optional[Toolchain]:
-        """Détecte le NDK Android et crée une toolchain générique."""
+        """DÃ©tecte le NDK Android et crÃ©e une toolchain gÃ©nÃ©rique."""
         if ndkPath is None:
             candidates = []
             if "ANDROID_NDK_ROOT" in os.environ:
@@ -369,7 +471,7 @@ class ToolchainManager:
 
     @staticmethod
     def DetectEmscripten(emsdkPath: Optional[Path] = None) -> Optional[Toolchain]:
-        """Détecte Emscripten SDK."""
+        """DÃ©tecte Emscripten SDK."""
         emcc_from_path = Process.Which("emcc")
         emcc_direct = Path(emcc_from_path) if emcc_from_path else None
         if emsdkPath is None:
@@ -439,7 +541,7 @@ class ToolchainManager:
 
     @staticmethod
     def DetectCrossLinuxOnWindows() -> Optional[Toolchain]:
-        """Détecte un cross-compilateur Linux sur Windows (GNU or clang --target)."""
+        """DÃ©tecte un cross-compilateur Linux sur Windows (GNU or clang --target)."""
         if sys.platform != "win32":
             return None
 
@@ -494,14 +596,61 @@ class ToolchainManager:
             except Exception:
                 pass
         return None
+    @staticmethod
+    def DetectZigToolchains() -> Dict[str, Toolchain]:
+        """Detect Zig wrapper toolchains (zig-cc/zig-c++/zig-ar)."""
+        zig_cc = ToolchainManager._FirstRunnable(["zig-cc"])
+        zig_cxx = ToolchainManager._FirstRunnable(["zig-c++"])
+        if not zig_cc or not zig_cxx:
+            return {}
+
+        zig_ar = ToolchainManager._FirstRunnable(["zig-ar"])
+        if not zig_ar:
+            zig_ar = Process.Which("llvm-ar") or Process.Which("ar")
+
+        detected: Dict[str, Toolchain] = {}
+
+        def _register(name: str,
+                      target_os: TargetOS,
+                      target_arch: TargetArch,
+                      target_env: Optional[TargetEnv],
+                      triple: str) -> None:
+            tc = Toolchain(
+                name=name,
+                compilerFamily=CompilerFamily.CLANG,
+                ccPath=zig_cc,
+                cxxPath=zig_cxx,
+                arPath=zig_ar,
+                ldPath=zig_cxx,
+            )
+            tc.targetOs = target_os
+            tc.targetArch = target_arch
+            if target_env is not None:
+                tc.targetEnv = target_env
+            tc.targetTriple = triple
+            tc.cflags.extend(["-target", triple])
+            tc.cxxflags.extend(["-target", triple])
+            tc.ldflags.extend(["-target", triple])
+            detected[name] = tc
+
+        _register("zig-linux-x86_64", TargetOS.LINUX, TargetArch.X86_64, TargetEnv.GNU, "x86_64-linux-gnu")
+        _register("zig-linux-x64", TargetOS.LINUX, TargetArch.X86_64, TargetEnv.GNU, "x86_64-linux-gnu")
+        _register("zig-windows-x86_64", TargetOS.WINDOWS, TargetArch.X86_64, TargetEnv.MINGW, "x86_64-windows-gnu")
+        _register("zig-windows-x64", TargetOS.WINDOWS, TargetArch.X86_64, TargetEnv.MINGW, "x86_64-windows-gnu")
+        _register("zig-macos-x86_64", TargetOS.MACOS, TargetArch.X86_64, TargetEnv.GNU, "x86_64-macos")
+        _register("zig-macos-arm64", TargetOS.MACOS, TargetArch.ARM64, TargetEnv.GNU, "aarch64-macos")
+        _register("zig-android-arm64", TargetOS.ANDROID, TargetArch.ARM64, TargetEnv.ANDROID, "aarch64-linux-android21")
+        _register("zig-web-wasm32", TargetOS.WEB, TargetArch.WASM32, None, "wasm32-wasi")
+
+        return detected
 
     # -----------------------------------------------------------------------
     # Interface publique
     # -----------------------------------------------------------------------
 
     def DetectAll(self, workspace: Optional[Any] = None) -> Dict[str, Toolchain]:
-        """Détecte toutes les toolchains disponibles et les retourne. Ordre de priorité : Clang, GCC, autres."""
-        toolchains = {}
+        """Detect all available toolchains for the current host and common targets."""
+        toolchains: Dict[str, Toolchain] = {}
         original_path = os.environ.get("PATH", "")
         old_compilers_env = os.environ.get("JENGA_COMPILERS_DIR")
         compilers_root = self._GetCompilersRoot(workspace)
@@ -512,42 +661,34 @@ class ToolchainManager:
             if compilers_root:
                 os.environ["JENGA_COMPILERS_DIR"] = str(compilers_root)
 
-            # 1. Clang hôte
-            host_cc = self.DetectHostCC()
-            if host_cc and host_cc.compilerFamily == CompilerFamily.CLANG:
-                toolchains[host_cc.name] = host_cc
-            # 2. Clang sur Windows (MinGW)
+            # 1) Host-native compilers.
+            self._AddToolchainIfValid(toolchains, self.DetectHostClang())
+            self._AddToolchainIfValid(toolchains, self.DetectHostGCC())
+            self._AddToolchainIfValid(toolchains, self.DetectHostCC())
+
+            # 2) Windows families.
             if sys.platform == "win32":
-                clang_win = self.DetectClangOnWindows()
-                if clang_win:
-                    toolchains[clang_win.name] = clang_win
-            # 3. GCC hôte
-            host_gcc = self.DetectHostCC()
-            if host_gcc and host_gcc.compilerFamily == CompilerFamily.GCC and host_gcc.name not in toolchains:
-                toolchains[host_gcc.name] = host_gcc
-            # 4. MinGW (gcc)
-            if sys.platform == "win32":
-                mingw = self.DetectMinGW()
-                if mingw and mingw.name not in toolchains:
-                    toolchains[mingw.name] = mingw
+                self._AddToolchainIfValid(toolchains, self.DetectMSVC())
+                self._AddToolchainIfValid(toolchains, self.DetectClangOnWindows())
+                self._AddToolchainIfValid(toolchains, self.DetectMinGW())
+                self._AddToolchainIfValid(toolchains, self.DetectCrossLinuxOnWindows())
             else:
-                cross_windows = self.DetectCrossWindows()
-                if cross_windows and cross_windows.name not in toolchains:
-                    toolchains[cross_windows.name] = cross_windows
-            # 5. Cross Linux on Windows
-            if sys.platform == "win32":
-                cross_linux = self.DetectCrossLinuxOnWindows()
-                if cross_linux and cross_linux.name not in toolchains:
-                    toolchains[cross_linux.name] = cross_linux
-            # 6. Android NDK
-            android = self.DetectAndroidNDK()
-            if android:
-                toolchains[android.name] = android
-            # 7. Emscripten
-            emscripten = self.DetectEmscripten()
-            if emscripten:
-                toolchains[emscripten.name] = emscripten
-            # MSVC n'est pas ajouté automatiquement (incomplet)
+                self._AddToolchainIfValid(toolchains, self.DetectCrossWindows())
+
+            # 3) SDK-managed toolchains.
+            self._AddToolchainIfValid(toolchains, self.DetectAndroidNDK())
+            self._AddToolchainIfValid(toolchains, self.DetectEmscripten())
+
+            # 4) Zig wrappers (if installed).
+            for zig_name, zig_tc in self.DetectZigToolchains().items():
+                self._AddToolchainIfValid(toolchains, zig_tc)
+
+            # 5) Compatibility aliases used by existing workspaces/examples.
+            if "zig-linux-x86_64" in toolchains and "zig-linux-x64" not in toolchains:
+                toolchains["zig-linux-x64"] = self._CloneToolchainWithName(toolchains["zig-linux-x86_64"], "zig-linux-x64")
+            if "zig-windows-x86_64" in toolchains and "zig-windows-x64" not in toolchains:
+                toolchains["zig-windows-x64"] = self._CloneToolchainWithName(toolchains["zig-windows-x86_64"], "zig-windows-x64")
+
             self._detected = toolchains
             return toolchains
         finally:
@@ -563,7 +704,7 @@ class ToolchainManager:
                          targetEnv: Optional[TargetEnv] = None,
                          prefer: Optional[List[str]] = None,
                          exclude: Optional[List[str]] = None) -> Optional[str]:
-        """Trouve la meilleure toolchain pour une cible donnée."""
+        """Trouve la meilleure toolchain pour une cible donnÃ©e."""
         exclude_set = {str(name).strip().lower() for name in (exclude or []) if str(name).strip()}
         use_cache = not exclude_set
         cache_key = (targetOs, targetArch, targetEnv)

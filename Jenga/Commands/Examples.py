@@ -312,8 +312,8 @@ class ExamplesCommand:
         # Footer with usage
         print(Colored.Colorize("─" * 100, color='cyan'))
         print(Colored.Colorize("Usage:", color='yellow', bold=True))
-        print(f"  {Colored.Colorize('jenga examples copy', color='green')} {Colored.Colorize('<example-id>', color='cyan')} {Colored.Colorize('<destination>', color='cyan')}")
-        print(f"  Example: {Colored.Colorize('jenga examples copy 01_hello_console ~/my-project', color='green')}")
+        print(f"  {Colored.Colorize('jenga examples copy', color='green')} {Colored.Colorize('<example-id>', color='cyan')} {Colored.Colorize('<destination-parent>', color='cyan')} [{Colored.Colorize('--name', color='yellow')} {Colored.Colorize('<new-name>', color='cyan')}]")
+        print(f"  Example: {Colored.Colorize('jenga examples copy 01_hello_console ~/projects --name hello_demo', color='green')}")
         print(Colored.Colorize("═" * 100, color='cyan', bold=True))
         print()
 
@@ -327,7 +327,8 @@ class ExamplesCommand:
             description="Copy an example project to a destination directory."
         )
         parser.add_argument("example_id", help="Example project ID (e.g., 01_hello_console)")
-        parser.add_argument("destination", help="Destination directory path")
+        parser.add_argument("destination", help="Destination parent directory path")
+        parser.add_argument("--name", "-n", default="", help="Override destination folder name")
         parser.add_argument("--force", "-f", action="store_true", help="Overwrite if destination exists")
         parsed = parser.parse_args(args)
 
@@ -340,14 +341,26 @@ class ExamplesCommand:
         # Get paths
         examples_path = ExamplesCommand.GetExamplesPath()
         source_path = examples_path / parsed.example_id
-        dest_path = Path(parsed.destination).resolve()
+        dest_root = Path(parsed.destination).resolve()
+        dest_name = (parsed.name or parsed.example_id).strip()
+        if not dest_name:
+            Colored.PrintError("Invalid destination folder name.")
+            return 1
+        dest_path = dest_root / dest_name
 
         # Check source exists
         if not source_path.exists():
             Colored.PrintError(f"Example not found: {source_path}")
             return 1
 
-        # Check destination
+        # Check destination parent
+        if dest_root.exists() and not dest_root.is_dir():
+            Colored.PrintError(f"Destination parent is not a directory: {dest_root}")
+            return 1
+        if not dest_root.exists():
+            dest_root.mkdir(parents=True, exist_ok=True)
+
+        # Check destination folder
         if dest_path.exists():
             if not parsed.force:
                 Colored.PrintError(f"Destination already exists: {dest_path}")
@@ -367,10 +380,23 @@ class ExamplesCommand:
 
         try:
             shutil.copytree(source_path, dest_path)
+
+            # Keep workspace file name aligned with copied folder name when renamed.
+            if dest_name != parsed.example_id:
+                source_jenga = dest_path / f"{parsed.example_id}.jenga"
+                if source_jenga.exists():
+                    target_jenga = dest_path / f"{dest_name}.jenga"
+                    source_jenga.rename(target_jenga)
+                else:
+                    jenga_files = list(dest_path.glob("*.jenga"))
+                    if len(jenga_files) == 1 and jenga_files[0].stem != dest_name:
+                        target_jenga = dest_path / f"{dest_name}.jenga"
+                        jenga_files[0].rename(target_jenga)
+
             Colored.PrintSuccess(f"Example copied successfully!")
             print()
             Colored.PrintInfo("Next steps:")
-            print(f"  1. {Colored.Colorize('cd', color='green')} {dest_path.name}")
+            print(f"  1. {Colored.Colorize('cd', color='green')} {dest_path}")
             print(f"  2. {Colored.Colorize('jenga build', color='green')}")
             print()
             return 0
@@ -391,13 +417,14 @@ class ExamplesCommand:
             print()
             print(Colored.Colorize("Usage:", color='yellow', bold=True))
             print(f"  jenga examples list [--filter <platform|difficulty>]")
-            print(f"  jenga examples copy <example-id> <destination> [--force]")
+            print(f"  jenga examples copy <example-id> <destination-parent> [--name <new-name>] [--force]")
             print()
             print(Colored.Colorize("Examples:", color='yellow', bold=True))
             print(f"  jenga examples list")
             print(f"  jenga examples list --filter Android")
             print(f"  jenga examples list --filter Advanced")
-            print(f"  jenga examples copy 01_hello_console ~/my-project")
+            print(f"  jenga examples copy 01_hello_console ~/projects")
+            print(f"  jenga examples copy 01_hello_console ~/projects --name my_console")
             print(f"  jenga examples copy 09_multi_projects ./test --force")
             print()
             return 0

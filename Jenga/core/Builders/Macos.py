@@ -23,6 +23,7 @@ class MacOSBuilder(Builder):
         super().__init__(workspace, config, platform, targetOs, targetArch, targetEnv, verbose)
         # Apple Clang ou Clang standard
         self.is_apple_clang = self.toolchain.compilerFamily == CompilerFamily.APPLE_CLANG
+        self._objcxxProbeCache = {}
 
     @staticmethod
     def _IsDirectLibPath(lib: str) -> bool:
@@ -47,13 +48,39 @@ class MacOSBuilder(Builder):
         else:
             return ""
 
+    def _NeedsObjectiveCppMode(self, sourcePath: Path) -> bool:
+        """Detect C++ sources that must be compiled as Objective-C++ on macOS."""
+        ext = sourcePath.suffix.lower()
+        if ext == ".mm":
+            return True
+        if ext not in (".cpp", ".cc", ".cxx", ".c++", ".cp"):
+            return False
+
+        key = str(sourcePath.resolve())
+        if key in self._objcxxProbeCache:
+            return self._objcxxProbeCache[key]
+
+        needs_objcpp = False
+        try:
+            content = sourcePath.read_text(encoding="utf-8", errors="ignore")
+            # NkMain.h includes Cocoa/UIKit entry-points with Objective-C syntax.
+            needs_objcpp = "NkMain.h" in content or "#import <Cocoa/Cocoa.h>" in content
+        except Exception:
+            needs_objcpp = False
+
+        self._objcxxProbeCache[key] = needs_objcpp
+        return needs_objcpp
+
     def Compile(self, project: Project, sourceFile: str, objectFile: str) -> bool:
         src = Path(sourceFile)
         obj = Path(objectFile)
         FileSystem.MakeDirectory(obj.parent)
 
         compiler = self.toolchain.cxxPath if project.language.value in ("C++", "Objective-C++") else self.toolchain.ccPath
-        args = [compiler, "-c", "-o", str(obj)]
+        args = [compiler]
+        if self._NeedsObjectiveCppMode(src):
+            args.extend(["-x", "objective-c++"])
+        args.extend(["-c", "-o", str(obj)])
         args.extend(self.GetDependencyFlags(str(obj)))
         args.extend(self._GetCompilerFlags(project))
         args.append(str(src))
@@ -81,15 +108,37 @@ class MacOSBuilder(Builder):
             args = [linker, "-o", str(out)]
             if project.kind == ProjectKind.SHARED_LIB:
                 args.append("-dynamiclib")
+            # Put objects first so following libraries/frameworks can satisfy symbols.
+            args.extend(objectFiles)
+
+            # Framework paths
+            for fw_path in getattr(self.toolchain, 'frameworkPaths', []):
+                args.append(f"-F{fw_path}")
             # Frameworks (toolchain)
             for fw in getattr(self.toolchain, 'frameworks', []):
                 args.extend(["-framework", fw])
             # Frameworks (project)
             for fw in project.frameworks:
                 args.extend(["-framework", fw])
-            # Framework paths
-            for fw_path in getattr(self.toolchain, 'frameworkPaths', []):
-                args.append(f"-F{fw_path}")
+            # Default Apple frameworks for macOS app/test targets.
+            # This ensures Objective-C runtime symbols and common platform APIs
+            # used by Cocoa backends are resolved even when workspaces omit explicit frameworks.
+            if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE):
+                default_frameworks = [
+                    "Cocoa",
+                    "QuartzCore",
+                    "CoreGraphics",
+                    "GameController",
+                    "AVFoundation",
+                    "CoreMedia",
+                    "CoreVideo",
+                ]
+                toolchain_frameworks = set(getattr(self.toolchain, "frameworks", []) or [])
+                project_frameworks = set(project.frameworks or [])
+                for fw in default_frameworks:
+                    if fw in toolchain_frameworks or fw in project_frameworks:
+                        continue
+                    args.extend(["-framework", fw])
             # Library directories
             for libdir in project.libDirs:
                 args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
@@ -105,8 +154,6 @@ class MacOSBuilder(Builder):
             args.extend(self.toolchain.ldflags)
             # Project ldflags
             args.extend(project.ldflags)
-            # Object files
-            args.extend(objectFiles)
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
@@ -168,18 +215,14 @@ class MacOSBuilder(Builder):
                 flags.append(f"-std={project.cdialect.lower()}")
             flags.extend(self.toolchain.cflags)
 
-        # Objective-C
-        if project.language.value in ("Objective-C", "Objective-C++"):
-            flags.append("-ObjC")
-
         # Position Independent Code
         if project.kind == ProjectKind.SHARED_LIB:
             flags.append("-fPIC")
 
         # Architecture
         if self.targetArch == TargetArch.ARM64:
-            flags.append("-arch arm64")
+            flags.extend(["-arch", "arm64"])
         elif self.targetArch == TargetArch.X86_64:
-            flags.append("-arch x86_64")
+            flags.extend(["-arch", "x86_64"])
 
         return flags

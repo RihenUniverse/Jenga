@@ -1,4 +1,4 @@
-// -----------------------------------------------------------------------------
+﻿// -----------------------------------------------------------------------------
 // FICHIER: Core\NKCore\src\NKCore\NkInline.h
 // DESCRIPTION: Macros d'inlining et optimisation fonctions
 // AUTEUR: Rihen
@@ -19,12 +19,12 @@
 
 /**
  * @defgroup InlineMacros Macros d'Inlining
- * @brief Macros pour contrôle de l'inlining des fonctions
+ * @brief Macros pour contrÃ´le de l'inlining des fonctions
  */
 
 /**
  * @brief Inline standard C++
- * @note Suggestion au compilateur, peut être ignorée
+ * @note Suggestion au compilateur, peut Ãªtre ignorÃ©e
  * @ingroup InlineMacros
  */
 #define NKENTSEU_INLINE inline
@@ -35,36 +35,35 @@
  * @ingroup InlineMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_AGGRESSIVE_INLINE \
-        inline __attribute__((always_inline, hot, optimize("O3")))
+#define NKENTSEU_AGGRESSIVE_INLINE inline __attribute__((always_inline, hot, optimize("O3")))
 #elif defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_AGGRESSIVE_INLINE __forceinline __pragma(inline_depth(255))
+#define NKENTSEU_AGGRESSIVE_INLINE __forceinline __pragma(inline_depth(255))
 #else
-    #define NKENTSEU_AGGRESSIVE_INLINE inline
+#define NKENTSEU_AGGRESSIVE_INLINE inline
 #endif
 
 /**
  * @brief Inline pour code critique (hot path)
- * @note Suggère que la fonction est appelée fréquemment
+ * @note SuggÃ¨re que la fonction est appelÃ©e frÃ©quemment
  * @ingroup InlineMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_HOT_INLINE inline __attribute__((hot, always_inline))
+#define NKENTSEU_HOT_INLINE inline __attribute__((hot, always_inline))
 #elif defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_HOT_INLINE __forceinline
+#define NKENTSEU_HOT_INLINE __forceinline
 #else
-    #define NKENTSEU_HOT_INLINE NKENTSEU_FORCE_INLINE
+#define NKENTSEU_HOT_INLINE NKENTSEU_FORCE_INLINE
 #endif
 
 /**
- * @brief Inline pour code rarement exécuté (cold path)
- * @note Suggère que la fonction est rarement appelée
+ * @brief Inline pour code rarement exÃ©cutÃ© (cold path)
+ * @note SuggÃ¨re que la fonction est rarement appelÃ©e
  * @ingroup InlineMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_COLD_INLINE inline __attribute__((cold))
+#define NKENTSEU_COLD_INLINE inline __attribute__((cold))
 #else
-    #define NKENTSEU_COLD_INLINE inline
+#define NKENTSEU_COLD_INLINE inline
 #endif
 
 // ============================================================
@@ -73,46 +72,46 @@
 
 /**
  * @defgroup OptimizeMacros Macros d'Optimisation
- * @brief Macros pour contrôle des optimisations de taille/vitesse
+ * @brief Macros pour contrÃ´le des optimisations de taille/vitesse
  */
 
 /**
  * @brief Optimiser pour vitesse
- * @note Privilégie performance au détriment de la taille
+ * @note PrivilÃ©gie performance au dÃ©triment de la taille
  * @ingroup OptimizeMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_OPTIMIZE_SPEED __attribute__((optimize("O3")))
+#define NKENTSEU_OPTIMIZE_SPEED __attribute__((optimize("O3")))
 #elif defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_OPTIMIZE_SPEED __pragma(optimize("t", on))
+#define NKENTSEU_OPTIMIZE_SPEED __pragma(optimize("t", on))
 #else
-    #define NKENTSEU_OPTIMIZE_SPEED
+#define NKENTSEU_OPTIMIZE_SPEED
 #endif
 
 /**
  * @brief Optimiser pour taille
- * @note Privilégie taille code au détriment de la performance
+ * @note PrivilÃ©gie taille code au dÃ©triment de la performance
  * @ingroup OptimizeMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_OPTIMIZE_SIZE __attribute__((optimize("Os")))
+#define NKENTSEU_OPTIMIZE_SIZE __attribute__((optimize("Os")))
 #elif defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_OPTIMIZE_SIZE __pragma(optimize("s", on))
+#define NKENTSEU_OPTIMIZE_SIZE __pragma(optimize("s", on))
 #else
-    #define NKENTSEU_OPTIMIZE_SIZE
+#define NKENTSEU_OPTIMIZE_SIZE
 #endif
 
 /**
- * @brief Désactiver optimisations
+ * @brief DÃ©sactiver optimisations
  * @note Utile pour debugging
  * @ingroup OptimizeMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_NO_OPTIMIZE __attribute__((optimize("O0")))
+#define NKENTSEU_NO_OPTIMIZE __attribute__((optimize("O0")))
 #elif defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_NO_OPTIMIZE __pragma(optimize("", off))
+#define NKENTSEU_NO_OPTIMIZE __pragma(optimize("", off))
 #else
-    #define NKENTSEU_NO_OPTIMIZE
+#define NKENTSEU_NO_OPTIMIZE
 #endif
 
 // ============================================================
@@ -130,20 +129,20 @@
  * @ingroup BuildInline
  */
 #if defined(NDEBUG) || defined(NKENTSEU_RELEASE)
-    #define NKENTSEU_INLINE_RELEASE NKENTSEU_FORCE_INLINE
+#define NKENTSEU_INLINE_RELEASE NKENTSEU_FORCE_INLINE
 #else
-    #define NKENTSEU_INLINE_RELEASE inline
+#define NKENTSEU_INLINE_RELEASE inline
 #endif
 
 /**
  * @brief Inline en Debug, normal en Release
- * @note Rare, mais peut être utile pour profiling
+ * @note Rare, mais peut Ãªtre utile pour profiling
  * @ingroup BuildInline
  */
 #if !defined(NDEBUG) && !defined(NKENTSEU_RELEASE)
-    #define NKENTSEU_INLINE_DEBUG NKENTSEU_FORCE_INLINE
+#define NKENTSEU_INLINE_DEBUG NKENTSEU_FORCE_INLINE
 #else
-    #define NKENTSEU_INLINE_DEBUG inline
+#define NKENTSEU_INLINE_DEBUG inline
 #endif
 
 // ============================================================
@@ -156,29 +155,29 @@
  */
 
 /**
- * @brief Fonction pure (pas d'effets de bord, dépend seulement des args)
+ * @brief Fonction pure (pas d'effets de bord, dÃ©pend seulement des args)
  * @note Permet optimisations agressives
  * @ingroup PureConstMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_PURE __attribute__((pure))
-    #define NKENTSEU_INLINE_PURE inline __attribute__((pure, always_inline))
+#define NKENTSEU_PURE __attribute__((pure))
+#define NKENTSEU_INLINE_PURE inline __attribute__((pure, always_inline))
 #else
-    #define NKENTSEU_PURE
-    #define NKENTSEU_INLINE_PURE inline
+#define NKENTSEU_PURE
+#define NKENTSEU_INLINE_PURE inline
 #endif
 
 /**
- * @brief Fonction const (pas d'effets de bord, ne lit pas mémoire globale)
+ * @brief Fonction const (pas d'effets de bord, ne lit pas mÃ©moire globale)
  * @note Plus restrictif que pure, permet plus d'optimisations
  * @ingroup PureConstMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_CONST __attribute__((const))
-    #define NKENTSEU_INLINE_CONST inline __attribute__((const, always_inline))
+#define NKENTSEU_CONST __attribute__((const))
+#define NKENTSEU_INLINE_CONST inline __attribute__((const, always_inline))
 #else
-    #define NKENTSEU_CONST
-    #define NKENTSEU_INLINE_CONST inline
+#define NKENTSEU_CONST
+#define NKENTSEU_INLINE_CONST inline
 #endif
 
 // ============================================================
@@ -195,9 +194,9 @@
  * @ingroup ConvenienceInline
  */
 #if defined(NKENTSEU_HAS_CONSTEXPR)
-    #define NKENTSEU_INLINE_CONSTEXPR constexpr inline
+#define NKENTSEU_INLINE_CONSTEXPR constexpr inline
 #else
-    #define NKENTSEU_INLINE_CONSTEXPR inline
+#define NKENTSEU_INLINE_CONSTEXPR inline
 #endif
 
 /**
@@ -205,9 +204,9 @@
  * @ingroup ConvenienceInline
  */
 #if defined(NKENTSEU_HAS_CONSTEXPR)
-    #define NKENTSEU_FORCE_INLINE_CONSTEXPR constexpr NKENTSEU_FORCE_INLINE
+#define NKENTSEU_FORCE_INLINE_CONSTEXPR constexpr NKENTSEU_FORCE_INLINE
 #else
-    #define NKENTSEU_FORCE_INLINE_CONSTEXPR NKENTSEU_FORCE_INLINE
+#define NKENTSEU_FORCE_INLINE_CONSTEXPR NKENTSEU_FORCE_INLINE
 #endif
 
 /**
@@ -215,9 +214,9 @@
  * @ingroup ConvenienceInline
  */
 #if defined(NKENTSEU_HAS_NOEXCEPT)
-    #define NKENTSEU_INLINE_NOEXCEPT inline noexcept
+#define NKENTSEU_INLINE_NOEXCEPT inline noexcept
 #else
-    #define NKENTSEU_INLINE_NOEXCEPT inline
+#define NKENTSEU_INLINE_NOEXCEPT inline
 #endif
 
 /**
@@ -225,9 +224,9 @@
  * @ingroup ConvenienceInline
  */
 #if defined(NKENTSEU_HAS_NOEXCEPT)
-    #define NKENTSEU_FORCE_INLINE_NOEXCEPT NKENTSEU_FORCE_INLINE noexcept
+#define NKENTSEU_FORCE_INLINE_NOEXCEPT NKENTSEU_FORCE_INLINE noexcept
 #else
-    #define NKENTSEU_FORCE_INLINE_NOEXCEPT NKENTSEU_FORCE_INLINE
+#define NKENTSEU_FORCE_INLINE_NOEXCEPT NKENTSEU_FORCE_INLINE
 #endif
 
 /**
@@ -235,41 +234,41 @@
  * @ingroup ConvenienceInline
  */
 #if defined(NKENTSEU_HAS_CONSTEXPR) && defined(NKENTSEU_HAS_NOEXCEPT)
-    #define NKENTSEU_INLINE_CONSTEXPR_NOEXCEPT constexpr inline noexcept
+#define NKENTSEU_INLINE_CONSTEXPR_NOEXCEPT constexpr inline noexcept
 #else
-    #define NKENTSEU_INLINE_CONSTEXPR_NOEXCEPT inline
+#define NKENTSEU_INLINE_CONSTEXPR_NOEXCEPT inline
 #endif
 
 // ============================================================
-// MACROS SPÉCIFIQUES COMPILATEUR
+// MACROS SPÃ‰CIFIQUES COMPILATEUR
 // ============================================================
 
 /**
- * @defgroup CompilerSpecificMacros Macros Spécifiques Compilateur
- * @brief Macros pour fonctionnalités spécifiques au compilateur
+ * @defgroup CompilerSpecificMacros Macros SpÃ©cifiques Compilateur
+ * @brief Macros pour fonctionnalitÃ©s spÃ©cifiques au compilateur
  */
 
 /**
- * @brief Inline pour fonctions flatten (aplatir récursivité)
+ * @brief Inline pour fonctions flatten (aplatir rÃ©cursivitÃ©)
  * @note GCC/Clang seulement
  * @ingroup CompilerSpecificMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_FLATTEN __attribute__((flatten))
-    #define NKENTSEU_INLINE_FLATTEN inline __attribute__((flatten, always_inline))
+#define NKENTSEU_FLATTEN __attribute__((flatten))
+#define NKENTSEU_INLINE_FLATTEN inline __attribute__((flatten, always_inline))
 #else
-    #define NKENTSEU_FLATTEN
-    #define NKENTSEU_INLINE_FLATTEN inline
+#define NKENTSEU_FLATTEN
+#define NKENTSEU_INLINE_FLATTEN inline
 #endif
 
 /**
- * @brief Fonction toujours instrumentée pour profiling
+ * @brief Fonction toujours instrumentÃ©e pour profiling
  * @ingroup CompilerSpecificMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_INSTRUMENT __attribute__((no_instrument_function))
+#define NKENTSEU_INSTRUMENT __attribute__((no_instrument_function))
 #else
-    #define NKENTSEU_INSTRUMENT
+#define NKENTSEU_INSTRUMENT
 #endif
 
 // ============================================================
@@ -277,18 +276,18 @@
 // ============================================================
 
 /**
- * @defgroup MemoryOptMacros Macros d'Optimisation Mémoire
- * @brief Macros pour optimisation de l'utilisation mémoire
+ * @defgroup MemoryOptMacros Macros d'Optimisation MÃ©moire
+ * @brief Macros pour optimisation de l'utilisation mÃ©moire
  */
 
 /**
- * @brief Fonction qui ne nécessite pas de stack frame
+ * @brief Fonction qui ne nÃ©cessite pas de stack frame
  * @ingroup MemoryOptMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_NO_STACK_FRAME __attribute__((naked))
+#define NKENTSEU_NO_STACK_FRAME __attribute__((naked))
 #else
-    #define NKENTSEU_NO_STACK_FRAME
+#define NKENTSEU_NO_STACK_FRAME
 #endif
 
 /**
@@ -296,18 +295,18 @@
  * @ingroup MemoryOptMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_REGISTER_SAFE __attribute__((regparm(3)))
+#define NKENTSEU_REGISTER_SAFE __attribute__((regparm(3)))
 #else
-    #define NKENTSEU_REGISTER_SAFE
+#define NKENTSEU_REGISTER_SAFE
 #endif
 
 // ============================================================
-// MACROS DE VISIBILITÉ
+// MACROS DE VISIBILITÃ‰
 // ============================================================
 
 /**
- * @defgroup VisibilityMacros Macros de Visibilité
- * @brief Macros pour contrôle de la visibilité des fonctions
+ * @defgroup VisibilityMacros Macros de VisibilitÃ©
+ * @brief Macros pour contrÃ´le de la visibilitÃ© des fonctions
  */
 
 /**
@@ -315,19 +314,19 @@
  * @ingroup VisibilityMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_INTERNAL_VISIBILITY __attribute__((visibility("hidden")))
+#define NKENTSEU_INTERNAL_VISIBILITY __attribute__((visibility("hidden")))
 #else
-    #define NKENTSEU_INTERNAL_VISIBILITY
+#define NKENTSEU_INTERNAL_VISIBILITY
 #endif
 
 /**
- * @brief Fonction visible partout (par défaut)
+ * @brief Fonction visible partout (par dÃ©faut)
  * @ingroup VisibilityMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_EXTERNAL_VISIBILITY __attribute__((visibility("default")))
+#define NKENTSEU_EXTERNAL_VISIBILITY __attribute__((visibility("default")))
 #else
-    #define NKENTSEU_EXTERNAL_VISIBILITY
+#define NKENTSEU_EXTERNAL_VISIBILITY
 #endif
 
 // ============================================================
@@ -336,29 +335,29 @@
 
 /**
  * @defgroup Optimization Optimisation
- * @brief Macros pour contrôler l'optimisation et l'inlining
+ * @brief Macros pour contrÃ´ler l'optimisation et l'inlining
  */
 
 #if defined(_MSC_VER)
-    /**
-     * @brief Empêche l'inlining
-     * @ingroup Optimization
-     */
-    #define NKENTSEU_NOINLINE __declspec(noinline)
-    
-    /**
-     * @brief Force l'inlining
-     * @ingroup Optimization
-     */
-    #define NKENTSEU_FORCE_INLINE __forceinline
-    
+/**
+ * @brief EmpÃªche l'inlining
+ * @ingroup Optimization
+ */
+#define NKENTSEU_NOINLINE __declspec(noinline)
+
+/**
+ * @brief Force l'inlining
+ * @ingroup Optimization
+ */
+#define NKENTSEU_FORCE_INLINE __forceinline
+
 #elif defined(__GNUC__) || defined(__clang__)
-    #define NKENTSEU_NOINLINE __attribute__((noinline))
-    #define NKENTSEU_FORCE_INLINE __attribute__((always_inline)) inline
-    
+#define NKENTSEU_NOINLINE __attribute__((noinline))
+#define NKENTSEU_FORCE_INLINE __attribute__((always_inline)) inline
+
 #else
-    #define NKENTSEU_NOINLINE
-    #define NKENTSEU_FORCE_INLINE inline
+#define NKENTSEU_NOINLINE
+#define NKENTSEU_FORCE_INLINE inline
 #endif
 
 // ============================================================
@@ -366,11 +365,11 @@
 // ============================================================
 
 #if 0
-// Pour éviter les conflits avec les fichiers existants,
-// les exemples sont commentés mais montrent l'usage correct
+// Pour Ã©viter les conflits avec les fichiers existants,
+// les exemples sont commentÃ©s mais montrent l'usage correct
 
 /**
- * @example Fonction mathématique simple
+ * @example Fonction mathÃ©matique simple
  */
 NKENTSEU_INLINE_CONSTEXPR_NOEXCEPT int32 NkAdd(int32 a, int32 b) {
     return a + b;
@@ -387,15 +386,15 @@ NKENTSEU_HOT_INLINE void NkProcessFrame(float32 deltaTime) {
  * @example Fonction cold path (gestion erreurs)
  */
 NKENTSEU_COLD_INLINE void NkHandleError(const char* message) {
-    // Code rarement exécuté
+    // Code rarement exÃ©cutÃ©
 }
 
 /**
- * @example Fonction pure (calcul mathématique)
+ * @example Fonction pure (calcul mathÃ©matique)
  */
 NKENTSEU_INLINE_PURE float32 NkSquareRoot(float32 x) {
     // Pas d'effets de bord
-    return std::sqrt(x);
+    return ::sqrt(x);
 }
 
 /**
@@ -409,7 +408,7 @@ NKENTSEU_INLINE_CONST int32 NkAbs(int32 x) {
 #endif // NKENTSEU_CORE_NKCORE_SRC_NKCORE_NKINLINE_H_INCLUDED
 
 // ============================================================
-// Copyright © 2024-2026 Rihen. All rights reserved.
+// Copyright Â© 2024-2026 Rihen. All rights reserved.
 // Proprietary License - Free to use and modify
 //
 // Generated by Rihen on 2026-02-07

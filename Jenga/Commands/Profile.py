@@ -71,7 +71,7 @@ class ProfileCommand:
         project = workspace.projects[project_name]
 
         # Construire le projet
-        from .build import BuildCommand
+        from .Build import BuildCommand
         build_args = ["--config", parsed.config, "--platform", parsed.platform, "--target", project_name]
         if parsed.ios_builder and parsed.platform in ("ios", "tvos", "watchos"):
             build_args += [f"--ios-builder={parsed.ios_builder}"]
@@ -103,7 +103,7 @@ class ProfileCommand:
     @staticmethod
     def _ProfileLinux(workspace, project, parsed):
         """Profile Linux with perf when available, otherwise run-based fallback."""
-        from .build import BuildCommand
+        from .Build import BuildCommand
 
         builder = BuildCommand.CreateBuilder(
             workspace, parsed.config, "linux", project.name, parsed.verbose,

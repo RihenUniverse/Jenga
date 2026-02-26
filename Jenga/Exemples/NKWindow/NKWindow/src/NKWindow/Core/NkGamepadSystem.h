@@ -40,148 +40,182 @@
 #include <memory>
 #include <array>
 
+/**
+ * @brief Namespace nkentseu.
+ */
 namespace nkentseu {
 
-    // Constante : max manettes supportées simultanément
-    inline constexpr NkU32 NK_MAX_GAMEPADS = 8;
+// Constante : max manettes supportées simultanément
+inline constexpr NkU32 NK_MAX_GAMEPADS = 8;
 
-    // ---------------------------------------------------------------------------
-    // Callbacks
-    // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Callbacks
+// ---------------------------------------------------------------------------
 
-    using NkGamepadConnectCallback = std::function<void(const NkGamepadInfo&, bool connected)>;
-    using NkGamepadButtonCallback  = std::function<void(NkU32 idx, NkGamepadButton, NkButtonState)>;
-    using NkGamepadAxisCallback    = std::function<void(NkU32 idx, NkGamepadAxis, float value)>;
-    using NkGamepadRumbleRequest   = NkGamepadRumbleData;
+using NkGamepadConnectCallback = std::function<void(const NkGamepadInfo &, bool connected)>;
+using NkGamepadButtonCallback = std::function<void(NkU32 idx, NkGamepadButton, NkButtonState)>;
+using NkGamepadAxisCallback = std::function<void(NkU32 idx, NkGamepadAxis, float value)>;
+using NkGamepadRumbleRequest = NkGamepadRumbleData;
 
-    // ---------------------------------------------------------------------------
-    // INkGamepadBackend — interface PIMPL
-    // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// INkGamepadBackend — interface PIMPL
+// ---------------------------------------------------------------------------
 
-    class INkGamepadBackend {
-        public:
-            virtual ~INkGamepadBackend() = default;
+/**
+ * @brief Platform backend interface for gamepad polling and control.
+ */
+class INkGamepadBackend {
+public:
+	virtual ~INkGamepadBackend() = default;
 
-            /// Initialise le backend (ouvre les devices, enregistre les callbacks OS…)
-            virtual bool Init() = 0;
+	/// Initialise le backend (ouvre les devices, enregistre les callbacks OS…)
+	virtual bool Init() = 0;
 
-            /// Libère toutes les ressources.
-            virtual void Shutdown() = 0;
+	/// Libère toutes les ressources.
+	virtual void Shutdown() = 0;
 
-            /// Pompe les événements gamepad et remplit les états internes.
-            virtual void Poll() = 0;
+	/// Pompe les événements gamepad et remplit les états internes.
+	virtual void Poll() = 0;
 
-            /// Nombre de manettes actuellement connectées.
-            virtual NkU32 GetConnectedCount() const = 0;
+	/// Nombre de manettes actuellement connectées.
+	virtual NkU32 GetConnectedCount() const = 0;
 
-            /// Infos sur la manette à l'indice idx (0-based).
-            virtual const NkGamepadInfo& GetInfo(NkU32 idx) const = 0;
+	/// Infos sur la manette à l'indice idx (0-based).
+	virtual const NkGamepadInfo &GetInfo(NkU32 idx) const = 0;
 
-            /// Snapshot complet de l'état courant.
-            virtual const NkGamepadStateData& GetState(NkU32 idx) const = 0;
+	/// Snapshot complet de l'état courant.
+	virtual const NkGamepadStateData &GetState(NkU32 idx) const = 0;
 
-            /// Lance une vibration. Implémentation peut ignorer si non supporté.
-            virtual void Rumble(NkU32 idx, float motorLow, float motorHigh,
-                                float triggerLeft, float triggerRight,
-                                NkU32 durationMs) = 0;
+	/// Lance une vibration. Implémentation peut ignorer si non supporté.
+	virtual void Rumble(NkU32 idx, float motorLow, float motorHigh, float triggerLeft, float triggerRight,
+						NkU32 durationMs) = 0;
 
-            /// LED de couleur (DualSense, Joy-Con).  RGBA 0xRRGGBBAA.
-            virtual void SetLEDColor(NkU32 idx, NkU32 rgba) { (void)idx; (void)rgba; }
+	/// LED de couleur (DualSense, Joy-Con).  RGBA 0xRRGGBBAA.
+	virtual void SetLEDColor(NkU32 idx, NkU32 rgba) {
+		(void)idx;
+		(void)rgba;
+	}
 
-            /// Gyro/accéléromètre disponible ?
-            virtual bool HasMotion(NkU32 idx) const { (void)idx; return false; }
-    };
+	/// Gyro/accéléromètre disponible ?
+	virtual bool HasMotion(NkU32 idx) const {
+		(void)idx;
+		return false;
+	}
+};
 
-    // ---------------------------------------------------------------------------
-    // NkGamepadSystem — façade singleton
-    // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// NkGamepadSystem — façade singleton
+// ---------------------------------------------------------------------------
 
-    class NkGamepadSystem {
-        public:
-            static NkGamepadSystem& Instance();
+/**
+ * @brief Cross-platform gamepad system facade.
+ *
+ * PollGamepads() updates backend state, emits callbacks and injects
+ * NK_GAMEPAD_* events into the EventSystem queue.
+ */
+class NkGamepadSystem {
+public:
+	/// @brief Access singleton instance.
+	static NkGamepadSystem &Instance();
 
-            NkGamepadSystem(const NkGamepadSystem&)            = delete;
-            NkGamepadSystem& operator=(const NkGamepadSystem&) = delete;
+	NkGamepadSystem(const NkGamepadSystem &) = delete;
+	NkGamepadSystem &operator=(const NkGamepadSystem &) = delete;
 
-            // -----------------------------------------------------------------------
-            // Cycle de vie (appelé par NkSystem::Initialise / Close)
-            // -----------------------------------------------------------------------
+	// -----------------------------------------------------------------------
+	// Cycle de vie (appelé par NkSystem::Initialise / Close)
+	// -----------------------------------------------------------------------
 
-            bool Init();
-            void Shutdown();
-            bool IsReady() const { return mReady; }
+	/// @brief Initialize backend and internal state.
+	bool Init();
+	/// @brief Shutdown backend and clear state.
+	void Shutdown();
+	bool IsReady() const {
+		return mReady;
+	}
 
-            // -----------------------------------------------------------------------
-            // Pompe (appeler chaque trame dans la boucle principale)
-            // -----------------------------------------------------------------------
+	// -----------------------------------------------------------------------
+	// Pompe (appeler chaque trame dans la boucle principale)
+	// -----------------------------------------------------------------------
 
-            void PollGamepads();
+	/// @brief Poll backend, detect deltas and emit gamepad events.
+	void PollGamepads();
 
-            // -----------------------------------------------------------------------
-            // Callbacks
-            // -----------------------------------------------------------------------
+	// -----------------------------------------------------------------------
+	// Callbacks
+	// -----------------------------------------------------------------------
 
-            void SetConnectCallback(NkGamepadConnectCallback cb) { mConnectCb = std::move(cb); }
-            void SetButtonCallback (NkGamepadButtonCallback  cb) { mButtonCb  = std::move(cb); }
-            void SetAxisCallback   (NkGamepadAxisCallback    cb) { mAxisCb    = std::move(cb); }
+	void SetConnectCallback(NkGamepadConnectCallback cb) {
+		mConnectCb = std::move(cb);
+	}
+	void SetButtonCallback(NkGamepadButtonCallback cb) {
+		mButtonCb = std::move(cb);
+	}
+	void SetAxisCallback(NkGamepadAxisCallback cb) {
+		mAxisCb = std::move(cb);
+	}
 
-            // -----------------------------------------------------------------------
-            // Accès direct à l'état (polling)
-            // -----------------------------------------------------------------------
+	// -----------------------------------------------------------------------
+	// Accès direct à l'état (polling)
+	// -----------------------------------------------------------------------
 
-            NkU32                     GetConnectedCount() const;
-            bool                      IsConnected(NkU32 idx) const;
-            const NkGamepadInfo&      GetInfo (NkU32 idx) const;
-            const NkGamepadStateData& GetState(NkU32 idx) const;
+	/// @brief Number of connected gamepads.
+	NkU32 GetConnectedCount() const;
+	/// @brief True if gamepad index is connected.
+	bool IsConnected(NkU32 idx) const;
+	/// @brief Device info for a connected gamepad index.
+	const NkGamepadInfo &GetInfo(NkU32 idx) const;
+	/// @brief Snapshot state for a gamepad index.
+	const NkGamepadStateData &GetState(NkU32 idx) const;
 
-            bool  IsButtonDown(NkU32 idx, NkGamepadButton btn) const;
-            float GetAxis     (NkU32 idx, NkGamepadAxis   ax)  const;
+	bool IsButtonDown(NkU32 idx, NkGamepadButton btn) const;
+	float GetAxis(NkU32 idx, NkGamepadAxis ax) const;
 
-            // -----------------------------------------------------------------------
-            // Sortie / commandes
-            // -----------------------------------------------------------------------
+	// -----------------------------------------------------------------------
+	// Sortie / commandes
+	// -----------------------------------------------------------------------
 
-            /// Lance une vibration sur la manette idx.
-            void Rumble(NkU32 idx,
-                        float motorLow  = 0.f,
-                        float motorHigh = 0.f,
-                        float triggerLeft  = 0.f,
-                        float triggerRight = 0.f,
-                        NkU32 durationMs   = 0);
+	/// Lance une vibration sur la manette idx.
+	void Rumble(NkU32 idx, float motorLow = 0.f, float motorHigh = 0.f, float triggerLeft = 0.f,
+				float triggerRight = 0.f, NkU32 durationMs = 0);
 
-            /// LED (DualSense, Joy-Con…).
-            void SetLEDColor(NkU32 idx, NkU32 rgba);
+	/// LED (DualSense, Joy-Con…).
+	void SetLEDColor(NkU32 idx, NkU32 rgba);
 
-            // -----------------------------------------------------------------------
-            // Accès backend
-            // -----------------------------------------------------------------------
+	// -----------------------------------------------------------------------
+	// Accès backend
+	// -----------------------------------------------------------------------
 
-            INkGamepadBackend* GetBackend() { return mBackend.get(); }
+	INkGamepadBackend *GetBackend() {
+		return mBackend.get();
+	}
 
-        private:
-            NkGamepadSystem() = default;
+private:
+	NkGamepadSystem() = default;
 
-            void FireConnect(const NkGamepadInfo& info, bool connected);
-            void FireButton (NkU32 idx, NkGamepadButton btn, NkButtonState st);
-            void FireAxis   (NkU32 idx, NkGamepadAxis ax, float value);
+	void FireConnect(const NkGamepadInfo &info, bool connected);
+	void FireButton(NkU32 idx, NkGamepadButton btn, NkButtonState st);
+	void FireAxis(NkU32 idx, NkGamepadAxis ax, float value, float prevValue);
 
-            std::unique_ptr<INkGamepadBackend> mBackend;
-            bool                               mReady = false;
+	std::unique_ptr<INkGamepadBackend> mBackend;
+	bool mReady = false;
 
-            NkGamepadConnectCallback mConnectCb;
-            NkGamepadButtonCallback  mButtonCb;
-            NkGamepadAxisCallback    mAxisCb;
+	NkGamepadConnectCallback mConnectCb;
+	NkGamepadButtonCallback mButtonCb;
+	NkGamepadAxisCallback mAxisCb;
 
-            // États précédents pour détection delta (boutons + axes)
-            std::array<NkGamepadStateData, NK_MAX_GAMEPADS> mPrevState;
-            static NkGamepadStateData                        sDummyState;
-            static NkGamepadInfo                             sDummyInfo;
-    };
+	// États précédents pour détection delta (boutons + axes)
+	std::array<NkGamepadStateData, NK_MAX_GAMEPADS> mPrevState;
+	static NkGamepadStateData sDummyState;
+	static NkGamepadInfo sDummyInfo;
+};
 
-    // ---------------------------------------------------------------------------
-    // Raccourcis globaux
-    // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Raccourcis globaux
+// ---------------------------------------------------------------------------
 
-    inline NkGamepadSystem& NkGamepads() { return NkGamepadSystem::Instance(); }
+/// @brief Convenience accessor for NkGamepadSystem singleton.
+inline NkGamepadSystem &NkGamepads() {
+	return NkGamepadSystem::Instance();
+}
 
 } // namespace nkentseu

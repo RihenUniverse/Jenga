@@ -9,7 +9,7 @@ import sys
 from typing import List
 
 # ⚠️ IMPORTER DEPUIS registry, PAS depuis . (__init__)
-from .registry import COMMANDS, ALIASES, get_command_class
+from .Registry import COMMANDS, ALIASES, get_command_class
 from .. import __version__
 
 

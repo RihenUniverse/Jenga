@@ -383,79 +383,189 @@ class AndroidBuilder(Builder):
         pcm_path = obj_dir / pcm_name
         flags.append(f"-o{str(pcm_path)}")
         return flags
-
+    
     def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
         out = Path(outputFile)
         FileSystem.MakeDirectory(out.parent)
 
+        linker = self.toolchain.cxxPath
+        min_api = project.androidMinSdk or 21
+        target_triple = f"{self.ndk_llvm_triple}{min_api}"
+        sysroot = self.toolchain.sysroot
+
+        # Flags de base pour tous les types sauf static lib
+        base_flags = [
+            f"--target={target_triple}",
+            f"--sysroot={sysroot}"
+        ]
+
+        # -----------------------------------------------------------------------
+        # Cas 1 : STATIC_LIB
+        # -----------------------------------------------------------------------
         if project.kind == ProjectKind.STATIC_LIB:
             ar = self.toolchain.arPath or "llvm-ar"
-            args = [ar, "rcs", str(out)]
-            args.extend(objectFiles)
+            args = [ar, "rcs", str(out)] + objectFiles
             result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
             return result.returnCode == 0
-        else:
-            linker = self.toolchain.cxxPath
-            # Déterminer si on crée un exécutable ou une bibliothèque partagée
-            if project.kind == ProjectKind.CONSOLE_APP:
-                link_type = []  # exécutable par défaut (pas de -shared)
-            else:
-                link_type = ["-shared"]  # bibliothèque partagée pour WINDOWED_APP et SHARED_LIB
-            args = [linker] + link_type + ["-o", str(out)]
-            args.extend(self._GetLinkerFlags(project))
-            # Object files first; archives are order-sensitive.
-            final_objects = list(objectFiles)
-            if project.androidNativeActivity and project.kind != ProjectKind.CONSOLE_APP:
+
+        # Pour les autres cas, on prépare la liste des objets finaux
+        final_objects = list(objectFiles)
+
+        # -----------------------------------------------------------------------
+        # Cas 2 : SHARED_LIB (bibliothèque partagée simple)
+        # -----------------------------------------------------------------------
+        if project.kind == ProjectKind.SHARED_LIB:
+            args = [linker, "-shared"] + base_flags + ["-o", str(out)]
+            # Pas d'objet supplémentaire
+
+        # -----------------------------------------------------------------------
+        # Cas 3 : WINDOWED_APP (application graphique NativeActivity)
+        # -----------------------------------------------------------------------
+        elif project.kind == ProjectKind.WINDOWED_APP:
+            args = [linker, "-shared"] + base_flags + ["-o", str(out)]
+            # Ajouter l'objet glue si nécessaire
+            if project.androidNativeActivity:
                 glue_obj = self._BuildNativeAppGlueObject(project, self.GetObjectDir(project))
                 if not glue_obj:
                     Colored.PrintError("android_native_app_glue source not found/compilation failed in NDK")
                     return False
                 final_objects.append(glue_obj)
-            args.extend(final_objects)
 
-            # Add NDK library search paths including API-level specific paths
-            min_api = project.androidMinSdk or 21
-            api_lib_path = Path(self.toolchain.sysroot) / "usr" / "lib" / self.ndk_triple / str(min_api)
-            if api_lib_path.exists():
-                args.append(f"-L{api_lib_path}")
+        # -----------------------------------------------------------------------
+        # Cas 4 : CONSOLE_APP (exécutable en ligne de commande)
+        # -----------------------------------------------------------------------
+        elif project.kind == ProjectKind.CONSOLE_APP:
+            args = [linker] + base_flags + ["-o", str(out)]
+            # Pas de -shared, le linker génère un exécutable
+            # Les objets de démarrage (crtbegin, crtend) sont automatiquement ajoutés via sysroot
 
-            for libdir in project.libDirs:
-                args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
-            for lib in project.links:
-                if self._IsDirectLibPath(lib):
-                    args.append(self.ResolveProjectPath(project, lib))
-                else:
-                    args.append(f"-l{lib}")
+        else:
+            raise RuntimeError(f"Unsupported project kind for Android: {project.kind}")
 
-            # Auto-link C++ STL if project uses C++
-            if hasattr(project, 'cppDialect') and project.cppDialect:
-                # Check if c++_shared is not already in links
-                if 'c++_shared' not in project.links:
-                    args.append("-lc++_shared")
+        # -----------------------------------------------------------------------
+        # Ajout des flags supplémentaires (provenant de _GetLinkerFlags)
+        # On filtre pour ne pas dupliquer --target et --sysroot
+        # -----------------------------------------------------------------------
+        linker_flags = self._GetLinkerFlags(project)
+        filtered_flags = []
+        skip_next = False
+        for flag in linker_flags:
+            if skip_next:
+                skip_next = False
+                continue
+            if flag.startswith('--target=') or flag.startswith('--sysroot='):
+                continue
+            if flag == '--target' or flag == '--sysroot':
+                skip_next = True
+                continue
+            filtered_flags.append(flag)
+        args.extend(filtered_flags)
 
-            # Pour les exécutables, il faut inclure crtbegin_dynamic.o et crtend_android.o
-            if project.kind == ProjectKind.CONSOLE_APP:
-                # Ajouter les objets de démarrage NDK
-                min_api = project.androidMinSdk or 21
-                arch_lib = Path(self.toolchain.sysroot) / "usr" / "lib" / self.ndk_triple / str(min_api)
-                crtbegin = arch_lib / "crtbegin_dynamic.o"
-                crtend = arch_lib / "crtend_android.o"
-                if crtbegin.exists():
-                    # Réorganiser les arguments pour placer crtbegin avant les objets et crtend après
-                    # On reconstruit la commande
-                    args = [linker] + link_type + ["-o", str(out)] + [str(crtbegin)] + final_objects + [str(crtend)]
-                    # Ajouter les flags de librairies et autres
-                    for libdir in project.libDirs:
-                        args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
-                    for lib in project.links:
-                        if self._IsDirectLibPath(lib):
-                            args.append(self.ResolveProjectPath(project, lib))
-                        else:
-                            args.append(f"-l{lib}")
-                else:
-                    Colored.PrintWarning(f"crtbegin_dynamic.o not found for API {min_api}, linking may fail")
-            result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
-            return result.returnCode == 0
+        # Ajouter les objets
+        args.extend(final_objects)
+
+        # -----------------------------------------------------------------------
+        # Chemins de bibliothèques supplémentaires
+        # -----------------------------------------------------------------------
+        api_lib_path = Path(sysroot) / "usr" / "lib" / self.ndk_triple / str(min_api)
+        if api_lib_path.exists():
+            args.append(f"-L{api_lib_path}")
+
+        for libdir in project.libDirs:
+            args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
+
+        # -----------------------------------------------------------------------
+        # Bibliothèques à lier
+        # -----------------------------------------------------------------------
+        for lib in project.links:
+            if self._IsDirectLibPath(lib):
+                args.append(self.ResolveProjectPath(project, lib))
+            else:
+                args.append(f"-l{lib}")
+
+        # Lien automatique de la STL C++ si nécessaire
+        if hasattr(project, 'cppDialect') and project.cppDialect:
+            if 'c++_shared' not in project.links:
+                args.append("-lc++_shared")
+
+        # -----------------------------------------------------------------------
+        # Exécution du linker
+        # -----------------------------------------------------------------------
+        result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+        return result.returnCode == 0
+
+    # def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
+    #     out = Path(outputFile)
+    #     FileSystem.MakeDirectory(out.parent)
+
+    #     if project.kind == ProjectKind.STATIC_LIB:
+    #         ar = self.toolchain.arPath or "llvm-ar"
+    #         args = [ar, "rcs", str(out)]
+    #         args.extend(objectFiles)
+    #         result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+    #         return result.returnCode == 0
+    #     else:
+    #         linker = self.toolchain.cxxPath
+    #         # Déterminer si on crée un exécutable ou une bibliothèque partagée
+    #         if project.kind == ProjectKind.CONSOLE_APP:
+    #             link_type = []  # exécutable par défaut (pas de -shared)
+    #         else:
+    #             link_type = ["-shared"]  # bibliothèque partagée pour WINDOWED_APP et SHARED_LIB
+    #         args = [linker] + link_type + ["-o", str(out)]
+    #         args.extend(self._GetLinkerFlags(project))
+    #         # Object files first; archives are order-sensitive.
+    #         final_objects = list(objectFiles)
+    #         if project.androidNativeActivity and project.kind != ProjectKind.CONSOLE_APP:
+    #             glue_obj = self._BuildNativeAppGlueObject(project, self.GetObjectDir(project))
+    #             if not glue_obj:
+    #                 Colored.PrintError("android_native_app_glue source not found/compilation failed in NDK")
+    #                 return False
+    #             final_objects.append(glue_obj)
+    #         args.extend(final_objects)
+
+    #         # Add NDK library search paths including API-level specific paths
+    #         min_api = project.androidMinSdk or 21
+    #         api_lib_path = Path(self.toolchain.sysroot) / "usr" / "lib" / self.ndk_triple / str(min_api)
+    #         if api_lib_path.exists():
+    #             args.append(f"-L{api_lib_path}")
+
+    #         for libdir in project.libDirs:
+    #             args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
+    #         for lib in project.links:
+    #             if self._IsDirectLibPath(lib):
+    #                 args.append(self.ResolveProjectPath(project, lib))
+    #             else:
+    #                 args.append(f"-l{lib}")
+
+    #         # Auto-link C++ STL if project uses C++
+    #         if hasattr(project, 'cppDialect') and project.cppDialect:
+    #             # Check if c++_shared is not already in links
+    #             if 'c++_shared' not in project.links:
+    #                 args.append("-lc++_shared")
+
+    #         # Pour les exécutables, il faut inclure crtbegin_dynamic.o et crtend_android.o
+    #         if project.kind == ProjectKind.CONSOLE_APP:
+    #             # Ajouter les objets de démarrage NDK
+    #             min_api = project.androidMinSdk or 21
+    #             arch_lib = Path(self.toolchain.sysroot) / "usr" / "lib" / self.ndk_triple / str(min_api)
+    #             crtbegin = arch_lib / "crtbegin_dynamic.o"
+    #             crtend = arch_lib / "crtend_android.o"
+    #             if crtbegin.exists():
+    #                 # Réorganiser les arguments pour placer crtbegin avant les objets et crtend après
+    #                 # On reconstruit la commande
+    #                 args = [linker] + link_type + ["-o", str(out)] + [str(crtbegin)] + final_objects + [str(crtend)]
+    #                 # Ajouter les flags de librairies et autres
+    #                 for libdir in project.libDirs:
+    #                     args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
+    #                 for lib in project.links:
+    #                     if self._IsDirectLibPath(lib):
+    #                         args.append(self.ResolveProjectPath(project, lib))
+    #                     else:
+    #                         args.append(f"-l{lib}")
+    #             else:
+    #                 Colored.PrintWarning(f"crtbegin_dynamic.o not found for API {min_api}, linking may fail")
+    #         result = Process.ExecuteCommand(args, captureOutput=False, silent=False)
+    #         return result.returnCode == 0
 
     def _GetCompilerFlags(self, project: Project) -> List[str]:
         flags = []
@@ -544,10 +654,10 @@ class AndroidBuilder(Builder):
         target = f"{self.ndk_llvm_triple}{min_api}"
         flags.append(f"--target={target}")
         flags.append(f"--sysroot={self.toolchain.sysroot}")
+        flags.append("-llog")
 
         # Pour les applications non-console, lier les bibliothèques Android standards
         if project.kind != ProjectKind.CONSOLE_APP:
-            flags.append("-llog")
             flags.append("-landroid")
             flags.append("-lEGL")
             flags.append("-lGLESv2")
@@ -624,11 +734,145 @@ class AndroidBuilder(Builder):
         app_mk = next((p for p in app_candidates if p.exists()), None)
         return android_mk, app_mk
 
-    def _CollectBuiltSharedLibs(self, libs_dir: Path) -> List[str]:
-        abi_dir = libs_dir / self.ndk_abi
+    def _CollectBuiltSharedLibs(self, libs_dir: Path, abi: Optional[str] = None) -> List[str]:
+        abi_dir = libs_dir / (abi or self.ndk_abi)
         if not abi_dir.exists():
             return []
         return [str(p) for p in sorted(abi_dir.glob("*.so")) if p.is_file()]
+
+    def _ResolveRequestedAndroidAbis(self, project: Project) -> List[str]:
+        # CLI override first, then project.androidAbis, then current platform ABI.
+        raw = (self._GetOptionValue("android-abis") or self._GetOptionValue("android-ndk-mk-abis") or "").strip().lower()
+        if raw:
+            source_tokens = [t.strip() for t in raw.replace(";", ",").replace(" ", ",").split(",") if t.strip()]
+        else:
+            source_tokens = [str(abi).strip() for abi in (getattr(project, "androidAbis", None) or []) if str(abi).strip()]
+
+        if not source_tokens:
+            return [self.ndk_abi]
+
+        known = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+        alias_map = {
+            "armeabi-v7a": "armeabi-v7a",
+            "armeabi": "armeabi-v7a",
+            "armv7": "armeabi-v7a",
+            "armv7a": "armeabi-v7a",
+            "arm": "armeabi-v7a",
+            "arm64-v8a": "arm64-v8a",
+            "arm64": "arm64-v8a",
+            "aarch64": "arm64-v8a",
+            "x86": "x86",
+            "x86_64": "x86_64",
+            "x64": "x86_64",
+            "amd64": "x86_64",
+        }
+
+        resolved: List[str] = []
+        seen: Set[str] = set()
+        for token in source_tokens:
+            key = token.strip().lower()
+            if not key:
+                continue
+            if key in ("all", "*"):
+                for abi in known:
+                    if abi not in seen:
+                        resolved.append(abi)
+                        seen.add(abi)
+                continue
+            abi = alias_map.get(key)
+            if not abi:
+                Reporter.Warning(f"Unknown Android ABI '{token}' ignored")
+                continue
+            if abi not in seen:
+                resolved.append(abi)
+                seen.add(abi)
+
+        if not resolved:
+            Reporter.Warning(f"No valid Android ABI selected, fallback to platform ABI '{self.ndk_abi}'")
+            return [self.ndk_abi]
+        return resolved
+
+    def _ResolveNdkMkOutputMode(self, target_abis: List[str]) -> str:
+        if self._OptionEnabled("android-ndk-mk-both"):
+            return "both"
+        if self._OptionEnabled("android-ndk-mk-universal"):
+            return "universal"
+        if self._OptionEnabled("android-ndk-mk-split"):
+            return "split"
+
+        raw_mode = (
+            self._GetOptionValue("android-ndk-mk-mode")
+            or self._GetOptionValue("android-ndk-mk-output")
+            or ""
+        ).strip().lower()
+
+        default_mode = "both" if len(target_abis) > 1 else "split"
+        if not raw_mode:
+            return default_mode
+
+        aliases = {
+            "split": "split",
+            "single": "split",
+            "per-abi": "split",
+            "individual": "split",
+            "universal": "universal",
+            "fat": "universal",
+            "multi": "universal",
+            "multi-abi": "universal",
+            "both": "both",
+            "all": "both",
+            "split+universal": "both",
+            "universal+split": "both",
+        }
+        mode = aliases.get(raw_mode)
+        if not mode:
+            Reporter.Warning(
+                f"Unknown ndk-mk output mode '{raw_mode}', using default '{default_mode}' "
+                "(allowed: split, universal, both)"
+            )
+            return default_mode
+        return mode
+
+    def _RunNdkMkForAbi(self, project: Project, ndk_build: Path, android_mk: Path,
+                        app_mk: Optional[Path], abi: str) -> Tuple[Path, List[str]]:
+        mk_build_dir = Path(self.GetTargetDir(project)) / f"android-ndk-mk-{abi}"
+        libs_out = mk_build_dir / "libs"
+        obj_out = mk_build_dir / "obj"
+        FileSystem.MakeDirectory(mk_build_dir)
+        FileSystem.MakeDirectory(libs_out)
+        FileSystem.MakeDirectory(obj_out)
+
+        min_sdk = project.androidMinSdk or self._GetMinApiLevel()
+        ndk_debug = "1" if self.config.lower() == "debug" else "0"
+
+        cmd = [
+            str(ndk_build),
+            f"NDK_PROJECT_PATH={mk_build_dir}",
+            f"APP_BUILD_SCRIPT={android_mk}",
+            f"NDK_LIBS_OUT={libs_out}",
+            f"NDK_OUT={obj_out}",
+            f"APP_ABI={abi}",
+            f"APP_PLATFORM=android-{min_sdk}",
+            f"NDK_DEBUG={ndk_debug}",
+            f"-j{max(1, os.cpu_count() or 1)}",
+        ]
+        if app_mk:
+            cmd.append(f"NDK_APPLICATION_MK={app_mk}")
+        if self.verbose:
+            cmd.append("V=1")
+
+        Reporter.Info(f"Building with ndk-build ({project.name}, {abi})...")
+        result = Process.ExecuteCommand(
+            cmd,
+            cwd=android_mk.parent,
+            captureOutput=False,
+            silent=False
+        )
+        if result.returnCode != 0:
+            raise RuntimeError(f"ndk-build failed for project '{project.name}' ({abi})")
+
+        native_libs = self._CollectBuiltSharedLibs(libs_out, abi=abi)
+        return libs_out, native_libs
 
     def _BuildUsingNdkMk(self, targetProject: Optional[str] = None) -> int:
         ndk_build = self._ResolveNdkBuildPath()
@@ -649,72 +893,66 @@ class AndroidBuilder(Builder):
         if not app_projects:
             return super().Build(targetProject)
 
-        for proj in app_projects:
-            android_mk, app_mk = self._FindProjectAndroidMk(proj)
-            if not android_mk:
-                Reporter.Error(
-                    f"Android.mk not found for project '{proj.name}'. "
-                    "Generate it with `jenga gen --android-mk` or add one in the project/workspace."
-                )
-                return 1
-
-            mk_build_dir = Path(self.GetTargetDir(proj)) / f"android-ndk-mk-{self.ndk_abi}"
-            libs_out = mk_build_dir / "libs"
-            obj_out = mk_build_dir / "obj"
-            FileSystem.MakeDirectory(mk_build_dir)
-            FileSystem.MakeDirectory(libs_out)
-            FileSystem.MakeDirectory(obj_out)
-
-            min_sdk = proj.androidMinSdk or self._GetMinApiLevel()
-            ndk_debug = "1" if self.config.lower() == "debug" else "0"
-
-            cmd = [
-                str(ndk_build),
-                f"NDK_PROJECT_PATH={mk_build_dir}",
-                f"APP_BUILD_SCRIPT={android_mk}",
-                f"NDK_LIBS_OUT={libs_out}",
-                f"NDK_OUT={obj_out}",
-                f"APP_ABI={self.ndk_abi}",
-                f"APP_PLATFORM=android-{min_sdk}",
-                f"NDK_DEBUG={ndk_debug}",
-                f"-j{max(1, os.cpu_count() or 1)}",
-            ]
-            if app_mk:
-                cmd.append(f"NDK_APPLICATION_MK={app_mk}")
-            if self.verbose:
-                cmd.append("V=1")
-
-            Reporter.Info(f"Building with ndk-build ({proj.name})...")
-            result = Process.ExecuteCommand(
-                cmd,
-                cwd=android_mk.parent,
-                captureOutput=False,
-                silent=False
-            )
-            if result.returnCode != 0:
-                Reporter.Error(f"ndk-build failed for project '{proj.name}'")
-                return 1
-
-            native_libs = self._CollectBuiltSharedLibs(libs_out)
-            if not native_libs:
-                Reporter.Error(f"No shared libraries produced by ndk-build for '{proj.name}' ({self.ndk_abi})")
-                return 1
-
-            # Pour les projets console, on ne fait pas d'APK
-            if proj.kind == ProjectKind.CONSOLE_APP:
-                # Copier l'exécutable produit (ndk-build produit généralement un exécutable dans libs/<abi>/)
-                exe_name = proj.targetName or proj.name
-                exe_path = libs_out / self.ndk_abi / exe_name
-                if exe_path.exists():
-                    final_exe = Path(self.GetTargetDir(proj)) / exe_name
-                    shutil.copy2(exe_path, final_exe)
-                    Reporter.Success(f"Executable generated: {final_exe}")
-                else:
-                    Reporter.Error(f"Executable not found: {exe_path}")
+        original_ndk_abi = self.ndk_abi
+        try:
+            for proj in app_projects:
+                android_mk, app_mk = self._FindProjectAndroidMk(proj)
+                if not android_mk:
+                    Reporter.Error(
+                        f"Android.mk not found for project '{proj.name}'. "
+                        "Generate it with `jenga gen --android-mk` or add one in the project/workspace."
+                    )
                     return 1
-            else:
-                if not self.BuildAPK(proj, native_libs):
-                    return 1
+
+                target_abis = self._ResolveRequestedAndroidAbis(proj)
+                output_mode = self._ResolveNdkMkOutputMode(target_abis)
+                Reporter.Info(f"ndk-mk plan for {proj.name}: mode={output_mode}, ABIs={', '.join(target_abis)}")
+
+                all_native_libs: Dict[str, List[str]] = {}
+
+                for abi in target_abis:
+                    try:
+                        libs_out, native_libs = self._RunNdkMkForAbi(proj, ndk_build, android_mk, app_mk, abi)
+                    except RuntimeError as exc:
+                        Reporter.Error(str(exc))
+                        return 1
+
+                    if proj.kind == ProjectKind.CONSOLE_APP:
+                        exe_name = proj.targetName or proj.name
+                        exe_path = libs_out / abi / exe_name
+                        if not exe_path.exists():
+                            Reporter.Error(f"Executable not found: {exe_path}")
+                            return 1
+                        suffix = f"-{abi}" if len(target_abis) > 1 else ""
+                        final_exe = Path(self.GetTargetDir(proj)) / f"{exe_name}{suffix}"
+                        shutil.copy2(exe_path, final_exe)
+                        Reporter.Success(f"Executable generated: {final_exe}")
+                        continue
+
+                    if not native_libs:
+                        Reporter.Error(f"No shared libraries produced by ndk-build for '{proj.name}' ({abi})")
+                        return 1
+
+                    all_native_libs[abi] = native_libs
+                    if output_mode in ("split", "both"):
+                        self.ndk_abi = abi
+                        if self.build_aab:
+                            if not self.BuildAAB(proj, native_libs):
+                                return 1
+                        else:
+                            if not self.BuildAPK(proj, native_libs):
+                                return 1
+
+                if proj.kind != ProjectKind.CONSOLE_APP and output_mode in ("universal", "both"):
+                    if not all_native_libs:
+                        Reporter.Error(f"No native outputs found for universal APK packaging: {proj.name}")
+                        return 1
+                    if self.build_aab:
+                        Reporter.Warning("AAB not yet supported for ndk-mk universal builds, falling back to APK")
+                    if not self._BuildUniversalAPKFile(proj, all_native_libs):
+                        return 1
+        finally:
+            self.ndk_abi = original_ndk_abi
 
         return 0
 
@@ -1254,9 +1492,46 @@ class AndroidBuilder(Builder):
             matches = glob.glob(str(full_pattern), recursive=True)
             for m in matches:
                 p = Path(m)
-                if p.is_file() and p.suffix == '.jar':
+                if not p.is_file():
+                    continue
+                suffix = p.suffix.lower()
+                if suffix == '.jar':
                     libs.append(p)
+                elif suffix == '.aar':
+                    extracted = self._ExtractAarClassesJar(p)
+                    if extracted is not None:
+                        libs.append(extracted)
         return libs
+
+    def _ExtractAarClassesJar(self, aar_path: Path) -> Optional[Path]:
+        """Extract classes.jar from an .aar so it can be consumed by javac/d8."""
+        extract_root = aar_path.parent / ".jenga_aar"
+        extracted_jar = extract_root / f"{aar_path.stem}-classes.jar"
+
+        try:
+            needs_extract = (
+                (not extracted_jar.exists())
+                or (extracted_jar.stat().st_mtime < aar_path.stat().st_mtime)
+            )
+        except OSError:
+            needs_extract = True
+
+        if not needs_extract:
+            return extracted_jar
+
+        try:
+            FileSystem.MakeDirectory(extract_root)
+            with zipfile.ZipFile(aar_path, 'r') as aar_zip:
+                if "classes.jar" not in aar_zip.namelist():
+                    Reporter.Warning(f"No classes.jar found in AAR: {aar_path}")
+                    return None
+                with aar_zip.open("classes.jar", "r") as src, open(extracted_jar, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+        except Exception as e:
+            Reporter.Warning(f"Failed to extract classes.jar from {aar_path}: {e}")
+            return None
+
+        return extracted_jar
 
     def _CompileJava(self, project: Project, r_java_dir: Path, java_files: List[Path],
                      java_libs: List[Path], classes_dir: Path) -> bool:
@@ -1395,9 +1670,10 @@ class AndroidBuilder(Builder):
         # Ajouter les .jar
         for lib in java_libs:
             d8_cmd.append(str(lib))
-        # Ajouter le répertoire de classes
+        # Ajouter les classes compilées.
+        # Certaines versions de d8 n'acceptent pas un dossier en entrée.
         if class_files:
-            d8_cmd.append(str(classes_dir))
+            d8_cmd.extend(str(f) for f in class_files)
 
         result = Process.ExecuteCommand(d8_cmd, captureOutput=False, silent=False)
         if result.returnCode != 0:

@@ -147,7 +147,7 @@ class PackageCommand:
 
         # Créer le builder pour ce projet (nécessaire pour connaître les chemins de sortie)
         try:
-            from ..Commands.build import BuildCommand
+            from ..Commands.Build import BuildCommand
             builder = PackageCommand._CreateBuilder(
                 workspace, parsed.config, parsed.platform, project_name, parsed.verbose,
                 action="package",
@@ -197,7 +197,7 @@ class PackageCommand:
                        action: str = "package",
                        options: Optional[List[str]] = None) -> Builder:
         """Crée un builder pour le projet cible."""
-        from ..Commands.build import BuildCommand
+        from ..Commands.Build import BuildCommand
         return BuildCommand.CreateBuilder(
             workspace, config, platform, target, verbose,
             action=action,

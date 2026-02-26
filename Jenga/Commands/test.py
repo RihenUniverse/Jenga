@@ -15,7 +15,7 @@ from ..Core.Loader import Loader
 from ..Core.Cache import Cache
 from ..Core.Builder import Builder
 from ..Utils import Colored, Reporter, Process, FileSystem
-from .build import BuildCommand
+from .Build import BuildCommand
 
 
 class TestCommand:

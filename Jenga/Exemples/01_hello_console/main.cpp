@@ -1,13 +1,12 @@
 #ifdef __ANDROID__
-    #include <android/log.h>
-    // Android NativeActivity entry point (must be extern "C")
-    extern "C" void android_main(void*) {
-        __android_log_print(ANDROID_LOG_INFO, "HelloJenga", "Hello from Jenga on Android!");
-    }
+#include <android/log.h>
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "HelloJenga", __VA_ARGS__)
 #else
-    #include <iostream>
-    int main() {
-        std::cout << "Hello from Jenga!" << std::endl;
-        return 0;
-    }
+#include <iostream>
+#define LOGI(...) std::cout << __VA_ARGS__ << std::endl
 #endif
+
+int main() {
+    LOGI("Hello from Jenga!");
+    return 0;
+}

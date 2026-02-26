@@ -42,22 +42,22 @@
  * @ingroup BuiltinMacros
  */
 #ifdef __cplusplus
-    // C++: utilise __FUNCTION__ ou équivalent
-    #if defined(_MSC_VER)
-        #define NKENTSEU_BUILTIN_FUNCTION __FUNCTION__
-    #elif defined(__GNUC__) || defined(__clang__)
-        #define NKENTSEU_BUILTIN_FUNCTION __PRETTY_FUNCTION__
-    #else
-        #define NKENTSEU_BUILTIN_FUNCTION __func__
-    #endif
+// C++: utilise __FUNCTION__ ou équivalent
+#if defined(_MSC_VER)
+#define NKENTSEU_BUILTIN_FUNCTION __FUNCTION__
+#elif defined(__GNUC__) || defined(__clang__)
+#define NKENTSEU_BUILTIN_FUNCTION __PRETTY_FUNCTION__
 #else
-    // C: utilise __func__ (standard C99)
-    #if __STDC_VERSION__ >= 199901L
-        #define NKENTSEU_BUILTIN_FUNCTION __func__
-    #else
-        // Fallback pour anciens compilateurs C
-        #define NKENTSEU_BUILTIN_FUNCTION ""
-    #endif
+#define NKENTSEU_BUILTIN_FUNCTION __func__
+#endif
+#else
+// C: utilise __func__ (standard C99)
+#if __STDC_VERSION__ >= 199901L
+#define NKENTSEU_BUILTIN_FUNCTION __func__
+#else
+// Fallback pour anciens compilateurs C
+#define NKENTSEU_BUILTIN_FUNCTION ""
+#endif
 #endif
 
 /**
@@ -121,11 +121,11 @@
  * @ingroup DebugMacros
  */
 #if defined(_MSC_VER)
-    #define NKENTSEU_COMPILE_MESSAGE(msg) __pragma(message(msg))
+#define NKENTSEU_COMPILE_MESSAGE(msg) __pragma(message(msg))
 #elif defined(__GNUC__) || defined(__clang__)
-    #define NKENTSEU_COMPILE_MESSAGE(msg) _Pragma(NKENTSEU_STRINGIFY(message msg))
+#define NKENTSEU_COMPILE_MESSAGE(msg) _Pragma(NKENTSEU_STRINGIFY(message msg))
 #else
-    #define NKENTSEU_COMPILE_MESSAGE(msg)
+#define NKENTSEU_COMPILE_MESSAGE(msg)
 #endif
 
 /**
@@ -134,9 +134,8 @@
  * @param msg Description de la tâche TODO
  * @ingroup DebugMacros
  */
-#define NKENTSEU_TODO(msg) \
-    NKENTSEU_COMPILE_MESSAGE("TODO at " NKENTSEU_BUILTIN_FILE ":" \
-                            NKENTSEU_STRINGIFY(NKENTSEU_BUILTIN_LINE) ": " msg)
+#define NKENTSEU_TODO(msg)                                                                                             \
+	NKENTSEU_COMPILE_MESSAGE("TODO at " NKENTSEU_BUILTIN_FILE ":" NKENTSEU_STRINGIFY(NKENTSEU_BUILTIN_LINE) ": " msg)
 
 /**
  * @brief Message FIXME avec localisation
@@ -144,9 +143,8 @@
  * @param msg Description du problème à corriger
  * @ingroup DebugMacros
  */
-#define NKENTSEU_FIXME(msg) \
-    NKENTSEU_COMPILE_MESSAGE("FIXME at " NKENTSEU_BUILTIN_FILE ":" \
-                            NKENTSEU_STRINGIFY(NKENTSEU_BUILTIN_LINE) ": " msg)
+#define NKENTSEU_FIXME(msg)                                                                                            \
+	NKENTSEU_COMPILE_MESSAGE("FIXME at " NKENTSEU_BUILTIN_FILE ":" NKENTSEU_STRINGIFY(NKENTSEU_BUILTIN_LINE) ": " msg)
 
 /**
  * @brief Message NOTE avec localisation
@@ -154,9 +152,8 @@
  * @param msg Note informative
  * @ingroup DebugMacros
  */
-#define NKENTSEU_NOTE(msg) \
-    NKENTSEU_COMPILE_MESSAGE("NOTE at " NKENTSEU_BUILTIN_FILE ":" \
-                            NKENTSEU_STRINGIFY(NKENTSEU_BUILTIN_LINE) ": " msg)
+#define NKENTSEU_NOTE(msg)                                                                                             \
+	NKENTSEU_COMPILE_MESSAGE("NOTE at " NKENTSEU_BUILTIN_FILE ":" NKENTSEU_STRINGIFY(NKENTSEU_BUILTIN_LINE) ": " msg)
 
 // ============================================================
 // MACROS POUR ASSERTIONS AMÉLIORÉES
@@ -173,12 +170,12 @@
  * @param condition Condition à vérifier
  * @ingroup AssertMacros
  */
-#define NKENTSEU_SIMPLE_ASSERT(condition) \
-    do { \
-        if (!(condition)) { \
-            /* Log ou traitement d'erreur ici */ \
-        } \
-    } while(0)
+#define NKENTSEU_SIMPLE_ASSERT(condition)                                                                              \
+	do {                                                                                                               \
+		if (!(condition)) {                                                                                            \
+			/* Log ou traitement d'erreur ici */                                                                       \
+		}                                                                                                              \
+	} while (0)
 
 /**
  * @brief Assertion avec message personnalisé
@@ -187,12 +184,12 @@
  * @param msg Message d'erreur
  * @ingroup AssertMacros
  */
-#define NKENTSEU_ASSERT_MSG(condition, msg) \
-    do { \
-        if (!(condition)) { \
-            /* Log avec message */ \
-        } \
-    } while(0)
+#define NKENTSEU_ASSERT_MSG(condition, msg)                                                                            \
+	do {                                                                                                               \
+		if (!(condition)) {                                                                                            \
+			/* Log avec message */                                                                                     \
+		}                                                                                                              \
+	} while (0)
 
 // ============================================================
 // MACROS POUR PROFILING ET INSTRUMENTATION
@@ -210,10 +207,9 @@
  * @ingroup ProfileMacros
  */
 #if defined(NKENTSEU_ENABLE_PROFILING)
-    #define NKENTSEU_PROFILE_SCOPE(name) \
-        nkentseu::debug::ProfileScope NKENTSEU_UNIQUE_NAME(profile_scope_)(name)
+#define NKENTSEU_PROFILE_SCOPE(name) nkentseu::debug::ProfileScope NKENTSEU_UNIQUE_NAME(profile_scope_)(name)
 #else
-    #define NKENTSEU_PROFILE_SCOPE(name) ((void)0)
+#define NKENTSEU_PROFILE_SCOPE(name) ((void)0)
 #endif
 
 /**
@@ -222,10 +218,10 @@
  * @ingroup ProfileMacros
  */
 #if defined(NKENTSEU_ENABLE_INSTRUMENTATION)
-    #define NKENTSEU_INSTRUMENT_FUNCTION \
-        nkentseu::debug::InstrumentFunction NKENTSEU_UNIQUE_NAME(instrument_)(NKENTSEU_BUILTIN_FUNCTION)
+#define NKENTSEU_INSTRUMENT_FUNCTION                                                                                   \
+	nkentseu::debug::InstrumentFunction NKENTSEU_UNIQUE_NAME(instrument_)(NKENTSEU_BUILTIN_FUNCTION)
 #else
-    #define NKENTSEU_INSTRUMENT_FUNCTION ((void)0)
+#define NKENTSEU_INSTRUMENT_FUNCTION ((void)0)
 #endif
 
 // ============================================================
@@ -243,8 +239,8 @@
  * @param msg Message d'erreur
  * @ingroup ErrorMacros
  */
-#define NKENTSEU_LOG_ERROR(msg) \
-    NKENTSEU_LOG_ERROR_CONTEXT(msg, NKENTSEU_BUILTIN_FILE, NKENTSEU_BUILTIN_LINE, NKENTSEU_BUILTIN_FUNCTION)
+#define NKENTSEU_LOG_ERROR(msg)                                                                                        \
+	NKENTSEU_LOG_ERROR_CONTEXT(msg, NKENTSEU_BUILTIN_FILE, NKENTSEU_BUILTIN_LINE, NKENTSEU_BUILTIN_FUNCTION)
 
 /**
  * @brief Macro pour logger un avertissement avec contexte
@@ -252,8 +248,8 @@
  * @param msg Message d'avertissement
  * @ingroup ErrorMacros
  */
-#define NKENTSEU_LOG_WARNING(msg) \
-    NKENTSEU_LOG_WARNING_CONTEXT(msg, NKENTSEU_BUILTIN_FILE, NKENTSEU_BUILTIN_LINE, NKENTSEU_BUILTIN_FUNCTION)
+#define NKENTSEU_LOG_WARNING(msg)                                                                                      \
+	NKENTSEU_LOG_WARNING_CONTEXT(msg, NKENTSEU_BUILTIN_FILE, NKENTSEU_BUILTIN_LINE, NKENTSEU_BUILTIN_FUNCTION)
 
 /**
  * @brief Macro pour logger une information avec contexte
@@ -261,18 +257,15 @@
  * @param msg Message d'information
  * @ingroup ErrorMacros
  */
-#define NKENTSEU_LOG_INFO(msg) \
-    NKENTSEU_LOG_INFO_CONTEXT(msg, NKENTSEU_BUILTIN_FILE, NKENTSEU_BUILTIN_LINE, NKENTSEU_BUILTIN_FUNCTION)
+#define NKENTSEU_LOG_INFO(msg)                                                                                         \
+	NKENTSEU_LOG_INFO_CONTEXT(msg, NKENTSEU_BUILTIN_FILE, NKENTSEU_BUILTIN_LINE, NKENTSEU_BUILTIN_FUNCTION)
 
 // Ces macros doivent être implémentées dans le système de logging
-#define NKENTSEU_LOG_ERROR_CONTEXT(msg, file, line, func) \
-    nkentseu::log::Error(msg, file, line, func)
+#define NKENTSEU_LOG_ERROR_CONTEXT(msg, file, line, func) nkentseu::log::Error(msg, file, line, func)
 
-#define NKENTSEU_LOG_WARNING_CONTEXT(msg, file, line, func) \
-    nkentseu::log::Warning(msg, file, line, func)
+#define NKENTSEU_LOG_WARNING_CONTEXT(msg, file, line, func) nkentseu::log::Warning(msg, file, line, func)
 
-#define NKENTSEU_LOG_INFO_CONTEXT(msg, file, line, func) \
-    nkentseu::log::Info(msg, file, line, func)
+#define NKENTSEU_LOG_INFO_CONTEXT(msg, file, line, func) nkentseu::log::Info(msg, file, line, func)
 
 // ============================================================
 // MACROS UTILITAIRES AVEC CONTEXTE
@@ -291,9 +284,9 @@
  * @param value Valeur initiale
  * @ingroup ContextMacros
  */
-#define NKENTSEU_DECLARE_WITH_CONTEXT(type, name, value) \
-    type name = (value); \
-    NKENTSEU_UNUSED(name)  // Pour éviter les warnings si non utilisé
+#define NKENTSEU_DECLARE_WITH_CONTEXT(type, name, value)                                                               \
+	type name = (value);                                                                                               \
+	NKENTSEU_UNUSED(name) // Pour éviter les warnings si non utilisé
 
 /**
  * @brief Vérifie une condition et retourne si fausse
@@ -302,13 +295,13 @@
  * @param retval Valeur de retour si condition fausse
  * @ingroup ContextMacros
  */
-#define NKENTSEU_CHECK_RETURN(condition, retval) \
-    do { \
-        if (!(condition)) { \
-            NKENTSEU_LOG_WARNING("Check failed: " #condition); \
-            return retval; \
-        } \
-    } while(0)
+#define NKENTSEU_CHECK_RETURN(condition, retval)                                                                       \
+	do {                                                                                                               \
+		if (!(condition)) {                                                                                            \
+			NKENTSEU_LOG_WARNING("Check failed: " #condition);                                                         \
+			return retval;                                                                                             \
+		}                                                                                                              \
+	} while (0)
 
 /**
  * @brief Vérifie une condition et continue si fausse
@@ -316,13 +309,13 @@
  * @param condition Condition à vérifier
  * @ingroup ContextMacros
  */
-#define NKENTSEU_CHECK_CONTINUE(condition) \
-    do { \
-        if (!(condition)) { \
-            NKENTSEU_LOG_WARNING("Check failed: " #condition); \
-            continue; \
-        } \
-    } while(0)
+#define NKENTSEU_CHECK_CONTINUE(condition)                                                                             \
+	do {                                                                                                               \
+		if (!(condition)) {                                                                                            \
+			NKENTSEU_LOG_WARNING("Check failed: " #condition);                                                         \
+			continue;                                                                                                  \
+		}                                                                                                              \
+	} while (0)
 
 // ============================================================
 // MACROS POUR TESTS UNITAIRE
@@ -340,13 +333,13 @@
  * @param msg Message en cas d'échec
  * @ingroup TestMacros
  */
-#define NKENTSEU_TEST_ASSERT(condition, msg) \
-    do { \
-        if (!(condition)) { \
-            NKENTSEU_LOG_ERROR("Test failed: " msg); \
-            return false; \
-        } \
-    } while(0)
+#define NKENTSEU_TEST_ASSERT(condition, msg)                                                                           \
+	do {                                                                                                               \
+		if (!(condition)) {                                                                                            \
+			NKENTSEU_LOG_ERROR("Test failed: " msg);                                                                   \
+			return false;                                                                                              \
+		}                                                                                                              \
+	} while (0)
 
 /**
  * @brief Égalité de test avec valeurs
@@ -356,75 +349,79 @@
  * @param msg Message en cas d'échec
  * @ingroup TestMacros
  */
-#define NKENTSEU_TEST_EQUAL(actual, expected, msg) \
-    NKENTSEU_TEST_ASSERT((actual) == (expected), \
-        msg " (actual: " NKENTSEU_STRINGIFY(actual) \
-        ", expected: " NKENTSEU_STRINGIFY(expected) ")")
+#define NKENTSEU_TEST_EQUAL(actual, expected, msg)                                                                     \
+	NKENTSEU_TEST_ASSERT((actual) == (expected),                                                                       \
+						 msg " (actual: " NKENTSEU_STRINGIFY(actual) ", expected: " NKENTSEU_STRINGIFY(expected) ")")
 
 // ============================================================
 // NAMESPACE POUR CLASSES D'AIDE
 // ============================================================
 
 namespace nkentseu {
+/**
+ * @brief Namespace debug.
+ */
 namespace debug {
 
 #if defined(NKENTSEU_ENABLE_PROFILING)
-    /**
-     * @class ProfileScope
-     * @brief Classe utilitaire pour le profiling scope-based
-     */
-    class ProfileScope {
-    public:
-        explicit ProfileScope(const char* name) : m_name(name) {
-            // Début du profiling
-        }
-        
-        ~ProfileScope() {
-            // Fin du profiling
-        }
-        
-    private:
-        const char* m_name;
-    };
+/**
+ * @class ProfileScope
+ * @brief Classe utilitaire pour le profiling scope-based
+ */
+class ProfileScope {
+public:
+	explicit ProfileScope(const char *name) : m_name(name) {
+		// Début du profiling
+	}
+
+	~ProfileScope() {
+		// Fin du profiling
+	}
+
+private:
+	const char *m_name;
+};
 #endif
 
 #if defined(NKENTSEU_ENABLE_INSTRUMENTATION)
-    /**
-     * @class InstrumentFunction
-     * @brief Classe pour l'instrumentation de fonctions
-     */
-    class InstrumentFunction {
-    public:
-        explicit InstrumentFunction(const char* functionName) 
-            : m_functionName(functionName) {
-            // Entrée dans la fonction
-        }
-        
-        ~InstrumentFunction() {
-            // Sortie de la fonction
-        }
-        
-    private:
-        const char* m_functionName;
-    };
+/**
+ * @class InstrumentFunction
+ * @brief Classe pour l'instrumentation de fonctions
+ */
+class InstrumentFunction {
+public:
+	explicit InstrumentFunction(const char *functionName) : m_functionName(functionName) {
+		// Entrée dans la fonction
+	}
+
+	~InstrumentFunction() {
+		// Sortie de la fonction
+	}
+
+private:
+	const char *m_functionName;
+};
 #endif
 
 } // namespace debug
 
+/**
+ * @brief Namespace log.
+ */
 namespace log {
 
-    // Fonctions de logging simplifiées
-    inline void Error(const char* msg, const char* file, int line, const char* func) {
-        // Implémentation du logging d'erreur
-    }
-    
-    inline void Warning(const char* msg, const char* file, int line, const char* func) {
-        // Implémentation du logging d'avertissement
-    }
-    
-    inline void Info(const char* msg, const char* file, int line, const char* func) {
-        // Implémentation du logging d'information
-    }
+// Fonctions de logging simplifiées
+inline void Error(const char *msg, const char *file, int line, const char *func) {
+	// Implémentation du logging d'erreur
+}
+
+inline void Warning(const char *msg, const char *file, int line, const char *func) {
+	// Implémentation du logging d'avertissement
+}
+
+inline void Info(const char *msg, const char *file, int line, const char *func) {
+	// Implémentation du logging d'information
+}
 
 } // namespace log
 } // namespace nkentseu

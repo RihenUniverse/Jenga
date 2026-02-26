@@ -31,7 +31,7 @@
  * @ingroup CoreVersion
  */
 #ifndef NKENTSEU_VERSION_CORE_MAJOR
-    #define NKENTSEU_VERSION_CORE_MAJOR 1
+#define NKENTSEU_VERSION_CORE_MAJOR 1
 #endif
 
 /**
@@ -39,7 +39,7 @@
  * @ingroup CoreVersion
  */
 #ifndef NKENTSEU_VERSION_CORE_MINOR
-    #define NKENTSEU_VERSION_CORE_MINOR 0
+#define NKENTSEU_VERSION_CORE_MINOR 0
 #endif
 
 /**
@@ -47,7 +47,7 @@
  * @ingroup CoreVersion
  */
 #ifndef NKENTSEU_VERSION_CORE_PATCH
-    #define NKENTSEU_VERSION_CORE_PATCH 0
+#define NKENTSEU_VERSION_CORE_PATCH 0
 #endif
 
 /**
@@ -55,15 +55,16 @@
  * @note Format: 0xMMmmpppp (Major, minor, patch)
  * @ingroup CoreVersion
  */
-#define NKENTSEU_VERSION_CORE NkVersionEncode(NKENTSEU_VERSION_CORE_MAJOR, NKENTSEU_VERSION_CORE_MINOR, NKENTSEU_VERSION_CORE_PATCH)
+#define NKENTSEU_VERSION_CORE                                                                                          \
+	NkVersionEncode(NKENTSEU_VERSION_CORE_MAJOR, NKENTSEU_VERSION_CORE_MINOR, NKENTSEU_VERSION_CORE_PATCH)
 
 /**
  * @brief Version sous forme de chaîne
  * @ingroup CoreVersion
  */
-#define NKENTSEU_VERSION_CORE_STRING NkStringify(NKENTSEU_VERSION_CORE_MAJOR) "." \
-                                     NkStringify(NKENTSEU_VERSION_CORE_MINOR) "." \
-                                     NkStringify(NKENTSEU_VERSION_CORE_PATCH)
+#define NKENTSEU_VERSION_CORE_STRING                                                                                   \
+	NkStringify(NKENTSEU_VERSION_CORE_MAJOR) "." NkStringify(NKENTSEU_VERSION_CORE_MINOR) "." NkStringify(             \
+		NKENTSEU_VERSION_CORE_PATCH)
 
 /**
  * @brief Nom complet du framework
@@ -109,7 +110,7 @@
  * @ingroup BuildInfo
  */
 #ifndef NKENTSEU_BUILD_NUMBER
-    #define NKENTSEU_BUILD_NUMBER 0
+#define NKENTSEU_BUILD_NUMBER 0
 #endif
 
 // ============================================================
@@ -126,7 +127,7 @@
  * @ingroup APIVersion
  */
 #ifndef NKENTSEU_API_VERSION_MAJOR
-    #define NKENTSEU_API_VERSION_MAJOR 1
+#define NKENTSEU_API_VERSION_MAJOR 1
 #endif
 
 /**
@@ -134,7 +135,7 @@
  * @ingroup APIVersion
  */
 #ifndef NKENTSEU_API_VERSION_MINOR
-    #define NKENTSEU_API_VERSION_MINOR 0
+#define NKENTSEU_API_VERSION_MINOR 0
 #endif
 
 /**
@@ -142,16 +143,15 @@
  * @ingroup APIVersion
  */
 #ifndef NKENTSEU_API_VERSION_PATCH
-    #define NKENTSEU_API_VERSION_PATCH 0
+#define NKENTSEU_API_VERSION_PATCH 0
 #endif
 
 /**
  * @brief Version API complète encodée
  * @ingroup APIVersion
  */
-#define NKENTSEU_API_VERSION NkVersionEncode(NKENTSEU_API_VERSION_MAJOR, \
-                                           NKENTSEU_API_VERSION_MINOR, \
-                                           NKENTSEU_API_VERSION_PATCH)
+#define NKENTSEU_API_VERSION                                                                                           \
+	NkVersionEncode(NKENTSEU_API_VERSION_MAJOR, NKENTSEU_API_VERSION_MINOR, NKENTSEU_API_VERSION_PATCH)
 
 /**
  * @brief Macro pour marquer une API comme stable
@@ -189,8 +189,7 @@
  * @example #if NKENTSEU_VERSION_AT_LEAST(1, 2, 0)
  * @ingroup VersionCompatibility
  */
-#define NKENTSEU_VERSION_AT_LEAST(major, minor, patch) \
-    (NKENTSEU_VERSION_CORE >= NkVersionEncode(major, minor, patch))
+#define NKENTSEU_VERSION_AT_LEAST(major, minor, patch) (NKENTSEU_VERSION_CORE >= NkVersionEncode(major, minor, patch))
 
 /**
  * @brief Macro pour vérifier version exacte
@@ -200,8 +199,7 @@
  * @return true si version actuelle == version spécifiée
  * @ingroup VersionCompatibility
  */
-#define NKENTSEU_VERSION_EQUALS(major, minor, patch) \
-    (NKENTSEU_VERSION_CORE == NkVersionEncode(major, minor, patch))
+#define NKENTSEU_VERSION_EQUALS(major, minor, patch) (NKENTSEU_VERSION_CORE == NkVersionEncode(major, minor, patch))
 
 #endif // NKENTSEU_CORE_NKCORE_SRC_NKCORE_NKVERSION_H_INCLUDED
 

@@ -9,7 +9,7 @@ import sys
 from typing import List, Optional, Tuple
 
 from .Clean import CleanCommand
-from .build import BuildCommand
+from .Build import BuildCommand
 
 
 class RebuildCommand:

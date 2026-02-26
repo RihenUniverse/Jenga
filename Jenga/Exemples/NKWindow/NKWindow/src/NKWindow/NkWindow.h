@@ -1,10 +1,10 @@
 #pragma once
 
 // =============================================================================
-// NkWindow.h — Header principal NkWindow v2
+// NkWindow.h â€” Header principal NkWindow v2
 //
 // Inclure uniquement ce fichier dans vos sources.
-// NkMain.h uniquement dans le .cpp qui définit nkmain().
+// NkMain.h uniquement dans le .cpp qui dÃ©finit nkmain().
 //
 // Exemple d'usage complet :
 //
@@ -13,12 +13,12 @@
 //
 //   int nkmain(const nkentseu::NkEntryState& state)
 //   {
-//       // 1. Init (crée EventImpl + GamepadSystem)
+//       // 1. Init (crÃ©e EventImpl + GamepadSystem)
 //       nkentseu::NkAppData app;
 //       app.preferredRenderer = nkentseu::NkRendererApi::NK_SOFTWARE;
 //       nkentseu::NkInitialise(app);
 //
-//       // 2. Fenêtre (pas d'EventImpl à passer)
+//       // 2. FenÃªtre (pas d'EventImpl Ã  passer)
 //       nkentseu::NkWindowConfig cfg;
 //       cfg.title = "Hello"; cfg.width = 800; cfg.height = 600;
 //       nkentseu::Window window(cfg);
@@ -26,8 +26,8 @@
 //       // 3. Safe Area (mobile : notch / home indicator)
 //       auto insets = window.GetSafeAreaInsets();
 //
-//       // 4. Renderer
-//       nkentseu::Renderer renderer(window);
+//       // 4. NkRenderer
+//       nkentseu::NkRenderer renderer(window);
 //       renderer.SetBackgroundColor(0x1A1A2EFF);
 //
 //       // 5. Gamepad
@@ -38,17 +38,15 @@
 //       // 6. Boucle principale
 //       auto& es = nkentseu::EventSystem::Instance();
 //       while (window.IsOpen()) {
-//           es.PollEvents();
+//           while (auto* ev = es.PollEvent()) {
+//               if (ev->type == nkentseu::NkEventType::NK_WINDOW_CLOSE) {
+//                   window.Close();
+//               }
+//           }
 //           gp.PollGamepads();
 //
-//           // Transformation 2D
-//           nkentseu::NkTransform2D t;
-//           t.position = {400, 300};
-//           t.rotation += 1.f;
-//           renderer.SetTransform(t);
-//
 //           renderer.BeginFrame();
-//           renderer.FillRectTransformed({-50,-50}, 100, 100, 0xFF5733FF);
+//           renderer.SetPixel(100, 100, 0xFF5733FF);
 //           renderer.EndFrame();
 //           renderer.Present();
 //       }
@@ -78,10 +76,7 @@
 #include "Core/NkWindow.h"
 #include "Core/NkEventSystem.h"
 #include "Core/NkRenderer.h"
-#include "Core/NkCamera2D.h"
+#include "Core/IRendererImpl.h"
 
-// Système de capture caméra physique
-#include "Core/Camera/NkCameraSystem.h"
-#include "Core/Camera/NkCameraTypes.h"
 #include "Core/NkDialogs.h"
 #include "Core/NkEntry.h"

@@ -17,8 +17,10 @@
 #include <string>
 #include <memory>
 
-namespace nkentseu
-{
+/**
+ * @brief Namespace nkentseu.
+ */
+namespace nkentseu {
 
 class IEventImpl;
 class EventSystem;
@@ -27,70 +29,74 @@ class EventSystem;
 // NkAppData — paramètres de démarrage de l'application
 // ---------------------------------------------------------------------------
 
-struct NkAppData
-{
-    // --- Renderer préféré ---
-    NkRendererApi   preferredRenderer = NkRendererApi::NK_SOFTWARE;
+struct NkAppData {
+	// --- Renderer préféré ---
+	NkRendererApi preferredRenderer = NkRendererApi::NK_SOFTWARE;
 
-    // --- Debug ---
-    bool            enableRendererDebug  = false;
-    bool            enableEventLogging   = false;
+	// --- Debug ---
+	bool enableRendererDebug = false;
+	bool enableEventLogging = false;
 
-    // --- Application ---
-    std::string     appName    = "NkApp";
-    std::string     appVersion = "1.0.0";
+	// --- Application ---
+	std::string appName = "NkApp";
+	std::string appVersion = "1.0.0";
 
-    // --- Divers ---
-    bool            enableMultiWindow = true; ///< Permettre plusieurs fenêtres
+	// --- Divers ---
+	bool enableMultiWindow = true; ///< Permettre plusieurs fenêtres
 };
 
 // ---------------------------------------------------------------------------
 // NkSystem — gestion du cycle de vie global
 // ---------------------------------------------------------------------------
 
-class NkSystem
-{
+class NkSystem {
 public:
-    NkSystem()  = default;
-    ~NkSystem() = default;
+	NkSystem() = default;
+	~NkSystem() = default;
 
-    NkSystem(const NkSystem&)            = delete;
-    NkSystem& operator=(const NkSystem&) = delete;
+	NkSystem(const NkSystem &) = delete;
+	NkSystem &operator=(const NkSystem &) = delete;
 
-    static NkSystem& Instance();
+	static NkSystem &Instance();
 
-    // -----------------------------------------------------------------------
-    // Initialise la plateforme et le système d'événements.
-    // Doit être appelé AVANT toute création de Window.
-    // -----------------------------------------------------------------------
-    bool Initialise(const NkAppData& data = {});
+	// -----------------------------------------------------------------------
+	// Initialise la plateforme et le système d'événements.
+	// Doit être appelé AVANT toute création de Window.
+	// -----------------------------------------------------------------------
+	bool Initialise(const NkAppData &data = {});
 
-    // -----------------------------------------------------------------------
-    // Libère toutes les ressources (ferme fenêtres, event impl, etc.)
-    // -----------------------------------------------------------------------
-    void Close();
+	// -----------------------------------------------------------------------
+	// Libère toutes les ressources (ferme fenêtres, event impl, etc.)
+	// -----------------------------------------------------------------------
+	void Close();
 
-    // -----------------------------------------------------------------------
-    // Accès
-    // -----------------------------------------------------------------------
-    bool IsInitialised() const { return mInitialised; }
+	// -----------------------------------------------------------------------
+	// Accès
+	// -----------------------------------------------------------------------
+	bool IsInitialised() const {
+		return mInitialised;
+	}
 
-    IEventImpl*         GetEventImpl()  const { return mEventImpl.get(); }
+	IEventImpl *GetEventImpl() const {
+		return mEventImpl.get();
+	}
 
-    // -----------------------------------------------------------------------
-    // SINGLETON EVENT IMPL — Règle d'architecture
-    // -----------------------------------------------------------------------
-    // Il existe UNE SEULE instance de IEventImpl par NkSystem (et donc
-    // par application).  Toutes les fenêtres s'y enregistrent via
-    // eventImpl.Initialize(this, nativeHandle).
-    // Plusieurs instances de Window sont supportées.
-    // -----------------------------------------------------------------------
-    const NkAppData&    GetAppData()    const { return mAppData;         }
+	// -----------------------------------------------------------------------
+	// SINGLETON EVENT IMPL — Règle d'architecture
+	// -----------------------------------------------------------------------
+	// Il existe UNE SEULE instance de IEventImpl par NkSystem (et donc
+	// par application).  Toutes les fenêtres s'y enregistrent via
+	// eventImpl.Initialize(this, nativeHandle).
+	// Plusieurs instances de Window sont supportées.
+	// -----------------------------------------------------------------------
+	const NkAppData &GetAppData() const {
+		return mAppData;
+	}
 
 private:
-    bool                        mInitialised = false;
-    NkAppData                   mAppData;
-    std::unique_ptr<IEventImpl> mEventImpl;
+	bool mInitialised = false;
+	NkAppData mAppData;
+	std::unique_ptr<IEventImpl> mEventImpl;
 };
 
 // ---------------------------------------------------------------------------
@@ -107,26 +113,23 @@ private:
  *   nkentseu::NkInitialise(data);
  * @endcode
  */
-inline bool NkInitialise(const NkAppData& data = {})
-{
-    return NkSystem::Instance().Initialise(data);
+inline bool NkInitialise(const NkAppData &data = {}) {
+	return NkSystem::Instance().Initialise(data);
 }
 
 /**
  * @brief Libère toutes les ressources du framework.
  *        Appeler avant la fin de nkmain() / main().
  */
-inline void NkClose()
-{
-    NkSystem::Instance().Close();
+inline void NkClose() {
+	NkSystem::Instance().Close();
 }
 
 /**
  * @brief Accède à l'implémentation d'événements active (plateforme courante).
  */
-inline IEventImpl* NkGetEventImpl()
-{
-    return NkSystem::Instance().GetEventImpl();
+inline IEventImpl *NkGetEventImpl() {
+	return NkSystem::Instance().GetEventImpl();
 }
 
 } // namespace nkentseu

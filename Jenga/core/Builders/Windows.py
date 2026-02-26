@@ -54,7 +54,11 @@ class WindowsBuilder(Builder):
             return True
 
         header_path = Path(self.ResolveProjectPath(project, project.pchHeader))
-        Colored.PrintWarning(f"[PCH] {project.name}: pchHeader={project.pchHeader!r} resolved={header_path} exists={header_path.exists()}")
+        if self.verbose:
+            Colored.PrintInfo(
+                f"[PCH] {project.name}: pchHeader={project.pchHeader!r} "
+                f"resolved={header_path} exists={header_path.exists()}"
+            )
         if not header_path.exists():
             Colored.PrintError(f"[PCH] Header not found for {project.name}: {header_path}")
             return False
@@ -97,6 +101,19 @@ class WindowsBuilder(Builder):
         args = [compiler, "-x", "c++-header", str(header_path), "-o", str(pch_file)]
         for inc in project.includeDirs:
             args.append(f"-I{self.ResolveProjectPath(project, inc)}")
+        args.append(f"-I{header_path.parent}")
+        for define in self.toolchain.defines:
+            args.append(f"-D{define}")
+        for define in project.defines:
+            args.append(f"-D{define}")
+        if project.language.value in ("C++", "Objective-C++") and project.cppdialect:
+            args.append(f"-std={project.cppdialect.lower()}")
+            args.extend(self.toolchain.cxxflags)
+            args.extend(project.cxxflags)
+        elif project.cdialect:
+            args.append(f"-std={project.cdialect.lower()}")
+            args.extend(self.toolchain.cflags)
+            args.extend(project.cflags)
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
         if result.returnCode != 0:

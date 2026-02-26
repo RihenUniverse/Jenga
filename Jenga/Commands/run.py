@@ -14,7 +14,7 @@ from ..Core.Cache import Cache
 from ..Core.Builder import Builder
 from ..Core import Api
 from ..Utils import Colored, Process, FileSystem
-from .build import BuildCommand
+from .Build import BuildCommand
 
 
 class RunCommand:

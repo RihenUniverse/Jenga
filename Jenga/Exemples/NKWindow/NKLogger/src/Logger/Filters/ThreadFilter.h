@@ -1,15 +1,21 @@
 #ifndef NKENTSEU_LOGGER_FILTERS_THREADFILTER_H
 #define NKENTSEU_LOGGER_FILTERS_THREADFILTER_H
 
+/**
+ * @brief Namespace nkentseu.
+ */
 namespace nkentseu {
 
+/**
+ * @brief Class ThreadFilter.
+ */
 class ThreadFilter {
 public:
-    ThreadFilter();
-    ~ThreadFilter();
+	ThreadFilter();
+	~ThreadFilter();
 
 private:
-    // Implementation
+	// Implementation
 };
 
 } // namespace nkentseu

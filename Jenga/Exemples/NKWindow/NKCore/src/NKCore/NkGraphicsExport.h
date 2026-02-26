@@ -15,7 +15,7 @@
 // INCLUDE DU SYSTÈME D'EXPORT PRINCIPAL
 // ============================================================
 
-#include "../../Platform/NkExport.h"
+#include "NkExport.h"
 
 // ============================================================
 // CONFIGURATION DU MODULE GRAPHICS
@@ -31,13 +31,11 @@
  * @ingroup GraphicsModule
  */
 #ifndef NKENTSEU_BUILDING_GRAPHICS
-    #if defined(NKENTSEU_GRAPHICS_EXPORTS) || \
-        defined(GRAPHICS_EXPORTS) || \
-        defined(NKENTSEU_BUILDING_GFX)
-        #define NKENTSEU_BUILDING_GRAPHICS 1
-    #else
-        #define NKENTSEU_BUILDING_GRAPHICS 0
-    #endif
+#if defined(NKENTSEU_GRAPHICS_EXPORTS) || defined(GRAPHICS_EXPORTS) || defined(NKENTSEU_BUILDING_GFX)
+#define NKENTSEU_BUILDING_GRAPHICS 1
+#else
+#define NKENTSEU_BUILDING_GRAPHICS 0
+#endif
 #endif
 
 // ============================================================
@@ -48,9 +46,9 @@
  * @brief API principale du module Graphics
  * @def NKENTSEU_GRAPHICS_API
  * @ingroup GraphicsModule
- * 
+ *
  * Utilisé pour exporter/importer les classes et fonctions du module Graphics.
- * 
+ *
  * @example
  * @code
  * class NKENTSEU_GRAPHICS_API Renderer {
@@ -60,11 +58,11 @@
  * @endcode
  */
 #if NKENTSEU_BUILDING_GRAPHICS
-    #define NKENTSEU_GRAPHICS_API NKENTSEU_SYMBOL_EXPORT
+#define NKENTSEU_GRAPHICS_API NKENTSEU_SYMBOL_EXPORT
 #elif NKENTSEU_SHARED_BUILD
-    #define NKENTSEU_GRAPHICS_API NKENTSEU_SYMBOL_IMPORT
+#define NKENTSEU_GRAPHICS_API NKENTSEU_SYMBOL_IMPORT
 #else
-    #define NKENTSEU_GRAPHICS_API
+#define NKENTSEU_GRAPHICS_API
 #endif
 
 /**
@@ -126,40 +124,40 @@
 
 /*
  * UTILISATION DANS UN HEADER PUBLIC:
- * 
+ *
  * #include "NkGraphicsExport.h"
- * 
+ *
  * namespace nkentseu {
  * namespace graphics {
- * 
+ *
  * class NKENTSEU_GRAPHICS_API Renderer {
  * public:
  *     NKENTSEU_GRAPHICS_API Renderer();
  *     NKENTSEU_GRAPHICS_API ~Renderer();
- *     
+ *
  *     NKENTSEU_GRAPHICS_API void initialize();
  *     NKENTSEU_GRAPHICS_API void render();
  *     NKENTSEU_GRAPHICS_API void shutdown();
- *     
+ *
  * private:
  *     NKENTSEU_GRAPHICS_PRIVATE void updateInternal(); // Non exportée
  * };
- * 
+ *
  * class NKENTSEU_SHADER_API Shader {
  * public:
  *     NKENTSEU_SHADER_API bool compile(const char* source);
  * };
- * 
+ *
  * } // namespace graphics
  * } // namespace nkentseu
- * 
+ *
  * // API C
  * NKENTSEU_EXTERN_C_BEGIN
- * 
+ *
  * NKENTSEU_GRAPHICS_C_API void* nkGraphicsCreateRenderer(void);
  * NKENTSEU_GRAPHICS_C_API void nkGraphicsDestroyRenderer(void* renderer);
  * NKENTSEU_GRAPHICS_C_API void nkGraphicsRender(void* renderer);
- * 
+ *
  * NKENTSEU_EXTERN_C_END
  */
 

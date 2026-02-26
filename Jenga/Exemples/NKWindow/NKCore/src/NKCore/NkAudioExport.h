@@ -11,20 +11,18 @@
 #ifndef NKENTSEU_EXAMPLES_MODULAREXPORTS_NKAUDIOEXPORT_H_INCLUDED
 #define NKENTSEU_EXAMPLES_MODULAREXPORTS_NKAUDIOEXPORT_H_INCLUDED
 
-#include "../../Platform/NkExport.h"
+#include "NkExport.h"
 
 // ============================================================
 // CONFIGURATION DU MODULE AUDIO
 // ============================================================
 
 #ifndef NKENTSEU_BUILDING_AUDIO
-    #if defined(NKENTSEU_AUDIO_EXPORTS) || \
-        defined(AUDIO_EXPORTS) || \
-        defined(NKENTSEU_BUILDING_SND)
-        #define NKENTSEU_BUILDING_AUDIO 1
-    #else
-        #define NKENTSEU_BUILDING_AUDIO 0
-    #endif
+#if defined(NKENTSEU_AUDIO_EXPORTS) || defined(AUDIO_EXPORTS) || defined(NKENTSEU_BUILDING_SND)
+#define NKENTSEU_BUILDING_AUDIO 1
+#else
+#define NKENTSEU_BUILDING_AUDIO 0
+#endif
 #endif
 
 // ============================================================
@@ -32,11 +30,11 @@
 // ============================================================
 
 #if NKENTSEU_BUILDING_AUDIO
-    #define NKENTSEU_AUDIO_API NKENTSEU_SYMBOL_EXPORT
+#define NKENTSEU_AUDIO_API NKENTSEU_SYMBOL_EXPORT
 #elif NKENTSEU_SHARED_BUILD
-    #define NKENTSEU_AUDIO_API NKENTSEU_SYMBOL_IMPORT
+#define NKENTSEU_AUDIO_API NKENTSEU_SYMBOL_IMPORT
 #else
-    #define NKENTSEU_AUDIO_API
+#define NKENTSEU_AUDIO_API
 #endif
 
 #define NKENTSEU_AUDIO_C_API NKENTSEU_EXTERN_C NKENTSEU_AUDIO_API NKENTSEU_CALL
@@ -52,19 +50,19 @@
 
 /*
  * #include "NkAudioExport.h"
- * 
+ *
  * namespace nkentseu {
  * namespace audio {
- * 
+ *
  * class NKENTSEU_AUDIO_API AudioEngine {
  * public:
  *     NKENTSEU_AUDIO_API void initialize();
  *     NKENTSEU_AUDIO_API void playSound(const char* path);
  * };
- * 
+ *
  * } // namespace audio
  * } // namespace nkentseu
- * 
+ *
  * // API C
  * NKENTSEU_EXTERN_C_BEGIN
  * NKENTSEU_AUDIO_C_API void nkAudioInit(void);

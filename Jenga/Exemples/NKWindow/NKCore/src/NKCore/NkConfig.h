@@ -31,7 +31,7 @@
  * @ingroup BuildConfig
  */
 #if !defined(NDEBUG) && !defined(NKENTSEU_DEBUG) && !defined(NKENTSEU_RELEASE)
-    #define NKENTSEU_DEBUG
+#define NKENTSEU_DEBUG
 #endif
 
 /**
@@ -39,7 +39,7 @@
  * @ingroup BuildConfig
  */
 #if defined(NDEBUG) && !defined(NKENTSEU_RELEASE)
-    #define NKENTSEU_RELEASE
+#define NKENTSEU_RELEASE
 #endif
 
 /**
@@ -47,8 +47,8 @@
  * @ingroup BuildConfig
  */
 #if defined(NKENTSEU_DIST) || defined(NKENTSEU_DISTRIBUTION)
-    #define NKENTSEU_RELEASE
-    #define NKENTSEU_DISTRIBUTION
+#define NKENTSEU_RELEASE
+#define NKENTSEU_DISTRIBUTION
 #endif
 
 // ============================================================
@@ -65,7 +65,7 @@
  * @ingroup AssertConfig
  */
 #if defined(NKENTSEU_DEBUG)
-    #define NKENTSEU_ENABLE_ASSERTS
+#define NKENTSEU_ENABLE_ASSERTS
 #endif
 
 /**
@@ -73,12 +73,12 @@
  * @ingroup AssertConfig
  */
 #if defined(NKENTSEU_FORCE_ENABLE_ASSERTS)
-    #undef NKENTSEU_ENABLE_ASSERTS
-    #define NKENTSEU_ENABLE_ASSERTS
+#undef NKENTSEU_ENABLE_ASSERTS
+#define NKENTSEU_ENABLE_ASSERTS
 #endif
 
 #if defined(NKENTSEU_FORCE_DISABLE_ASSERTS)
-    #undef NKENTSEU_ENABLE_ASSERTS
+#undef NKENTSEU_ENABLE_ASSERTS
 #endif
 
 // ============================================================
@@ -95,7 +95,7 @@
  * @ingroup MemoryConfig
  */
 #if defined(NKENTSEU_DEBUG) && !defined(NKENTSEU_DISABLE_MEMORY_TRACKING)
-    #define NKENTSEU_ENABLE_MEMORY_TRACKING
+#define NKENTSEU_ENABLE_MEMORY_TRACKING
 #endif
 
 /**
@@ -103,7 +103,7 @@
  * @ingroup MemoryConfig
  */
 #if defined(NKENTSEU_ENABLE_MEMORY_TRACKING)
-    #define NKENTSEU_ENABLE_LEAK_DETECTION
+#define NKENTSEU_ENABLE_LEAK_DETECTION
 #endif
 
 /**
@@ -111,7 +111,7 @@
  * @ingroup MemoryConfig
  */
 #if defined(NKENTSEU_ENABLE_MEMORY_TRACKING)
-    #define NKENTSEU_ENABLE_MEMORY_STATS
+#define NKENTSEU_ENABLE_MEMORY_STATS
 #endif
 
 // ============================================================
@@ -129,9 +129,9 @@
  * @ingroup LogConfig
  */
 #if defined(NKENTSEU_DEBUG)
-    #define NKENTSEU_LOG_LEVEL 4  // DEBUG
+#define NKENTSEU_LOG_LEVEL 4 // DEBUG
 #else
-    #define NKENTSEU_LOG_LEVEL 2  // WARN
+#define NKENTSEU_LOG_LEVEL 2 // WARN
 #endif
 
 /**
@@ -139,7 +139,7 @@
  * @ingroup LogConfig
  */
 #if defined(NKENTSEU_DEBUG)
-    #define NKENTSEU_ENABLE_FILE_LOGGING
+#define NKENTSEU_ENABLE_FILE_LOGGING
 #endif
 
 // ============================================================
@@ -156,7 +156,7 @@
  * @ingroup PerfConfig
  */
 #if defined(NKENTSEU_DEBUG) || defined(NKENTSEU_PROFILE)
-    #define NKENTSEU_ENABLE_PROFILING
+#define NKENTSEU_ENABLE_PROFILING
 #endif
 
 /**
@@ -164,7 +164,7 @@
  * @ingroup PerfConfig
  */
 #if defined(NKENTSEU_ENABLE_INSTRUMENTATION)
-    #define NKENTSEU_ENABLE_PROFILING
+#define NKENTSEU_ENABLE_PROFILING
 #endif
 
 // ============================================================
@@ -181,9 +181,9 @@
  * @ingroup OptimConfig
  */
 #if !defined(NKENTSEU_DISABLE_SIMD)
-    #if defined(NKENTSEU_CPU_HAS_SSE2) || defined(NKENTSEU_CPU_HAS_NEON)
-        #define NKENTSEU_ENABLE_SIMD
-    #endif
+#if defined(NKENTSEU_CPU_HAS_SSE2) || defined(NKENTSEU_CPU_HAS_NEON)
+#define NKENTSEU_ENABLE_SIMD
+#endif
 #endif
 
 /**
@@ -191,7 +191,7 @@
  * @ingroup OptimConfig
  */
 #if !defined(NKENTSEU_DISABLE_THREADING)
-    #define NKENTSEU_ENABLE_THREADING
+#define NKENTSEU_ENABLE_THREADING
 #endif
 
 /**
@@ -214,16 +214,16 @@
  * @ingroup AllocConfig
  */
 #if defined(NKENTSEU_ENABLE_SIMD)
-    #define NKENTSEU_DEFAULT_ALIGNMENT 16
+#define NKENTSEU_DEFAULT_ALIGNMENT 16
 #else
-    #define NKENTSEU_DEFAULT_ALIGNMENT 8
+#define NKENTSEU_DEFAULT_ALIGNMENT 8
 #endif
 
 /**
  * @brief Taille page mémoire par défaut
  * @ingroup AllocConfig
  */
-#define NKENTSEU_DEFAULT_PAGE_SIZE (4 * 1024)  // 4 KB
+#define NKENTSEU_DEFAULT_PAGE_SIZE (4 * 1024) // 4 KB
 
 /**
  * @brief Allocateur par défaut
@@ -231,7 +231,7 @@
  * @ingroup AllocConfig
  */
 #ifndef NKENTSEU_DEFAULT_ALLOCATOR
-    #define NKENTSEU_DEFAULT_ALLOCATOR NKENTSEU_ALLOCATOR_MALLOC
+#define NKENTSEU_DEFAULT_ALLOCATOR NKENTSEU_ALLOCATOR_MALLOC
 #endif
 
 // ============================================================
@@ -308,9 +308,9 @@
  * @ingroup MathConfig
  */
 #if defined(NKENTSEU_MATH_USE_DOUBLE)
-    #define NKENTSEU_MATH_PRECISION_DOUBLE
+#define NKENTSEU_MATH_PRECISION_DOUBLE
 #else
-    #define NKENTSEU_MATH_PRECISION_FLOAT
+#define NKENTSEU_MATH_PRECISION_FLOAT
 #endif
 
 /**
@@ -341,9 +341,9 @@
  * @ingroup ReflectConfig
  */
 #if defined(NKENTSEU_ENABLE_REFLECTION)
-    #if !defined(NKENTSEU_HAS_RTTI)
-        #error "Reflection requires RTTI enabled"
-    #endif
+#if !defined(NKENTSEU_HAS_RTTI)
+#error "Reflection requires RTTI enabled"
+#endif
 #endif
 
 // ============================================================
@@ -360,7 +360,7 @@
  * @ingroup ExceptionConfig
  */
 #if defined(NKENTSEU_HAS_EXCEPTIONS) && !defined(NKENTSEU_DISABLE_EXCEPTIONS)
-    #define NKENTSEU_ENABLE_EXCEPTIONS
+#define NKENTSEU_ENABLE_EXCEPTIONS
 #endif
 
 // ============================================================
@@ -373,27 +373,27 @@
  */
 
 #if defined(NKENTSEU_PLATFORM_WINDOWS)
-    /**
-     * @brief Utiliser Win32 API
-     * @ingroup PlatformConfig
-     */
-    #define NKENTSEU_USE_WIN32_API
-    
-    /**
-     * @brief Activer support Unicode Windows (UNICODE/WCHAR)
-     * @ingroup PlatformConfig
-     */
-    #if !defined(NKENTSEU_DISABLE_UNICODE)
-        #define NKENTSEU_ENABLE_UNICODE
-    #endif
+/**
+ * @brief Utiliser Win32 API
+ * @ingroup PlatformConfig
+ */
+#define NKENTSEU_USE_WIN32_API
+
+/**
+ * @brief Activer support Unicode Windows (UNICODE/WCHAR)
+ * @ingroup PlatformConfig
+ */
+#if !defined(NKENTSEU_DISABLE_UNICODE)
+#define NKENTSEU_ENABLE_UNICODE
+#endif
 #endif
 
 #if defined(NKENTSEU_PLATFORM_POSIX)
-    /**
-     * @brief Utiliser POSIX API
-     * @ingroup PlatformConfig
-     */
-    #define NKENTSEU_USE_POSIX_API
+/**
+ * @brief Utiliser POSIX API
+ * @ingroup PlatformConfig
+ */
+#define NKENTSEU_USE_POSIX_API
 #endif
 
 // ============================================================
@@ -410,13 +410,13 @@
  * @ingroup GraphicsConfig
  */
 #if defined(NKENTSEU_PLATFORM_WINDOWS)
-    #define NKENTSEU_GRAPHICS_BACKEND_DEFAULT NKENTSEU_GRAPHICS_D3D11
+#define NKENTSEU_GRAPHICS_BACKEND_DEFAULT NKENTSEU_GRAPHICS_D3D11
 #elif defined(NKENTSEU_PLATFORM_MACOS) || defined(NKENTSEU_PLATFORM_IOS)
-    #define NKENTSEU_GRAPHICS_BACKEND_DEFAULT NKENTSEU_GRAPHICS_METAL
+#define NKENTSEU_GRAPHICS_BACKEND_DEFAULT NKENTSEU_GRAPHICS_METAL
 #elif defined(NKENTSEU_PLATFORM_ANDROID)
-    #define NKENTSEU_GRAPHICS_BACKEND_DEFAULT NKENTSEU_GRAPHICS_GLES3
+#define NKENTSEU_GRAPHICS_BACKEND_DEFAULT NKENTSEU_GRAPHICS_GLES3
 #else
-    #define NKENTSEU_GRAPHICS_BACKEND_DEFAULT NKENTSEU_GRAPHICS_OPENGL
+#define NKENTSEU_GRAPHICS_BACKEND_DEFAULT NKENTSEU_GRAPHICS_OPENGL
 #endif
 
 // ============================================================
@@ -425,15 +425,15 @@
 
 // Vérifier conflits Debug/Release
 #if defined(NKENTSEU_DEBUG) && defined(NKENTSEU_RELEASE)
-    #error "Cannot define both NKENTSEU_DEBUG and NKENTSEU_RELEASE"
+#error "Cannot define both NKENTSEU_DEBUG and NKENTSEU_RELEASE"
 #endif
 
 // Vérifier SIMD supporté si activé
 #if defined(NKENTSEU_ENABLE_SIMD)
-    #if !defined(NKENTSEU_CPU_HAS_SSE2) && !defined(NKENTSEU_CPU_HAS_NEON)
-        #warning "SIMD enabled but no SIMD instruction set detected"
-        #undef NKENTSEU_ENABLE_SIMD
-    #endif
+#if !defined(NKENTSEU_CPU_HAS_SSE2) && !defined(NKENTSEU_CPU_HAS_NEON)
+#warning "SIMD enabled but no SIMD instruction set detected"
+#undef NKENTSEU_ENABLE_SIMD
+#endif
 #endif
 
 // ============================================================
@@ -450,9 +450,9 @@
  * @ingroup ConfigUtils
  */
 #if defined(NKENTSEU_DEBUG)
-    #define NKENTSEU_IS_DEBUG 1
+#define NKENTSEU_IS_DEBUG 1
 #else
-    #define NKENTSEU_IS_DEBUG 0
+#define NKENTSEU_IS_DEBUG 0
 #endif
 
 /**
@@ -460,9 +460,9 @@
  * @ingroup ConfigUtils
  */
 #if defined(NKENTSEU_RELEASE)
-    #define NKENTSEU_IS_RELEASE 1
+#define NKENTSEU_IS_RELEASE 1
 #else
-    #define NKENTSEU_IS_RELEASE 0
+#define NKENTSEU_IS_RELEASE 0
 #endif
 
 /**
@@ -470,35 +470,34 @@
  * @ingroup ConfigUtils
  */
 #if defined(NKENTSEU_DEBUG)
-    #define NKENTSEU_DEBUG_ONLY(code) code
-    #define NKENTSEU_RELEASE_ONLY(code)
+#define NKENTSEU_DEBUG_ONLY(code) code
+#define NKENTSEU_RELEASE_ONLY(code)
 #else
-    #define NKENTSEU_DEBUG_ONLY(code)
-    #define NKENTSEU_RELEASE_ONLY(code) code
+#define NKENTSEU_DEBUG_ONLY(code)
+#define NKENTSEU_RELEASE_ONLY(code) code
 #endif
 
-
 #if defined(NKENTSEU_COMPILER_MSVC) || (defined(NKENTSEU_COMPILER_CLANG) && defined(NKENTSEU_PLATFORM_WINDOWS))
-    #define NKENTSEU_DEBUG_BREAK_IMPL() __debugbreak()
+#define NKENTSEU_DEBUG_BREAK_IMPL() __debugbreak()
 #elif defined(NKENTSEU_ARCH_ARM32)
-    #define NKENTSEU_DEBUG_BREAK_IMPL() __asm__ volatile(".inst 0xe7f000f0")
+#define NKENTSEU_DEBUG_BREAK_IMPL() __asm__ volatile(".inst 0xe7f000f0")
 #elif defined(NKENTSEU_ARCH_ARM64)
-    #define NKENTSEU_DEBUG_BREAK_IMPL() __asm__ volatile(".inst 0xd4200000")
+#define NKENTSEU_DEBUG_BREAK_IMPL() __asm__ volatile(".inst 0xd4200000")
 #elif defined(NKENTSEU_OS_HARMONYOS)
-    #define NKENTSEU_DEBUG_BREAK_IMPL() __arm_brk(0xDEB1)
+#define NKENTSEU_DEBUG_BREAK_IMPL() __arm_brk(0xDEB1)
 #else
-    #define NKENTSEU_DEBUG_BREAK_IMPL() __builtin_trap()
+#define NKENTSEU_DEBUG_BREAK_IMPL() __builtin_trap()
 #endif
 
 #ifdef NKENTSEU_DEBUG_MODE
-    #define NKENTSEU_DEBUG_BREAK(cond, ...) \
-        do { \
-            if (NKENTSEU_UNLIKELY(cond)) { \
-                NKENTSEU_DEBUG_BREAK_IMPL(); \
-            } \
-        } while(0)
+#define NKENTSEU_DEBUG_BREAK(cond, ...)                                                                                \
+	do {                                                                                                               \
+		if (NKENTSEU_UNLIKELY(cond)) {                                                                                 \
+			NKENTSEU_DEBUG_BREAK_IMPL();                                                                               \
+		}                                                                                                              \
+	} while (0)
 #else
-    #define NKENTSEU_DEBUG_BREAK(cond, ...) ((void)0)
+#define NKENTSEU_DEBUG_BREAK(cond, ...) ((void)0)
 #endif
 
 #endif // NKENTSEU_CORE_NKCORE_SRC_NKCORE_NKCONFIG_H_INCLUDED

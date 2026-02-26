@@ -48,7 +48,7 @@ class WatchCommand:
             from ..Core.Watcher import FileWatcher
             from ..Core.Loader import Loader
             from ..Core.Cache import Cache
-            from .build import BuildCommand
+            from .Build import BuildCommand
 
             watcher = FileWatcher(use_polling=parsed.polling)
             watcher.AddWatch(workspace_root)

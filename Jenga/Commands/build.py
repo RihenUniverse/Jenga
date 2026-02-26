@@ -450,6 +450,10 @@ class BuildCommand:
                             help="Android build mode override (default: native)")
         parser.add_argument("--use-android-mk", action="store_true",
                             help="Shortcut for --android-build-system ndk-mk")
+        parser.add_argument("--android-ndk-mk-mode", choices=["split", "universal", "both"], default=None,
+                            help="ndk-mk APK output mode: split, universal, or both (default: auto)")
+        parser.add_argument("--android-abis", default=None,
+                            help="Override Android ABIs (comma-separated): armeabi-v7a,arm64-v8a,x86,x86_64")
         parser.add_argument("--no-cache", action="store_true", help="Ignore cache and reload workspace")
         parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
         parser.add_argument("--no-daemon", action="store_true", help="Do not use daemon even if available")
@@ -466,6 +470,10 @@ class BuildCommand:
             cli_custom_options["android-build-system"] = parsed.android_build_system
         if parsed.use_android_mk:
             cli_custom_options["android-build-system"] = "ndk-mk"
+        if parsed.android_ndk_mk_mode:
+            cli_custom_options["android-ndk-mk-mode"] = parsed.android_ndk_mk_mode
+        if parsed.android_abis:
+            cli_custom_options["android-abis"] = parsed.android_abis
 
         # Déterminer le répertoire de travail (workspace root)
         workspace_root = Path.cwd()
@@ -556,6 +564,13 @@ class BuildCommand:
         if declared_options:
             builtin_custom_options = {
                 "android-build-system",
+                "android-ndk-mk-mode",
+                "android-ndk-mk-output",
+                "android-abis",
+                "android-ndk-mk-abis",
+                "android-ndk-mk-split",
+                "android-ndk-mk-universal",
+                "android-ndk-mk-both",
                 "emscripten-fullscreen-shell",
                 "emscripten-fullscreen",
             }

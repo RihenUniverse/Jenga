@@ -3,15 +3,21 @@
 
 #include <Logger/Logger.h>
 
+/**
+ * @brief Namespace nkentseu.
+ */
 namespace nkentseu {
 
+/**
+ * @brief Class AsyncLogger.
+ */
 class AsyncLogger {
 public:
-    AsyncLogger();
-    ~AsyncLogger();
+	AsyncLogger();
+	~AsyncLogger();
 
 private:
-    // Implementation
+	// Implementation
 };
 
 } // namespace nkentseu

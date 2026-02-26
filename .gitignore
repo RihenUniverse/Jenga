@@ -12,6 +12,8 @@ __pycache__/
 venv/
 env/
 ENV/
+# Environnement virtuel
+jenga_venv/
 
 # Packaging/build (Python)
 build/

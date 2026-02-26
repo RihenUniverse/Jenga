@@ -21,29 +21,29 @@
 #include "NkEntry.h"
 
 #if defined(NKENTSEU_PLATFORM_WIN32)
-#   include "../EntryPoints/NkWindowsDesktop.h"
+#include "../EntryPoints/NkWindowsDesktop.h"
 
 #elif defined(NKENTSEU_PLATFORM_UWP) || defined(NKENTSEU_PLATFORM_XBOX)
-#   include "../EntryPoints/NkUWP.h"
+#include "../EntryPoints/NkUWP.h"
 
 #elif defined(NKENTSEU_PLATFORM_COCOA)
-#   include "../EntryPoints/NkCocoa.h"
+#include "../EntryPoints/NkCocoa.h"
 
 #elif defined(NKENTSEU_PLATFORM_UIKIT)
-#   include "../EntryPoints/NkAppleMobile.h"
+#include "../EntryPoints/NkAppleMobile.h"
 
 #elif defined(NKENTSEU_PLATFORM_XCB)
-#   include "../EntryPoints/NkXCB.h"
+#include "../EntryPoints/NkXCB.h"
 
 #elif defined(NKENTSEU_PLATFORM_XLIB)
-#   include "../EntryPoints/NkXLib.h"
+#include "../EntryPoints/NkXLib.h"
 
 #elif defined(NKENTSEU_PLATFORM_ANDROID)
-#   include "../EntryPoints/NkAndroid.h"
+#include "../EntryPoints/NkAndroid.h"
 
 #elif defined(NKENTSEU_PLATFORM_WASM)
-#   include "../EntryPoints/NkWasm.h"
+#include "../EntryPoints/NkWasm.h"
 
 #else
-#   include "../EntryPoints/NkNoob.h"
+#include "../EntryPoints/NkNoob.h"
 #endif

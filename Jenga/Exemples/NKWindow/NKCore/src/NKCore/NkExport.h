@@ -26,7 +26,7 @@
 /**
  * @defgroup BuildConfiguration Configuration du Build
  * @brief Macros pour configurer le type de build (statique/partagé)
- * 
+ *
  * Le système détecte automatiquement le type de build à partir de:
  * - Variables CMake (BUILD_SHARED_LIBS)
  * - Variables de préprocesseur (_WINDLL, _USRDLL)
@@ -37,32 +37,32 @@
  * @brief Active le build statique
  * @def NKENTSEU_STATIC_BUILD
  * @ingroup BuildConfiguration
- * 
+ *
  * Définir cette macro à 1 pour forcer un build statique.
  * Si non définie, le système détecte automatiquement.
  */
 #ifndef NKENTSEU_STATIC_BUILD
-    #if defined(NKENTSEU_STATIC) || defined(NKENTSEU_LIB)
-        #define NKENTSEU_STATIC_BUILD 1
-    #else
-        #define NKENTSEU_STATIC_BUILD 0
-    #endif
+#if defined(NKENTSEU_STATIC) || defined(NKENTSEU_LIB)
+#define NKENTSEU_STATIC_BUILD 1
+#else
+#define NKENTSEU_STATIC_BUILD 0
+#endif
 #endif
 
 /**
  * @brief Active le build partagé (DLL/SO)
  * @def NKENTSEU_SHARED_BUILD
  * @ingroup BuildConfiguration
- * 
+ *
  * Définir cette macro à 1 pour forcer un build partagé.
  * Si non définie, le système détecte automatiquement.
  */
 #ifndef NKENTSEU_SHARED_BUILD
-    #if defined(NKENTSEU_SHARED) || defined(NKENTSEU_DLL)
-        #define NKENTSEU_SHARED_BUILD 1
-    #else
-        #define NKENTSEU_SHARED_BUILD 0
-    #endif
+#if defined(NKENTSEU_SHARED) || defined(NKENTSEU_DLL)
+#define NKENTSEU_SHARED_BUILD 1
+#else
+#define NKENTSEU_SHARED_BUILD 0
+#endif
 #endif
 
 // ============================================================
@@ -71,35 +71,35 @@
 
 // Si aucune configuration n'est spécifiée, détecter automatiquement
 #if !NKENTSEU_STATIC_BUILD && !NKENTSEU_SHARED_BUILD
-    NKENTSEU_WINDOWS_ONLY(
-        // Windows: détecter les flags de DLL
-        #if defined(_WINDLL) || defined(_USRDLL)
-            #undef NKENTSEU_SHARED_BUILD
-            #define NKENTSEU_SHARED_BUILD 1
-        #endif
-    )
-    
-    // CMake standard
-    #if defined(BUILD_SHARED_LIBS) && BUILD_SHARED_LIBS
-        #undef NKENTSEU_SHARED_BUILD
-        #define NKENTSEU_SHARED_BUILD 1
-    #endif
-    
-    // Consoles et embarqué: toujours statique
-    NKENTSEU_CONSOLE_ONLY(
-        #undef NKENTSEU_STATIC_BUILD
-        #define NKENTSEU_STATIC_BUILD 1
-    )
-    
-    NKENTSEU_EMBEDDED_ONLY(
-        #undef NKENTSEU_STATIC_BUILD
-        #define NKENTSEU_STATIC_BUILD 1
-    )
-    
-    // Si toujours rien, par défaut: statique
-    #if !NKENTSEU_STATIC_BUILD && !NKENTSEU_SHARED_BUILD
-        #define NKENTSEU_STATIC_BUILD 1
-    #endif
+NKENTSEU_WINDOWS_ONLY(
+// Windows: détecter les flags de DLL
+#if defined(_WINDLL) || defined(_USRDLL)
+#undef NKENTSEU_SHARED_BUILD
+#define NKENTSEU_SHARED_BUILD 1
+#endif
+)
+
+// CMake standard
+#if defined(BUILD_SHARED_LIBS) && BUILD_SHARED_LIBS
+#undef NKENTSEU_SHARED_BUILD
+#define NKENTSEU_SHARED_BUILD 1
+#endif
+
+// Consoles et embarqué: toujours statique
+NKENTSEU_CONSOLE_ONLY(
+#undef NKENTSEU_STATIC_BUILD
+#define NKENTSEU_STATIC_BUILD 1
+)
+
+NKENTSEU_EMBEDDED_ONLY(
+#undef NKENTSEU_STATIC_BUILD
+#define NKENTSEU_STATIC_BUILD 1
+)
+
+// Si toujours rien, par défaut: statique
+#if !NKENTSEU_STATIC_BUILD && !NKENTSEU_SHARED_BUILD
+#define NKENTSEU_STATIC_BUILD 1
+#endif
 #endif
 
 // ============================================================
@@ -109,7 +109,7 @@
 /**
  * @defgroup CoreExportMacros Macros Fondamentales d'Export
  * @brief Macros de base pour l'export/import selon la plateforme
- * 
+ *
  * Ces macros sont automatiquement définies selon la plateforme détectée
  * par NkPlatformDetect.h et ne devraient pas être utilisées directement.
  */
@@ -120,28 +120,26 @@
  * @ingroup CoreExportMacros
  */
 NKENTSEU_WINDOWS_ONLY(
-    #define NKENTSEU_SYMBOL_EXPORT __declspec(dllexport)
-    #define NKENTSEU_SYMBOL_IMPORT __declspec(dllimport)
+#define NKENTSEU_SYMBOL_EXPORT __declspec(dllexport)
+#define NKENTSEU_SYMBOL_IMPORT __declspec(dllimport)
 )
 
-NKENTSEU_UNIX_ONLY(
-    NKENTSEU_NOT_EMSCRIPTEN(
-        // Unix/Linux/macOS avec GCC/Clang
-        #define NKENTSEU_SYMBOL_EXPORT __attribute__((visibility("default")))
-        #define NKENTSEU_SYMBOL_IMPORT
-    )
-)
+NKENTSEU_UNIX_ONLY(NKENTSEU_NOT_EMSCRIPTEN(
+// Unix/Linux/macOS avec GCC/Clang
+#define NKENTSEU_SYMBOL_EXPORT __attribute__((visibility("default")))
+#define NKENTSEU_SYMBOL_IMPORT
+	))
 
 NKENTSEU_EMSCRIPTEN_ONLY(
-    // WebAssembly/Emscripten
-    #define NKENTSEU_SYMBOL_EXPORT __attribute__((used))
-    #define NKENTSEU_SYMBOL_IMPORT
+// WebAssembly/Emscripten
+#define NKENTSEU_SYMBOL_EXPORT __attribute__((used))
+#define NKENTSEU_SYMBOL_IMPORT
 )
 
 // Fallback si aucune plateforme détectée
 #ifndef NKENTSEU_SYMBOL_EXPORT
-    #define NKENTSEU_SYMBOL_EXPORT
-    #define NKENTSEU_SYMBOL_IMPORT
+#define NKENTSEU_SYMBOL_EXPORT
+#define NKENTSEU_SYMBOL_IMPORT
 #endif
 
 /**
@@ -150,11 +148,11 @@ NKENTSEU_EMSCRIPTEN_ONLY(
  * @ingroup CoreExportMacros
  */
 #if defined(__GNUC__) || defined(__clang__)
-    #define NKENTSEU_SYMBOL_HIDDEN __attribute__((visibility("hidden")))
-    #define NKENTSEU_SYMBOL_INTERNAL __attribute__((visibility("internal")))
+#define NKENTSEU_SYMBOL_HIDDEN __attribute__((visibility("hidden")))
+#define NKENTSEU_SYMBOL_INTERNAL __attribute__((visibility("internal")))
 #else
-    #define NKENTSEU_SYMBOL_HIDDEN
-    #define NKENTSEU_SYMBOL_INTERNAL
+#define NKENTSEU_SYMBOL_HIDDEN
+#define NKENTSEU_SYMBOL_INTERNAL
 #endif
 
 /**
@@ -163,9 +161,9 @@ NKENTSEU_EMSCRIPTEN_ONLY(
  * @ingroup CoreExportMacros
  */
 #if defined(__GNUC__) || defined(__clang__)
-    #define NKENTSEU_SYMBOL_VISIBLE __attribute__((visibility("default")))
+#define NKENTSEU_SYMBOL_VISIBLE __attribute__((visibility("default")))
 #else
-    #define NKENTSEU_SYMBOL_VISIBLE
+#define NKENTSEU_SYMBOL_VISIBLE
 #endif
 
 // ============================================================
@@ -178,63 +176,62 @@ NKENTSEU_EMSCRIPTEN_ONLY(
  */
 
 NKENTSEU_WINDOWS_ONLY(
-    /**
-     * @brief Convention d'appel C standard
-     * @ingroup CallingConventions
-     */
-    #define NKENTSEU_CDECL __cdecl
-    
-    /**
-     * @brief Convention d'appel Windows standard
-     * @ingroup CallingConventions
-     */
-    #define NKENTSEU_STDCALL __stdcall
-    
-    /**
-     * @brief Convention d'appel optimisée
-     * @ingroup CallingConventions
-     */
-    #define NKENTSEU_FASTCALL __fastcall
-    
-    /**
-     * @brief Convention d'appel vectorielle (SIMD)
-     * @ingroup CallingConventions
-     */
-    NKENTSEU_64BIT_ONLY(
-        #define NKENTSEU_VECTORCALL __vectorcall
-    )
-    
-    NKENTSEU_32BIT_ONLY(
-        #define NKENTSEU_VECTORCALL
-    )
-    
-    /**
-     * @brief Convention d'appel par défaut pour Nkentseu
-     * @ingroup CallingConventions
-     * 
-     * x64: fastcall (registres)
-     * x86: stdcall (compatibilité Win32)
-     */
-    NKENTSEU_X86_64_ONLY(
-        #define NKENTSEU_CALL __fastcall
-    )
-    
-    NKENTSEU_X86_ONLY(
-        #define NKENTSEU_CALL __stdcall
-    )
-    
-    NKENTSEU_ARM64_ONLY(
-        #define NKENTSEU_CALL
-    )
-)
+/**
+ * @brief Convention d'appel C standard
+ * @ingroup CallingConventions
+ */
+#define NKENTSEU_CDECL __cdecl
+
+/**
+ * @brief Convention d'appel Windows standard
+ * @ingroup CallingConventions
+ */
+#define NKENTSEU_STDCALL __stdcall
+
+/**
+ * @brief Convention d'appel optimisée
+ * @ingroup CallingConventions
+ */
+#define NKENTSEU_FASTCALL __fastcall
+
+	/**
+	 * @brief Convention d'appel vectorielle (SIMD)
+	 * @ingroup CallingConventions
+	 */
+	NKENTSEU_64BIT_ONLY(
+#define NKENTSEU_VECTORCALL __vectorcall
+		)
+
+		NKENTSEU_32BIT_ONLY(
+#define NKENTSEU_VECTORCALL
+			)
+
+	/**
+	 * @brief Convention d'appel par défaut pour Nkentseu
+	 * @ingroup CallingConventions
+	 *
+	 * x64: fastcall (registres)
+	 * x86: stdcall (compatibilité Win32)
+	 */
+	NKENTSEU_X86_64_ONLY(
+#define NKENTSEU_CALL __fastcall
+		)
+
+		NKENTSEU_X86_ONLY(
+#define NKENTSEU_CALL __stdcall
+			)
+
+			NKENTSEU_ARM64_ONLY(
+#define NKENTSEU_CALL
+				))
 
 NKENTSEU_NOT_WINDOWS(
-    // Unix/Linux/macOS/Consoles: pas de conventions d'appel spécifiques
-    #define NKENTSEU_CDECL
-    #define NKENTSEU_STDCALL
-    #define NKENTSEU_FASTCALL
-    #define NKENTSEU_VECTORCALL
-    #define NKENTSEU_CALL
+// Unix/Linux/macOS/Consoles: pas de conventions d'appel spécifiques
+#define NKENTSEU_CDECL
+#define NKENTSEU_STDCALL
+#define NKENTSEU_FASTCALL
+#define NKENTSEU_VECTORCALL
+#define NKENTSEU_CALL
 )
 
 // ============================================================
@@ -247,17 +244,17 @@ NKENTSEU_NOT_WINDOWS(
  */
 
 #ifdef __cplusplus
-    /**
-     * @brief Linkage C
-     * @ingroup CppCompatibility
-     */
-    #define NKENTSEU_EXTERN_C extern "C"
-    #define NKENTSEU_EXTERN_C_BEGIN extern "C" {
-    #define NKENTSEU_EXTERN_C_END }
+/**
+ * @brief Linkage C
+ * @ingroup CppCompatibility
+ */
+#define NKENTSEU_EXTERN_C extern "C"
+#define NKENTSEU_EXTERN_C_BEGIN extern "C" {
+#define NKENTSEU_EXTERN_C_END }
 #else
-    #define NKENTSEU_EXTERN_C
-    #define NKENTSEU_EXTERN_C_BEGIN
-    #define NKENTSEU_EXTERN_C_END
+#define NKENTSEU_EXTERN_C
+#define NKENTSEU_EXTERN_C_BEGIN
+#define NKENTSEU_EXTERN_C_END
 #endif
 
 // ============================================================
@@ -267,16 +264,16 @@ NKENTSEU_NOT_WINDOWS(
 /**
  * @defgroup ModularExport Système d'Export Modulaire
  * @brief Système pour créer des exports par module/application
- * 
+ *
  * Ce système permet de créer facilement des macros d'export pour
  * différents modules (Graphics, Audio, Physics, etc.) tout en
  * utilisant la même logique d'export/import.
- * 
+ *
  * @example
  * @code
  * // Définir l'API pour le module Graphics
  * NKENTSEU_DEFINE_MODULE_API(GRAPHICS)
- * 
+ *
  * // Utilisation
  * class NKENTSEU_GRAPHICS_API Renderer {
  *     NKENTSEU_GRAPHICS_API void render();
@@ -289,24 +286,24 @@ NKENTSEU_NOT_WINDOWS(
  * @def NKENTSEU_DEFINE_MODULE_API
  * @param MODULE_NAME Nom du module en MAJUSCULES (ex: GRAPHICS, AUDIO)
  * @ingroup ModularExport
- * 
+ *
  * Cette macro génère automatiquement:
  * - NKENTSEU_MODULE_API: Macro d'export/import principale
  * - NKENTSEU_MODULE_C_API: Version C de l'export
  * - NKENTSEU_MODULE_PRIVATE: Symboles privés du module
  * - NKENTSEU_MODULE_PUBLIC: Symboles publics du module
- * 
+ *
  * Le module doit définir NKENTSEU_BUILDING_MODULE avant d'inclure les headers.
  */
-#define NKENTSEU_DEFINE_MODULE_API(MODULE_NAME) \
-    /* Détection du contexte de build pour ce module */ \
-    _NKENTSEU_DETECT_MODULE_CONTEXT(MODULE_NAME) \
-    /* Définition de l'API principale */ \
-    _NKENTSEU_DEFINE_MODULE_EXPORT(MODULE_NAME) \
-    /* Définition de l'API C */ \
-    _NKENTSEU_DEFINE_MODULE_C_API(MODULE_NAME) \
-    /* Définition des macros de visibilité */ \
-    _NKENTSEU_DEFINE_MODULE_VISIBILITY(MODULE_NAME)
+#define NKENTSEU_DEFINE_MODULE_API(MODULE_NAME)                                                                        \
+	/* Détection du contexte de build pour ce module */                                                                \
+	_NKENTSEU_DETECT_MODULE_CONTEXT(MODULE_NAME)                                                                       \
+	/* Définition de l'API principale */                                                                               \
+	_NKENTSEU_DEFINE_MODULE_EXPORT(MODULE_NAME)                                                                        \
+	/* Définition de l'API C */                                                                                        \
+	_NKENTSEU_DEFINE_MODULE_C_API(MODULE_NAME)                                                                         \
+	/* Définition des macros de visibilité */                                                                          \
+	_NKENTSEU_DEFINE_MODULE_VISIBILITY(MODULE_NAME)
 
 // ============================================================
 // IMPLÉMENTATION INTERNE DU SYSTÈME MODULAIRE
@@ -316,43 +313,38 @@ NKENTSEU_NOT_WINDOWS(
  * @brief Détecte si on build ou utilise un module
  * @internal
  */
-#define _NKENTSEU_DETECT_MODULE_CONTEXT(MODULE_NAME) \
-    /* Détection si on compile le module */ \
-    NKENTSEU_CONCAT_IMPL(NKENTSEU_IS_BUILDING_, MODULE_NAME) = \
-        defined(NKENTSEU_CONCAT_IMPL(NKENTSEU_BUILDING_, MODULE_NAME)) || \
-        defined(NKENTSEU_CONCAT_IMPL(MODULE_NAME, _EXPORTS)) || \
-        defined(NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _EXPORTS))
+#define _NKENTSEU_DETECT_MODULE_CONTEXT(MODULE_NAME)                                                                   \
+	/* Détection si on compile le module */                                                                            \
+	NKENTSEU_CONCAT_IMPL(NKENTSEU_IS_BUILDING_, MODULE_NAME) =                                                         \
+		defined(NKENTSEU_CONCAT_IMPL(NKENTSEU_BUILDING_, MODULE_NAME)) ||                                              \
+		defined(NKENTSEU_CONCAT_IMPL(MODULE_NAME, _EXPORTS)) ||                                                        \
+		defined(NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _EXPORTS))
 
 /**
  * @brief Définit la macro d'export principale du module
  * @internal
  */
-#define _NKENTSEU_DEFINE_MODULE_EXPORT(MODULE_NAME) \
-    /* Nom de la macro d'API */ \
-    NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _API) = \
-        /* Si on build le module, on exporte */ \
-        _NKENTSEU_IF_BUILDING(MODULE_NAME, NKENTSEU_SYMBOL_EXPORT, \
-        /* Sinon si build partagé, on importe */ \
-        _NKENTSEU_IF_SHARED(NKENTSEU_SYMBOL_IMPORT, \
-        /* Sinon statique, rien */ ))
+#define _NKENTSEU_DEFINE_MODULE_EXPORT(MODULE_NAME)                                                                    \
+	/* Nom de la macro d'API */                                                                                        \
+	NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _API) =		   /* Si on build le module, on exporte */             \
+		_NKENTSEU_IF_BUILDING(MODULE_NAME, NKENTSEU_SYMBOL_EXPORT, /* Sinon si build partagé, on importe */            \
+							  _NKENTSEU_IF_SHARED(NKENTSEU_SYMBOL_IMPORT, /* Sinon statique, rien */))
 
 /**
  * @brief Définit la macro d'export C du module
  * @internal
  */
-#define _NKENTSEU_DEFINE_MODULE_C_API(MODULE_NAME) \
-    NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _C_API) = \
-        NKENTSEU_EXTERN_C NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _API) NKENTSEU_CALL
+#define _NKENTSEU_DEFINE_MODULE_C_API(MODULE_NAME)                                                                     \
+	NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _C_API) =                                                             \
+		NKENTSEU_EXTERN_C NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _API) NKENTSEU_CALL
 
 /**
  * @brief Définit les macros de visibilité du module
  * @internal
  */
-#define _NKENTSEU_DEFINE_MODULE_VISIBILITY(MODULE_NAME) \
-    NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _PUBLIC) = \
-        NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _API); \
-    NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _PRIVATE) = \
-        NKENTSEU_SYMBOL_HIDDEN
+#define _NKENTSEU_DEFINE_MODULE_VISIBILITY(MODULE_NAME)                                                                \
+	NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _PUBLIC) = NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _API);        \
+	NKENTSEU_CONCAT_IMPL(NKENTSEU_, MODULE_NAME, _PRIVATE) = NKENTSEU_SYMBOL_HIDDEN
 
 // ============================================================
 // UTILITAIRES POUR LE SYSTÈME MODULAIRE
@@ -362,36 +354,35 @@ NKENTSEU_NOT_WINDOWS(
  * @brief Concaténation de tokens (niveau 1)
  * @internal
  */
-#define NKENTSEU_CONCAT_IMPL(a, b) a ## b
+#define NKENTSEU_CONCAT_IMPL(a, b) a##b
 #define NKENTSEU_CONCAT(a, b) NKENTSEU_CONCAT_IMPL(a, b)
 
 /**
  * @brief Concaténation de 3 tokens
  * @internal
  */
-#define NKENTSEU_CONCAT3_IMPL(a, b, c) a ## b ## c
+#define NKENTSEU_CONCAT3_IMPL(a, b, c) a##b##c
 #define NKENTSEU_CONCAT3(a, b, c) NKENTSEU_CONCAT3_IMPL(a, b, c)
 
 /**
  * @brief Conditionnel pour build de module
  * @internal
  */
-#define _NKENTSEU_IF_BUILDING(MODULE_NAME, THEN, ELSE) \
-    NKENTSEU_IF(NKENTSEU_CONCAT(NKENTSEU_IS_BUILDING_, MODULE_NAME), THEN, ELSE)
+#define _NKENTSEU_IF_BUILDING(MODULE_NAME, THEN, ELSE)                                                                 \
+	NKENTSEU_IF(NKENTSEU_CONCAT(NKENTSEU_IS_BUILDING_, MODULE_NAME), THEN, ELSE)
 
 /**
  * @brief Conditionnel pour build partagé
  * @internal
  */
-#define _NKENTSEU_IF_SHARED(THEN, ELSE) \
-    NKENTSEU_IF(NKENTSEU_SHARED_BUILD, THEN, ELSE)
+#define _NKENTSEU_IF_SHARED(THEN, ELSE) NKENTSEU_IF(NKENTSEU_SHARED_BUILD, THEN, ELSE)
 
 /**
  * @brief Macro conditionnelle simple
  * @internal
  */
 #define NKENTSEU_IF(COND, THEN, ELSE) NKENTSEU_IF_IMPL(COND, THEN, ELSE)
-#define NKENTSEU_IF_IMPL(COND, THEN, ELSE) NKENTSEU_IF_ ## COND(THEN, ELSE)
+#define NKENTSEU_IF_IMPL(COND, THEN, ELSE) NKENTSEU_IF_##COND(THEN, ELSE)
 #define NKENTSEU_IF_0(THEN, ELSE) ELSE
 #define NKENTSEU_IF_1(THEN, ELSE) THEN
 
@@ -409,22 +400,20 @@ NKENTSEU_NOT_WINDOWS(
  * @ingroup CoreAPI
  */
 #ifndef NKENTSEU_BUILDING_CORE
-    #if defined(NKENTSEU_CORE_EXPORTS) || \
-        defined(NKENTSEU_BUILDING_NKENTSEU) || \
-        defined(NKENTSEU_EXPORTS)
-        #define NKENTSEU_BUILDING_CORE 1
-    #else
-        #define NKENTSEU_BUILDING_CORE 0
-    #endif
+#if defined(NKENTSEU_CORE_EXPORTS) || defined(NKENTSEU_BUILDING_NKENTSEU) || defined(NKENTSEU_EXPORTS)
+#define NKENTSEU_BUILDING_CORE 1
+#else
+#define NKENTSEU_BUILDING_CORE 0
+#endif
 #endif
 
 /**
  * @brief API principale de Nkentseu
  * @def NKENTSEU_API
  * @ingroup CoreAPI
- * 
+ *
  * Utilisé pour exporter/importer les symboles du module Core.
- * 
+ *
  * @example
  * @code
  * class NKENTSEU_API MyClass {
@@ -434,11 +423,11 @@ NKENTSEU_NOT_WINDOWS(
  * @endcode
  */
 #if NKENTSEU_BUILDING_CORE
-    #define NKENTSEU_API NKENTSEU_SYMBOL_EXPORT
+#define NKENTSEU_API NKENTSEU_SYMBOL_EXPORT
 #elif NKENTSEU_SHARED_BUILD
-    #define NKENTSEU_API NKENTSEU_SYMBOL_IMPORT
+#define NKENTSEU_API NKENTSEU_SYMBOL_IMPORT
 #else
-    #define NKENTSEU_API
+#define NKENTSEU_API
 #endif
 
 /**
@@ -479,36 +468,36 @@ NKENTSEU_NOT_WINDOWS(
  */
 
 NKENTSEU_EMSCRIPTEN_ONLY(
-    /**
-     * @brief Export WebAssembly avec nom
-     * @ingroup PlatformSpecificExport
-     */
-    #define NKENTSEU_WASM_EXPORT(name) __attribute__((export_name(#name)))
-    
-    /**
-     * @brief Import WebAssembly avec nom
-     * @ingroup PlatformSpecificExport
-     */
-    #define NKENTSEU_WASM_IMPORT(name) __attribute__((import_name(#name)))
-    
-    /**
-     * @brief Garde un symbole WebAssembly
-     * @ingroup PlatformSpecificExport
-     */
-    #define NKENTSEU_WASM_KEEP __attribute__((used))
-    
-    /**
-     * @brief Définit la fonction main pour WebAssembly
-     * @ingroup PlatformSpecificExport
-     */
-    #define NKENTSEU_WASM_MAIN __attribute__((export_name("main")))
+/**
+ * @brief Export WebAssembly avec nom
+ * @ingroup PlatformSpecificExport
+ */
+#define NKENTSEU_WASM_EXPORT(name) __attribute__((export_name(#name)))
+
+/**
+ * @brief Import WebAssembly avec nom
+ * @ingroup PlatformSpecificExport
+ */
+#define NKENTSEU_WASM_IMPORT(name) __attribute__((import_name(#name)))
+
+/**
+ * @brief Garde un symbole WebAssembly
+ * @ingroup PlatformSpecificExport
+ */
+#define NKENTSEU_WASM_KEEP __attribute__((used))
+
+/**
+ * @brief Définit la fonction main pour WebAssembly
+ * @ingroup PlatformSpecificExport
+ */
+#define NKENTSEU_WASM_MAIN __attribute__((export_name("main")))
 )
 
 NKENTSEU_NOT_EMSCRIPTEN(
-    #define NKENTSEU_WASM_EXPORT(name)
-    #define NKENTSEU_WASM_IMPORT(name)
-    #define NKENTSEU_WASM_KEEP
-    #define NKENTSEU_WASM_MAIN
+#define NKENTSEU_WASM_EXPORT(name)
+#define NKENTSEU_WASM_IMPORT(name)
+#define NKENTSEU_WASM_KEEP
+#define NKENTSEU_WASM_MAIN
 )
 
 // ============================================================
@@ -521,21 +510,21 @@ NKENTSEU_NOT_EMSCRIPTEN(
  */
 
 #if defined(__cplusplus) && __cplusplus >= 201402L
-    /**
-     * @brief Marque une API comme dépréciée
-     * @ingroup Deprecation
-     */
-    #define NKENTSEU_DEPRECATED [[deprecated]]
-    #define NKENTSEU_DEPRECATED_MSG(msg) [[deprecated(msg)]]
+/**
+ * @brief Marque une API comme dépréciée
+ * @ingroup Deprecation
+ */
+#define NKENTSEU_DEPRECATED [[deprecated]]
+#define NKENTSEU_DEPRECATED_MSG(msg) [[deprecated(msg)]]
 #elif defined(_MSC_VER)
-    #define NKENTSEU_DEPRECATED __declspec(deprecated)
-    #define NKENTSEU_DEPRECATED_MSG(msg) __declspec(deprecated(msg))
+#define NKENTSEU_DEPRECATED __declspec(deprecated)
+#define NKENTSEU_DEPRECATED_MSG(msg) __declspec(deprecated(msg))
 #elif defined(__GNUC__) || defined(__clang__)
-    #define NKENTSEU_DEPRECATED __attribute__((deprecated))
-    #define NKENTSEU_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
+#define NKENTSEU_DEPRECATED __attribute__((deprecated))
+#define NKENTSEU_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
 #else
-    #define NKENTSEU_DEPRECATED
-    #define NKENTSEU_DEPRECATED_MSG(msg)
+#define NKENTSEU_DEPRECATED
+#define NKENTSEU_DEPRECATED_MSG(msg)
 #endif
 
 /**
@@ -556,16 +545,16 @@ NKENTSEU_NOT_EMSCRIPTEN(
 
 // Vérification de cohérence
 #if NKENTSEU_STATIC_BUILD && NKENTSEU_SHARED_BUILD
-    #error "Nkentseu: Build ne peut pas être à la fois statique et partagé"
+#error "Nkentseu: Build ne peut pas être à la fois statique et partagé"
 #endif
 
 // Message informatif en mode debug
 #ifdef NKENTSEU_VERBOSE_BUILD
-    #if NKENTSEU_BUILDING_CORE
-        #pragma message("Nkentseu: Building Core as " NKENTSEU_IF(NKENTSEU_SHARED_BUILD, "SHARED", "STATIC"))
-    #else
-        #pragma message("Nkentseu: Using Core as " NKENTSEU_IF(NKENTSEU_SHARED_BUILD, "SHARED", "STATIC"))
-    #endif
+#if NKENTSEU_BUILDING_CORE
+#pragma message("Nkentseu: Building Core as " NKENTSEU_IF(NKENTSEU_SHARED_BUILD, "SHARED", "STATIC"))
+#else
+#pragma message("Nkentseu: Using Core as " NKENTSEU_IF(NKENTSEU_SHARED_BUILD, "SHARED", "STATIC"))
+#endif
 #endif
 
 // ============================================================
@@ -577,7 +566,7 @@ NKENTSEU_NOT_EMSCRIPTEN(
  * @code
  * // Dans MyClass.h
  * #include "NkExport.h"
- * 
+ *
  * class NKENTSEU_API MyClass {
  * public:
  *     NKENTSEU_API MyClass();
@@ -586,12 +575,12 @@ NKENTSEU_NOT_EMSCRIPTEN(
  *     NKENTSEU_PRIVATE void privateMethod(); // Non exportée
  * };
  * @endcode
- * 
+ *
  * @example Création d'une API pour un module Graphics
  * @code
  * // Dans NkGraphicsExport.h
  * #include "NkExport.h"
- * 
+ *
  * // Définir l'API du module Graphics
  * #ifdef NKENTSEU_BUILDING_GRAPHICS
  *     #define NKENTSEU_GRAPHICS_API NKENTSEU_SYMBOL_EXPORT
@@ -600,29 +589,29 @@ NKENTSEU_NOT_EMSCRIPTEN(
  * #else
  *     #define NKENTSEU_GRAPHICS_API
  * #endif
- * 
+ *
  * #define NKENTSEU_GRAPHICS_C_API NKENTSEU_EXTERN_C NKENTSEU_GRAPHICS_API
  * #define NKENTSEU_GRAPHICS_PUBLIC NKENTSEU_GRAPHICS_API
  * #define NKENTSEU_GRAPHICS_PRIVATE NKENTSEU_SYMBOL_HIDDEN
- * 
+ *
  * // Utilisation
  * class NKENTSEU_GRAPHICS_API Renderer {
  *     NKENTSEU_GRAPHICS_API void render();
  * };
  * @endcode
- * 
+ *
  * @example API C multiplateforme
  * @code
  * // API C avec convention d'appel appropriée
  * NKENTSEU_EXTERN_C_BEGIN
- * 
+ *
  * NKENTSEU_C_API int nkInit(void);
  * NKENTSEU_C_API void nkShutdown(void);
  * NKENTSEU_C_API const char* nkGetVersion(void);
- * 
+ *
  * NKENTSEU_EXTERN_C_END
  * @endcode
- * 
+ *
  * @example Fonction dépréciée
  * @code
  * // Marquer une fonction comme obsolète

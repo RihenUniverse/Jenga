@@ -94,9 +94,8 @@
  * @return Nombre d'arguments passés
  * @ingroup SizeMacros
  */
-#define NkVaArgsCount(...) \
-    NkVaArgsCountHelper(__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
-#define NkVaArgsCountHelper(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,N,...) N
+#define NkVaArgsCount(...) NkVaArgsCountHelper(__VA_ARGS__, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+#define NkVaArgsCountHelper(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, N, ...) N
 
 // ============================================================
 // MACROS MANIPULATION BITS
@@ -214,8 +213,7 @@
  * @return Pointeur aligné
  * @ingroup AlignmentMacros
  */
-#define NkAlignPtr(ptr, alignment) \
-    ((void*)NkAlignUp((uintptr_t)(ptr), (alignment)))
+#define NkAlignPtr(ptr, alignment) ((void *)NkAlignUp((uintptr_t)(ptr), (alignment)))
 
 // ============================================================
 // MACROS MIN/MAX/CLAMP
@@ -253,8 +251,7 @@
  * @return Valeur clampée dans [min, max]
  * @ingroup MathMacros
  */
-#define NkClamp(value, min, max) \
-    (((value) < (min)) ? (min) : (((value) > (max)) ? (max) : (value)))
+#define NkClamp(value, min, max) (((value) < (min)) ? (min) : (((value) > (max)) ? (max) : (value)))
 
 /**
  * @brief Retourne la valeur absolue
@@ -280,12 +277,12 @@
  * @param type Type des variables
  * @ingroup UtilityMacros
  */
-#define NkSwap(a, b, type) \
-    do { \
-        type NkConcat(tmp_, __LINE__) = (a); \
-        (a) = (b); \
-        (b) = NkConcat(tmp_, __LINE__); \
-    } while(0)
+#define NkSwap(a, b, type)                                                                                             \
+	do {                                                                                                               \
+		type NkConcat(tmp_, __LINE__) = (a);                                                                           \
+		(a) = (b);                                                                                                     \
+		(b) = NkConcat(tmp_, __LINE__);                                                                                \
+	} while (0)
 
 // ============================================================
 // MACROS UNUSED
@@ -305,7 +302,9 @@
  * @param y Deuxième variable
  * @ingroup UtilityMacros
  */
-#define NKENTSEU_UNUSED2(x, y) NKENTSEU_UNUSED(x); NKENTSEU_UNUSED(y)
+#define NKENTSEU_UNUSED2(x, y)                                                                                         \
+	NKENTSEU_UNUSED(x);                                                                                                \
+	NKENTSEU_UNUSED(y)
 
 /**
  * @brief Marque trois variables comme inutilisées
@@ -314,7 +313,9 @@
  * @param z Troisième variable
  * @ingroup UtilityMacros
  */
-#define NKENTSEU_UNUSED3(x, y, z) NKENTSEU_UNUSED2(x, y); NKENTSEU_UNUSED(z)
+#define NKENTSEU_UNUSED3(x, y, z)                                                                                      \
+	NKENTSEU_UNUSED2(x, y);                                                                                            \
+	NKENTSEU_UNUSED(z)
 
 /**
  * @brief Marque quatre variables comme inutilisées
@@ -324,7 +325,9 @@
  * @param w Quatrième variable
  * @ingroup UtilityMacros
  */
-#define NKENTSEU_UNUSED4(x, y, z, w) NKENTSEU_UNUSED3(x, y, z); NKENTSEU_UNUSED(w)
+#define NKENTSEU_UNUSED4(x, y, z, w)                                                                                   \
+	NKENTSEU_UNUSED3(x, y, z);                                                                                         \
+	NKENTSEU_UNUSED(w)
 
 // ============================================================
 // MACROS OFFSET & CONTAINER_OF
@@ -338,9 +341,9 @@
  * @ingroup UtilityMacros
  */
 #if defined(_MSC_VER)
-    #define NkOffsetOf(type, member) offsetof(type, member)
+#define NkOffsetOf(type, member) offsetof(type, member)
 #else
-    #define NkOffsetOf(type, member) __builtin_offsetof(type, member)
+#define NkOffsetOf(type, member) __builtin_offsetof(type, member)
 #endif
 
 /**
@@ -352,8 +355,7 @@
  * @note Technique utilisée dans le kernel Linux
  * @ingroup UtilityMacros
  */
-#define NkContainerOf(ptr, type, member) \
-    ((type*)((char*)(ptr) - NkOffsetOf(type, member)))
+#define NkContainerOf(ptr, type, member) ((type *)((char *)(ptr) - NkOffsetOf(type, member)))
 
 // ============================================================
 // MACROS STATIC ARRAY
@@ -366,9 +368,9 @@
  * @ingroup UtilityMacros
  */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    #define NKENTSEU_STATIC_ARRAY(size) static size
+#define NKENTSEU_STATIC_ARRAY(size) static size
 #else
-    #define NKENTSEU_STATIC_ARRAY(size)
+#define NKENTSEU_STATIC_ARRAY(size)
 #endif
 
 // ============================================================
@@ -381,7 +383,9 @@
  * @ingroup UtilityMacros
  */
 #define NKENTSEU_BLOCK_BEGIN do {
-#define NKENTSEU_BLOCK_END } while(0)
+#define NKENTSEU_BLOCK_END                                                                                             \
+	}                                                                                                                  \
+	while (0)
 
 // ============================================================
 // MACROS SCOPE
@@ -394,13 +398,11 @@
  * @ingroup UtilityMacros
  */
 #if defined(__GNUC__) || defined(__clang__)
-    #define NkDeferConcat(a, b) a##b
-    #define NkDeferVarname(a, b) NkDeferConcat(a, b)
-    #define NkDefer(code) \
-        auto NkDeferVarname(defer_, __LINE__) = \
-            nkentseu::core::NkScopeGuard([&]() { code; })
+#define NkDeferConcat(a, b) a##b
+#define NkDeferVarname(a, b) NkDeferConcat(a, b)
+#define NkDefer(code) auto NkDeferVarname(defer_, __LINE__) = nkentseu::core::NkScopeGuard([&]() { code; })
 #else
-    #define NkDefer(code)
+#define NkDefer(code)
 #endif
 
 // ============================================================
@@ -408,17 +410,16 @@
 // ============================================================
 
 #ifndef NKENTSEU_STATIC_ASSERT
-    #if defined(__cplusplus) && (__cplusplus >= 201103L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201103L))
-        // C++11 et supérieur
-        #define NKENTSEU_STATIC_ASSERT(condition, message) static_assert(condition, message)
-    #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
-        // C11 et supérieur
-        #define NKENTSEU_STATIC_ASSERT(condition, message) _Static_assert(condition, message)
-    #else
-        // Fallback pour anciens compilateurs
-        #define NKENTSEU_STATIC_ASSERT(condition, message) \
-            typedef char NKENTSEU_STATIC_ASSERT_##__LINE__[(condition) ? 1 : -1]
-    #endif
+#if defined(__cplusplus) && (__cplusplus >= 201103L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201103L))
+// C++11 et supérieur
+#define NKENTSEU_STATIC_ASSERT(condition, message) static_assert(condition, message)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+// C11 et supérieur
+#define NKENTSEU_STATIC_ASSERT(condition, message) _Static_assert(condition, message)
+#else
+// Fallback pour anciens compilateurs
+#define NKENTSEU_STATIC_ASSERT(condition, message) typedef char NKENTSEU_STATIC_ASSERT_##__LINE__[(condition) ? 1 : -1]
+#endif
 #endif
 
 // ============================================================
@@ -433,9 +434,9 @@
  * @ingroup UtilityMacros
  */
 #if defined(__GNUC__) || defined(__clang__)
-    #define NKENTSEU_SAME_TYPE(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
+#define NKENTSEU_SAME_TYPE(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
 #else
-    #define NKENTSEU_SAME_TYPE(a, b) (0)
+#define NKENTSEU_SAME_TYPE(a, b) (0)
 #endif
 
 /**
@@ -453,7 +454,7 @@
  * @return Taille du membre en octets
  * @ingroup UtilityMacros
  */
-#define NKENTSEU_SIZEOF_MEMBER(type, member) sizeof(((type*)0)->member)
+#define NKENTSEU_SIZEOF_MEMBER(type, member) sizeof(((type *)0)->member)
 
 // ============================================================
 // MACROS ARITHMÉTIQUE SÉCURISÉE
@@ -467,8 +468,7 @@
  * @return true si a + b > max, false sinon
  * @ingroup UtilityMacros
  */
-#define NKENTSEU_WILL_ADD_OVERFLOW(a, b, max) \
-    ((a) > (max) - (b))
+#define NKENTSEU_WILL_ADD_OVERFLOW(a, b, max) ((a) > (max) - (b))
 
 /**
  * @brief Vérifie si une multiplication déborde
@@ -478,8 +478,7 @@
  * @return true si a * b > max, false sinon
  * @ingroup UtilityMacros
  */
-#define NKENTSEU_WILL_MUL_OVERFLOW(a, b, max) \
-    ((b) != 0 && (a) > (max) / (b))
+#define NKENTSEU_WILL_MUL_OVERFLOW(a, b, max) ((b) != 0 && (a) > (max) / (b))
 
 // ============================================================
 // MACROS DEBUGGING
@@ -496,11 +495,11 @@
  * @ingroup DebugMacros
  */
 #if defined(_MSC_VER)
-    #define NKENTSEU_COMPILE_MESSAGE(msg) __pragma(message(msg))
+#define NKENTSEU_COMPILE_MESSAGE(msg) __pragma(message(msg))
 #elif defined(__GNUC__) || defined(__clang__)
-    #define NKENTSEU_COMPILE_MESSAGE(msg) _Pragma(NkStringify(message msg))
+#define NKENTSEU_COMPILE_MESSAGE(msg) _Pragma(NkStringify(message msg))
 #else
-    #define NKENTSEU_COMPILE_MESSAGE(msg)
+#define NKENTSEU_COMPILE_MESSAGE(msg)
 #endif
 
 /**
@@ -535,8 +534,7 @@
  * @example NkVersionEncode(1, 2, 3) → 0x00010203
  * @ingroup VersionMacros
  */
-#define NkVersionEncode(major, minor, patch) \
-    (((major) << 24) | ((minor) << 16) | (patch))
+#define NkVersionEncode(major, minor, patch) (((major) << 24) | ((minor) << 16) | (patch))
 
 /**
  * @brief Extrait le major d'une version encodée
@@ -577,8 +575,7 @@
  * @param ... Arguments variadiques
  * @ingroup FunctionalMacros
  */
-#define NkForEach(func, ...) \
-    NkForEachHelper(func, NkVaArgsCount(__VA_ARGS__), __VA_ARGS__)
+#define NkForEach(func, ...) NkForEachHelper(func, NkVaArgsCount(__VA_ARGS__), __VA_ARGS__)
 
 /**
  * @brief Helper pour NkForEach
@@ -586,9 +583,18 @@
  */
 #define NkForEachHelper(func, count, ...) NkForEachHelper##count(func, __VA_ARGS__)
 #define NkForEachHelper1(func, a) func(a)
-#define NkForEachHelper2(func, a, b) func(a); func(b)
-#define NkForEachHelper3(func, a, b, c) func(a); func(b); func(c)
-#define NkForEachHelper4(func, a, b, c, d) func(a); func(b); func(c); func(d)
+#define NkForEachHelper2(func, a, b)                                                                                   \
+	func(a);                                                                                                           \
+	func(b)
+#define NkForEachHelper3(func, a, b, c)                                                                                \
+	func(a);                                                                                                           \
+	func(b);                                                                                                           \
+	func(c)
+#define NkForEachHelper4(func, a, b, c, d)                                                                             \
+	func(a);                                                                                                           \
+	func(b);                                                                                                           \
+	func(c);                                                                                                           \
+	func(d)
 
 /**
  * @brief Masque une adresse mémoire (pour debug)
@@ -596,7 +602,7 @@
  * @return Pointeur masqué
  * @ingroup FunctionalMacros
  */
-#define NkMaskAddress(ptr) ((void*)((uintptr_t)(ptr) & 0xFFFFF000))
+#define NkMaskAddress(ptr) ((void *)((uintptr_t)(ptr) & 0xFFFFF000))
 
 /**
  * @brief Calcule la distance entre deux pointeurs en octets
@@ -605,7 +611,7 @@
  * @return Distance en octets (ptr2 - ptr1)
  * @ingroup FunctionalMacros
  */
-#define NkPointerDistance(ptr1, ptr2) ((intptr_t)((const char*)(ptr2) - (const char*)(ptr1)))
+#define NkPointerDistance(ptr1, ptr2) ((intptr_t)((const char *)(ptr2) - (const char *)(ptr1)))
 
 // ============================================================
 // MACROS DE CONVERSION
@@ -643,11 +649,11 @@
  * @ingroup OptimizationMacros
  */
 #if defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_LIKELY(x) __builtin_expect(!!(x), 1)
-    #define NKENTSEU_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#define NKENTSEU_LIKELY(x) __builtin_expect(!!(x), 1)
+#define NKENTSEU_UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
-    #define NKENTSEU_LIKELY(x) (x)
-    #define NKENTSEU_UNLIKELY(x) (x)
+#define NKENTSEU_LIKELY(x) (x)
+#define NKENTSEU_UNLIKELY(x) (x)
 #endif
 
 /**
@@ -656,11 +662,11 @@
  * @ingroup OptimizationMacros
  */
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_UNREACHABLE() __assume(0)
+#define NKENTSEU_UNREACHABLE() __assume(0)
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_UNREACHABLE() __builtin_unreachable()
+#define NKENTSEU_UNREACHABLE() __builtin_unreachable()
 #else
-    #define NKENTSEU_UNREACHABLE()
+#define NKENTSEU_UNREACHABLE()
 #endif
 
 #endif // NKENTSEU_CORE_NKCORE_SRC_NKCORE_NKMACROS_H_INCLUDED

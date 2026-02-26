@@ -17,38 +17,39 @@
 #define NK_APP_NAME "xlib_app"
 #endif
 
-namespace nkentseu { NkEntryState* gState = nullptr; }
+/**
+ * @brief Namespace nkentseu.
+ */
+namespace nkentseu {
+NkEntryState *gState = nullptr;
+}
 
-int main(int argc, char* argv[])
-{
-    XInitThreads();
+int main(int argc, char *argv[]) {
+	XInitThreads();
 
-    const char* displayName = std::getenv("DISPLAY");
-    Display* display = XOpenDisplay((displayName && *displayName) ? displayName : nullptr);
-    if (!display)
-    {
-        std::fprintf(
-            stderr,
-            "[NkWindow][XLIB] Unable to open X display. DISPLAY='%s'. "
-            "Enable WSLg/X11 server (or run headless backend).\n",
-            displayName ? displayName : "(null)"
-        );
-        return 1;
-    }
+	const char *displayName = std::getenv("DISPLAY");
+	Display *display = XOpenDisplay((displayName && *displayName) ? displayName : nullptr);
+	if (!display) {
+		std::fprintf(stderr,
+					 "[NkWindow][XLIB] Unable to open X display. DISPLAY='%s'. "
+					 "Enable WSLg/X11 server (or run headless backend).\n",
+					 displayName ? displayName : "(null)");
+		return 1;
+	}
 
-    nkentseu::nk_xlib_global_display = display;
+	nkentseu::nk_xlib_global_display = display;
 
-    std::vector<std::string> args(argv, argv + argc);
+	std::vector<std::string> args(argv, argv + argc);
 
-    nkentseu::NkEntryState state(display, args);
-    state.appName = NK_APP_NAME;
-    nkentseu::gState = &state;
+	nkentseu::NkEntryState state(display, args);
+	state.appName = NK_APP_NAME;
+	nkentseu::gState = &state;
 
-    int result = nkmain(state);
+	int result = nkmain(state);
 
-    nkentseu::gState        = nullptr;
-    nkentseu::nk_xlib_global_display  = nullptr;
+	nkentseu::gState = nullptr;
+	nkentseu::nk_xlib_global_display = nullptr;
 
-    XCloseDisplay(display);
-    return result;
+	XCloseDisplay(display);
+	return result;
 }

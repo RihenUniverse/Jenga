@@ -15,32 +15,35 @@
 #define NK_APP_NAME "cocoa_app"
 #endif
 
-namespace nkentseu { NkEntryState* gState = nullptr; }
+/**
+ * @brief Namespace nkentseu.
+ */
+namespace nkentseu {
+NkEntryState *gState = nullptr;
+}
 
 // ---------------------------------------------------------------------------
 // Delegate NSApplication
 // ---------------------------------------------------------------------------
 
-@interface NkAppDelegate : NSObject<NSApplicationDelegate>
-@property (nonatomic, assign) std::vector<std::string>* argsPtr;
+@interface NkAppDelegate : NSObject <NSApplicationDelegate>
+@property(nonatomic, assign) std::vector<std::string> *argsPtr;
 @end
 
 @implementation NkAppDelegate
 
-- (void)applicationDidFinishLaunching:(NSNotification*)notif
-{
-    std::vector<std::string>& args = *self.argsPtr;
-    nkentseu::NkEntryState state(args);
-    state.appName = NK_APP_NAME;
-    nkentseu::gState = &state;
-    nkmain(state);
-    nkentseu::gState = nullptr;
-    [NSApp terminate:nil];
+- (void)applicationDidFinishLaunching:(NSNotification *)notif {
+	std::vector<std::string> &args = *self.argsPtr;
+	nkentseu::NkEntryState state(args);
+	state.appName = NK_APP_NAME;
+	nkentseu::gState = &state;
+	nkmain(state);
+	nkentseu::gState = nullptr;
+	[NSApp terminate:nil];
 }
 
-- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication*)sender
-{
-    return YES;
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
+	return YES;
 }
 @end
 
@@ -48,35 +51,31 @@ namespace nkentseu { NkEntryState* gState = nullptr; }
 // main()
 // ---------------------------------------------------------------------------
 
-int main(int argc, const char* argv[])
-{
-    @autoreleasepool
-    {
-        std::vector<std::string> args(argv, argv + argc);
+int main(int argc, const char *argv[]) {
+	@autoreleasepool {
+		std::vector<std::string> args(argv, argv + argc);
 
-        NSApplication* app = [NSApplication sharedApplication];
-        [app setActivationPolicy:NSApplicationActivationPolicyRegular];
+		NSApplication *app = [NSApplication sharedApplication];
+		[app setActivationPolicy:NSApplicationActivationPolicyRegular];
 
-        // Menu minimal avec Quit
-        NSMenu* menuBar = [[NSMenu alloc] init];
-        NSMenuItem* appMenuItem = [[NSMenuItem alloc] init];
-        [menuBar addItem:appMenuItem];
-        NSMenu* appMenu = [[NSMenu alloc] init];
-        [appMenuItem setSubmenu:appMenu];
-        NSString* quitTitle = [@"Quit " stringByAppendingString:
-            [NSString stringWithUTF8String:NK_APP_NAME]];
-        NSMenuItem* quitItem = [[NSMenuItem alloc]
-            initWithTitle:quitTitle
-                   action:@selector(terminate:)
-            keyEquivalent:@"q"];
-        [appMenu addItem:quitItem];
-        [app setMainMenu:menuBar];
+		// Menu minimal avec Quit
+		NSMenu *menuBar = [[NSMenu alloc] init];
+		NSMenuItem *appMenuItem = [[NSMenuItem alloc] init];
+		[menuBar addItem:appMenuItem];
+		NSMenu *appMenu = [[NSMenu alloc] init];
+		[appMenuItem setSubmenu:appMenu];
+		NSString *quitTitle = [@"Quit " stringByAppendingString:[NSString stringWithUTF8String:NK_APP_NAME]];
+		NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:quitTitle
+														  action:@selector(terminate:)
+												   keyEquivalent:@"q"];
+		[appMenu addItem:quitItem];
+		[app setMainMenu:menuBar];
 
-        NkAppDelegate* delegate = [[NkAppDelegate alloc] init];
-        delegate.argsPtr = &args;
-        [app setDelegate:delegate];
+		NkAppDelegate *delegate = [[NkAppDelegate alloc] init];
+		delegate.argsPtr = &args;
+		[app setDelegate:delegate];
 
-        [app run];
-    }
-    return 0;
+		[app run];
+	}
+	return 0;
 }

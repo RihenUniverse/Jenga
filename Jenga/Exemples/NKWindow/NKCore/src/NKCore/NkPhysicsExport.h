@@ -11,20 +11,18 @@
 #ifndef NKENTSEU_EXAMPLES_MODULAREXPORTS_NKPHYSICSEXPORT_H_INCLUDED
 #define NKENTSEU_EXAMPLES_MODULAREXPORTS_NKPHYSICSEXPORT_H_INCLUDED
 
-#include "../../Platform/NkExport.h"
+#include "NkExport.h"
 
 // ============================================================
 // CONFIGURATION DU MODULE PHYSICS
 // ============================================================
 
 #ifndef NKENTSEU_BUILDING_PHYSICS
-    #if defined(NKENTSEU_PHYSICS_EXPORTS) || \
-        defined(PHYSICS_EXPORTS) || \
-        defined(NKENTSEU_BUILDING_PHY)
-        #define NKENTSEU_BUILDING_PHYSICS 1
-    #else
-        #define NKENTSEU_BUILDING_PHYSICS 0
-    #endif
+#if defined(NKENTSEU_PHYSICS_EXPORTS) || defined(PHYSICS_EXPORTS) || defined(NKENTSEU_BUILDING_PHY)
+#define NKENTSEU_BUILDING_PHYSICS 1
+#else
+#define NKENTSEU_BUILDING_PHYSICS 0
+#endif
 #endif
 
 // ============================================================
@@ -32,11 +30,11 @@
 // ============================================================
 
 #if NKENTSEU_BUILDING_PHYSICS
-    #define NKENTSEU_PHYSICS_API NKENTSEU_SYMBOL_EXPORT
+#define NKENTSEU_PHYSICS_API NKENTSEU_SYMBOL_EXPORT
 #elif NKENTSEU_SHARED_BUILD
-    #define NKENTSEU_PHYSICS_API NKENTSEU_SYMBOL_IMPORT
+#define NKENTSEU_PHYSICS_API NKENTSEU_SYMBOL_IMPORT
 #else
-    #define NKENTSEU_PHYSICS_API
+#define NKENTSEU_PHYSICS_API
 #endif
 
 #define NKENTSEU_PHYSICS_C_API NKENTSEU_EXTERN_C NKENTSEU_PHYSICS_API NKENTSEU_CALL
@@ -52,24 +50,24 @@
 
 /*
  * #include "NkPhysicsExport.h"
- * 
+ *
  * namespace nkentseu {
  * namespace physics {
- * 
+ *
  * class NKENTSEU_PHYSICS_API PhysicsWorld {
  * public:
  *     NKENTSEU_PHYSICS_API void step(float dt);
  *     NKENTSEU_PHYSICS_API void addRigidBody(void* body);
  * };
- * 
+ *
  * class NKENTSEU_PHYSICS_API RigidBody {
  * public:
  *     NKENTSEU_PHYSICS_API void applyForce(float x, float y, float z);
  * };
- * 
+ *
  * } // namespace physics
  * } // namespace nkentseu
- * 
+ *
  * // API C
  * NKENTSEU_EXTERN_C_BEGIN
  * NKENTSEU_PHYSICS_C_API void* nkPhysicsCreateWorld(void);

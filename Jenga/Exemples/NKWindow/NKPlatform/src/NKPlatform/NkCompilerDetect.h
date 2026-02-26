@@ -35,128 +35,128 @@
 
 // Microsoft Visual C++
 #if defined(_MSC_VER)
-    #define NKENTSEU_COMPILER_MSVC
-    #define NKENTSEU_COMPILER_VERSION _MSC_VER
-    
-    /**
-     * @brief MSVC 2024 ou supérieur
-     * @def NKENTSEU_COMPILER_MSVC_2024
-     * @ingroup CompilerDetection
-     */
-    #if _MSC_VER >= 1940
-        #define NKENTSEU_COMPILER_MSVC_2024
-    #endif
-    
-    /**
-     * @brief MSVC 2022 ou supérieur
-     * @def NKENTSEU_COMPILER_MSVC_2022
-     * @ingroup CompilerDetection
-     */
-    #if _MSC_VER >= 1930
-        #define NKENTSEU_COMPILER_MSVC_2022
-    #endif
-    
-    /**
-     * @brief MSVC 2019 ou supérieur
-     * @def NKENTSEU_COMPILER_MSVC_2019
-     * @ingroup CompilerDetection
-     */
-    #if _MSC_VER >= 1920
-        #define NKENTSEU_COMPILER_MSVC_2019
-    #endif
-    
-    /**
-     * @brief MSVC 2017 ou supérieur
-     * @def NKENTSEU_COMPILER_MSVC_2017
-     * @ingroup CompilerDetection
-     */
-    #if _MSC_VER >= 1910
-        #define NKENTSEU_COMPILER_MSVC_2017
-    #endif
+#define NKENTSEU_COMPILER_MSVC
+#define NKENTSEU_COMPILER_VERSION _MSC_VER
+
+/**
+ * @brief MSVC 2024 ou supérieur
+ * @def NKENTSEU_COMPILER_MSVC_2024
+ * @ingroup CompilerDetection
+ */
+#if _MSC_VER >= 1940
+#define NKENTSEU_COMPILER_MSVC_2024
+#endif
+
+/**
+ * @brief MSVC 2022 ou supérieur
+ * @def NKENTSEU_COMPILER_MSVC_2022
+ * @ingroup CompilerDetection
+ */
+#if _MSC_VER >= 1930
+#define NKENTSEU_COMPILER_MSVC_2022
+#endif
+
+/**
+ * @brief MSVC 2019 ou supérieur
+ * @def NKENTSEU_COMPILER_MSVC_2019
+ * @ingroup CompilerDetection
+ */
+#if _MSC_VER >= 1920
+#define NKENTSEU_COMPILER_MSVC_2019
+#endif
+
+/**
+ * @brief MSVC 2017 ou supérieur
+ * @def NKENTSEU_COMPILER_MSVC_2017
+ * @ingroup CompilerDetection
+ */
+#if _MSC_VER >= 1910
+#define NKENTSEU_COMPILER_MSVC_2017
+#endif
 #endif
 
 // Clang (y compris Apple Clang)
 #if defined(__clang__)
-    /**
-     * @brief Détection compilateur Clang
-     * @def NKENTSEU_COMPILER_CLANG
-     * @ingroup CompilerDetection
-     */
-    #ifndef NKENTSEU_COMPILER_CLANG
-        #define NKENTSEU_COMPILER_CLANG
-    #endif
-    #define NKENTSEU_COMPILER_VERSION (__clang_major__ * 10000 + __clang_minor__ * 100 + __clang_patchlevel__)
-    
-    /**
-     * @brief Détection Apple Clang
-     * @def NKENTSEU_COMPILER_APPLE_CLANG
-     * @ingroup CompilerDetection
-     */
-    #if defined(__apple_build_version__)
-        #define NKENTSEU_COMPILER_APPLE_CLANG
-    #endif
+/**
+ * @brief Détection compilateur Clang
+ * @def NKENTSEU_COMPILER_CLANG
+ * @ingroup CompilerDetection
+ */
+#ifndef NKENTSEU_COMPILER_CLANG
+#define NKENTSEU_COMPILER_CLANG
+#endif
+#define NKENTSEU_COMPILER_VERSION (__clang_major__ * 10000 + __clang_minor__ * 100 + __clang_patchlevel__)
+
+/**
+ * @brief Détection Apple Clang
+ * @def NKENTSEU_COMPILER_APPLE_CLANG
+ * @ingroup CompilerDetection
+ */
+#if defined(__apple_build_version__)
+#define NKENTSEU_COMPILER_APPLE_CLANG
+#endif
 #endif
 
 // GCC (GNU Compiler Collection)
 #if defined(__GNUC__) && !defined(__clang__)
-    /**
-     * @brief Détection compilateur GCC
-     * @def NKENTSEU_COMPILER_GCC
-     * @ingroup CompilerDetection
-     */
-    #define NKENTSEU_COMPILER_GCC
-    #define NKENTSEU_COMPILER_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+/**
+ * @brief Détection compilateur GCC
+ * @def NKENTSEU_COMPILER_GCC
+ * @ingroup CompilerDetection
+ */
+#define NKENTSEU_COMPILER_GCC
+#define NKENTSEU_COMPILER_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif
 
 // Intel C++ Compiler
 #if defined(__INTEL_COMPILER) || defined(__ICL) || defined(__ICC) || defined(__ECC)
-    /**
-     * @brief Détection compilateur Intel
-     * @def NKENTSEU_COMPILER_INTEL
-     * @ingroup CompilerDetection
-     */
-    #define NKENTSEU_COMPILER_INTEL
-    #define NKENTSEU_COMPILER_VERSION __INTEL_COMPILER
+/**
+ * @brief Détection compilateur Intel
+ * @def NKENTSEU_COMPILER_INTEL
+ * @ingroup CompilerDetection
+ */
+#define NKENTSEU_COMPILER_INTEL
+#define NKENTSEU_COMPILER_VERSION __INTEL_COMPILER
 #endif
 
 // Emscripten
 #if defined(__EMSCRIPTEN__)
-    /**
-     * @brief Détection Emscripten
-     * @def NKENTSEU_COMPILER_EMSCRIPTEN
-     * @ingroup CompilerDetection
-     */
-    #define NKENTSEU_COMPILER_EMSCRIPTEN
+/**
+ * @brief Détection Emscripten
+ * @def NKENTSEU_COMPILER_EMSCRIPTEN
+ * @ingroup CompilerDetection
+ */
+#define NKENTSEU_COMPILER_EMSCRIPTEN
 #endif
 
 // NVIDIA CUDA Compiler
 #if defined(__NVCC__)
-    /**
-     * @brief Détection NVCC (CUDA)
-     * @def NKENTSEU_COMPILER_NVCC
-     * @ingroup CompilerDetection
-     */
-    #define NKENTSEU_COMPILER_NVCC
+/**
+ * @brief Détection NVCC (CUDA)
+ * @def NKENTSEU_COMPILER_NVCC
+ * @ingroup CompilerDetection
+ */
+#define NKENTSEU_COMPILER_NVCC
 #endif
 
 // Oracle/Sun Studio
 #if defined(__SUNPRO_C) || defined(__SUNPRO_CC)
-    /**
-     * @brief Détection SunPro
-     * @def NKENTSEU_COMPILER_SUNPRO
-     * @ingroup CompilerDetection
-     */
-    #define NKENTSEU_COMPILER_SUNPRO
+/**
+ * @brief Détection SunPro
+ * @def NKENTSEU_COMPILER_SUNPRO
+ * @ingroup CompilerDetection
+ */
+#define NKENTSEU_COMPILER_SUNPRO
 #endif
 
 // IBM XL C/C++
 #if defined(__xlC__) || defined(__xlc__)
-    /**
-     * @brief Détection IBM XL
-     * @def NKENTSEU_COMPILER_XLC
-     * @ingroup CompilerDetection
-     */
-    #define NKENTSEU_COMPILER_XLC
+/**
+ * @brief Détection IBM XL
+ * @def NKENTSEU_COMPILER_XLC
+ * @ingroup CompilerDetection
+ */
+#define NKENTSEU_COMPILER_XLC
 #endif
 
 // ============================================================
@@ -169,57 +169,57 @@
  */
 
 #if __cplusplus >= 202302L
-    /**
-     * @brief Standard C++23 ou supérieur
-     * @def NKENTSEU_CPP23
-     * @ingroup CppStandards
-     */
-    #define NKENTSEU_CPP23
-    #define NKENTSEU_CPP_VERSION 23
+/**
+ * @brief Standard C++23 ou supérieur
+ * @def NKENTSEU_CPP23
+ * @ingroup CppStandards
+ */
+#define NKENTSEU_CPP23
+#define NKENTSEU_CPP_VERSION 23
 #elif __cplusplus >= 202002L
-    /**
-     * @brief Standard C++20 ou supérieur
-     * @def NKENTSEU_CPP20
-     * @ingroup CppStandards
-     */
-    #ifndef NKENTSEU_CPP20
-        #define NKENTSEU_CPP20
-    #endif
-    #define NKENTSEU_CPP_VERSION 20
+/**
+ * @brief Standard C++20 ou supérieur
+ * @def NKENTSEU_CPP20
+ * @ingroup CppStandards
+ */
+#ifndef NKENTSEU_CPP20
+#define NKENTSEU_CPP20
+#endif
+#define NKENTSEU_CPP_VERSION 20
 #elif __cplusplus >= 201703L
-    /**
-     * @brief Standard C++17 ou supérieur
-     * @def NKENTSEU_CPP17
-     * @ingroup CppStandards
-     */
-    #define NKENTSEU_CPP17
-    #define NKENTSEU_CPP_VERSION 17
+/**
+ * @brief Standard C++17 ou supérieur
+ * @def NKENTSEU_CPP17
+ * @ingroup CppStandards
+ */
+#define NKENTSEU_CPP17
+#define NKENTSEU_CPP_VERSION 17
 #elif __cplusplus >= 201402L
-    /**
-     * @brief Standard C++14 ou supérieur
-     * @def NKENTSEU_CPP14
-     * @ingroup CppStandards
-     */
-    #define NKENTSEU_CPP14
-    #define NKENTSEU_CPP_VERSION 14
+/**
+ * @brief Standard C++14 ou supérieur
+ * @def NKENTSEU_CPP14
+ * @ingroup CppStandards
+ */
+#define NKENTSEU_CPP14
+#define NKENTSEU_CPP_VERSION 14
 #elif __cplusplus >= 201103L
-    /**
-     * @brief Standard C++11 ou supérieur
-     * @def NKENTSEU_CPP11
-     * @ingroup CppStandards
-     */
-    #define NKENTSEU_CPP11
-    #define NKENTSEU_CPP_VERSION 11
+/**
+ * @brief Standard C++11 ou supérieur
+ * @def NKENTSEU_CPP11
+ * @ingroup CppStandards
+ */
+#define NKENTSEU_CPP11
+#define NKENTSEU_CPP_VERSION 11
 #elif __cplusplus >= 199711L
-    /**
-     * @brief Standard C++98/C++03
-     * @def NKENTSEU_CPP98
-     * @ingroup CppStandards
-     */
-    #define NKENTSEU_CPP98
-    #define NKENTSEU_CPP_VERSION 98
+/**
+ * @brief Standard C++98/C++03
+ * @def NKENTSEU_CPP98
+ * @ingroup CppStandards
+ */
+#define NKENTSEU_CPP98
+#define NKENTSEU_CPP_VERSION 98
 #else
-    #error "C++ standard not detected - minimum required is C++11"
+#error "C++ standard not detected - minimum required is C++11"
 #endif
 
 // ============================================================
@@ -231,26 +231,27 @@
  * @brief Macros indiquant la disponibilité des fonctionnalités C++11
  */
 
-#if defined(NKENTSEU_CPP11) || defined(NKENTSEU_CPP14) || defined(NKENTSEU_CPP17) || defined(NKENTSEU_CPP20) || defined(NKENTSEU_CPP23)
-    /**
-     * @brief Support général C++11
-     * @def NKENTSEU_HAS_CPP11
-     * @ingroup Cpp11Features
-     */
-    #define NKENTSEU_HAS_CPP11
-    #define NKENTSEU_HAS_NULLPTR
-    #define NKENTSEU_HAS_AUTO
-    #define NKENTSEU_HAS_DECLTYPE
-    #define NKENTSEU_HAS_RVALUE_REFERENCES
-    #define NKENTSEU_HAS_VARIADIC_TEMPLATES
-    #define NKENTSEU_HAS_STATIC_ASSERT
-    #define NKENTSEU_HAS_CONSTEXPR
-    #define NKENTSEU_HAS_NOEXCEPT
-    #define NKENTSEU_HAS_OVERRIDE
-    #define NKENTSEU_HAS_FINAL
-    #define NKENTSEU_HAS_DEFAULT_DELETE
-    #define NKENTSEU_HAS_LAMBDA
-    #define NKENTSEU_HAS_RANGE_FOR
+#if defined(NKENTSEU_CPP11) || defined(NKENTSEU_CPP14) || defined(NKENTSEU_CPP17) || defined(NKENTSEU_CPP20) ||        \
+	defined(NKENTSEU_CPP23)
+/**
+ * @brief Support général C++11
+ * @def NKENTSEU_HAS_CPP11
+ * @ingroup Cpp11Features
+ */
+#define NKENTSEU_HAS_CPP11
+#define NKENTSEU_HAS_NULLPTR
+#define NKENTSEU_HAS_AUTO
+#define NKENTSEU_HAS_DECLTYPE
+#define NKENTSEU_HAS_RVALUE_REFERENCES
+#define NKENTSEU_HAS_VARIADIC_TEMPLATES
+#define NKENTSEU_HAS_STATIC_ASSERT
+#define NKENTSEU_HAS_CONSTEXPR
+#define NKENTSEU_HAS_NOEXCEPT
+#define NKENTSEU_HAS_OVERRIDE
+#define NKENTSEU_HAS_FINAL
+#define NKENTSEU_HAS_DEFAULT_DELETE
+#define NKENTSEU_HAS_LAMBDA
+#define NKENTSEU_HAS_RANGE_FOR
 #endif
 
 // ============================================================
@@ -263,17 +264,17 @@
  */
 
 #if defined(NKENTSEU_CPP14) || defined(NKENTSEU_CPP17) || defined(NKENTSEU_CPP20) || defined(NKENTSEU_CPP23)
-    /**
-     * @brief Support général C++14
-     * @def NKENTSEU_HAS_CPP14
-     * @ingroup Cpp14Features
-     */
-    #define NKENTSEU_HAS_CPP14
-    #define NKENTSEU_HAS_GENERIC_LAMBDAS
-    #define NKENTSEU_HAS_VARIABLE_TEMPLATES
-    #define NKENTSEU_HAS_RELAXED_CONSTEXPR
-    #define NKENTSEU_HAS_BINARY_LITERALS
-    #define NKENTSEU_HAS_DECLTYPE_AUTO
+/**
+ * @brief Support général C++14
+ * @def NKENTSEU_HAS_CPP14
+ * @ingroup Cpp14Features
+ */
+#define NKENTSEU_HAS_CPP14
+#define NKENTSEU_HAS_GENERIC_LAMBDAS
+#define NKENTSEU_HAS_VARIABLE_TEMPLATES
+#define NKENTSEU_HAS_RELAXED_CONSTEXPR
+#define NKENTSEU_HAS_BINARY_LITERALS
+#define NKENTSEU_HAS_DECLTYPE_AUTO
 #endif
 
 // ============================================================
@@ -286,20 +287,20 @@
  */
 
 #if defined(NKENTSEU_CPP17) || defined(NKENTSEU_CPP20) || defined(NKENTSEU_CPP23)
-    /**
-     * @brief Support général C++17
-     * @def NKENTSEU_HAS_CPP17
-     * @ingroup Cpp17Features
-     */
-    #define NKENTSEU_HAS_CPP17
-    #define NKENTSEU_HAS_INLINE_VARIABLES
-    #define NKENTSEU_HAS_FOLD_EXPRESSIONS
-    #define NKENTSEU_HAS_IF_CONSTEXPR
-    #define NKENTSEU_HAS_STRUCTURED_BINDINGS
-    #define NKENTSEU_HAS_CONSTEXPR_IF
-    #define NKENTSEU_HAS_NODISCARD
-    #define NKENTSEU_HAS_MAYBE_UNUSED
-    #define NKENTSEU_HAS_FALLTHROUGH
+/**
+ * @brief Support général C++17
+ * @def NKENTSEU_HAS_CPP17
+ * @ingroup Cpp17Features
+ */
+#define NKENTSEU_HAS_CPP17
+#define NKENTSEU_HAS_INLINE_VARIABLES
+#define NKENTSEU_HAS_FOLD_EXPRESSIONS
+#define NKENTSEU_HAS_IF_CONSTEXPR
+#define NKENTSEU_HAS_STRUCTURED_BINDINGS
+#define NKENTSEU_HAS_CONSTEXPR_IF
+#define NKENTSEU_HAS_NODISCARD
+#define NKENTSEU_HAS_MAYBE_UNUSED
+#define NKENTSEU_HAS_FALLTHROUGH
 #endif
 
 // ============================================================
@@ -312,20 +313,20 @@
  */
 
 #if defined(NKENTSEU_CPP20) || defined(NKENTSEU_CPP23)
-    /**
-     * @brief Support général C++20
-     * @def NKENTSEU_HAS_CPP20
-     * @ingroup Cpp20Features
-     */
-    #define NKENTSEU_HAS_CPP20
-    #define NKENTSEU_HAS_CONCEPTS
-    #define NKENTSEU_HAS_MODULES
-    #define NKENTSEU_HAS_COROUTINES
-    #define NKENTSEU_HAS_CONSTEXPR_VIRTUAL
-    #define NKENTSEU_HAS_CONSTEVAL
-    #define NKENTSEU_HAS_CONSTINIT
-    #define NKENTSEU_HAS_THREE_WAY_COMPARISON
-    #define NKENTSEU_HAS_DESIGNATED_INITIALIZERS
+/**
+ * @brief Support général C++20
+ * @def NKENTSEU_HAS_CPP20
+ * @ingroup Cpp20Features
+ */
+#define NKENTSEU_HAS_CPP20
+#define NKENTSEU_HAS_CONCEPTS
+#define NKENTSEU_HAS_MODULES
+#define NKENTSEU_HAS_COROUTINES
+#define NKENTSEU_HAS_CONSTEXPR_VIRTUAL
+#define NKENTSEU_HAS_CONSTEVAL
+#define NKENTSEU_HAS_CONSTINIT
+#define NKENTSEU_HAS_THREE_WAY_COMPARISON
+#define NKENTSEU_HAS_DESIGNATED_INITIALIZERS
 #endif
 
 // ============================================================
@@ -338,15 +339,15 @@
  */
 
 #if defined(NKENTSEU_CPP23)
-    /**
-     * @brief Support général C++23
-     * @def NKENTSEU_HAS_CPP23
-     * @ingroup Cpp23Features
-     */
-    #define NKENTSEU_HAS_CPP23
-    #define NKENTSEU_HAS_DEDUCING_THIS
-    #define NKENTSEU_HAS_IF_CONSTEVAL
-    #define NKENTSEU_HAS_MULTIDIMENSIONAL_SUBSCRIPT
+/**
+ * @brief Support général C++23
+ * @def NKENTSEU_HAS_CPP23
+ * @ingroup Cpp23Features
+ */
+#define NKENTSEU_HAS_CPP23
+#define NKENTSEU_HAS_DEDUCING_THIS
+#define NKENTSEU_HAS_IF_CONSTEVAL
+#define NKENTSEU_HAS_MULTIDIMENSIONAL_SUBSCRIPT
 #endif
 
 // ============================================================
@@ -365,9 +366,9 @@
  * @note S'étend à constexpr si disponible, vide sinon
  */
 #if defined(NKENTSEU_HAS_CONSTEXPR)
-    #define NKENTSEU_CONSTEXPR constexpr
+#define NKENTSEU_CONSTEXPR constexpr
 #else
-    #define NKENTSEU_CONSTEXPR
+#define NKENTSEU_CONSTEXPR
 #endif
 
 /**
@@ -376,11 +377,11 @@
  * @ingroup CppConvenience
  */
 #if defined(NKENTSEU_HAS_NOEXCEPT)
-    #define NKENTSEU_NOEXCEPT noexcept
-    #define NKENTSEU_NOEXCEPT_IF(condition) noexcept(condition)
+#define NKENTSEU_NOEXCEPT noexcept
+#define NKENTSEU_NOEXCEPT_IF(condition) noexcept(condition)
 #else
-    #define NKENTSEU_NOEXCEPT throw()
-    #define NKENTSEU_NOEXCEPT_IF(condition)
+#define NKENTSEU_NOEXCEPT throw()
+#define NKENTSEU_NOEXCEPT_IF(condition)
 #endif
 
 /**
@@ -389,9 +390,9 @@
  * @ingroup CppConvenience
  */
 #if defined(NKENTSEU_HAS_OVERRIDE)
-    #define NKENTSEU_OVERRIDE override
+#define NKENTSEU_OVERRIDE override
 #else
-    #define NKENTSEU_OVERRIDE
+#define NKENTSEU_OVERRIDE
 #endif
 
 /**
@@ -400,9 +401,9 @@
  * @ingroup CppConvenience
  */
 #if defined(NKENTSEU_HAS_FINAL)
-    #define NKENTSEU_FINAL final
+#define NKENTSEU_FINAL final
 #else
-    #define NKENTSEU_FINAL
+#define NKENTSEU_FINAL
 #endif
 
 /**
@@ -411,18 +412,18 @@
  * @ingroup CppConvenience
  */
 #if defined(__cplusplus) && __cplusplus >= 202002L
-        #define NKENTSEU_NODISCARD [[nodiscard]]
-        #define NKENTSEU_NODISCARD_MSG(msg) [[nodiscard(msg)]]
-        #define NKENTSEU_NODISCARD_SIMPLE [[nodiscard]]
-    #elif defined(__cplusplus) && __cplusplus >= 201703L
-        #define NKENTSEU_NODISCARD [[nodiscard]]
-        #define NKENTSEU_NODISCARD_MSG(msg) [[nodiscard(msg)]]
-        #define NKENTSEU_NODISCARD_SIMPLE [[nodiscard]]
-    #else
-        #define NKENTSEU_NODISCARD
-        #define NKENTSEU_NODISCARD_MSG(msg)
-        #define NKENTSEU_NODISCARD_SIMPLE
-    #endif
+#define NKENTSEU_NODISCARD [[nodiscard]]
+#define NKENTSEU_NODISCARD_MSG(msg) [[nodiscard(msg)]]
+#define NKENTSEU_NODISCARD_SIMPLE [[nodiscard]]
+#elif defined(__cplusplus) && __cplusplus >= 201703L
+#define NKENTSEU_NODISCARD [[nodiscard]]
+#define NKENTSEU_NODISCARD_MSG(msg) [[nodiscard(msg)]]
+#define NKENTSEU_NODISCARD_SIMPLE [[nodiscard]]
+#else
+#define NKENTSEU_NODISCARD
+#define NKENTSEU_NODISCARD_MSG(msg)
+#define NKENTSEU_NODISCARD_SIMPLE
+#endif
 
 /**
  * @brief Attribut [[maybe_unused]] (C++17+)
@@ -430,9 +431,9 @@
  * @ingroup CppConvenience
  */
 #if defined(NKENTSEU_HAS_MAYBE_UNUSED)
-    #define NKENTSEU_MAYBE_UNUSED [[maybe_unused]]
+#define NKENTSEU_MAYBE_UNUSED [[maybe_unused]]
 #else
-    #define NKENTSEU_MAYBE_UNUSED
+#define NKENTSEU_MAYBE_UNUSED
 #endif
 
 /**
@@ -441,9 +442,9 @@
  * @ingroup CppConvenience
  */
 #if defined(NKENTSEU_HAS_FALLTHROUGH)
-    #define NKENTSEU_FALLTHROUGH [[fallthrough]]
+#define NKENTSEU_FALLTHROUGH [[fallthrough]]
 #else
-    #define NKENTSEU_FALLTHROUGH
+#define NKENTSEU_FALLTHROUGH
 #endif
 
 // ============================================================
@@ -462,11 +463,11 @@
  * @note Garantit l'inlining même avec optimisations désactivées
  */
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_FORCE_INLINE __forceinline
+#define NKENTSEU_FORCE_INLINE __forceinline
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_FORCE_INLINE inline __attribute__((always_inline))
+#define NKENTSEU_FORCE_INLINE inline __attribute__((always_inline))
 #else
-    #define NKENTSEU_FORCE_INLINE inline
+#define NKENTSEU_FORCE_INLINE inline
 #endif
 
 /**
@@ -475,11 +476,11 @@
  * @ingroup CompilerAttributes
  */
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_NEVER_INLINE __declspec(noinline)
+#define NKENTSEU_NEVER_INLINE __declspec(noinline)
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_NEVER_INLINE __attribute__((noinline))
+#define NKENTSEU_NEVER_INLINE __attribute__((noinline))
 #else
-    #define NKENTSEU_NEVER_INLINE
+#define NKENTSEU_NEVER_INLINE
 #endif
 
 /**
@@ -489,11 +490,11 @@
  * @ingroup CompilerAttributes
  */
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_ALIGN(x) __declspec(align(x))
+#define NKENTSEU_ALIGN(x) __declspec(align(x))
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_ALIGN(x) __attribute__((aligned(x)))
+#define NKENTSEU_ALIGN(x) __attribute__((aligned(x)))
 #else
-    #define NKENTSEU_ALIGN(x)
+#define NKENTSEU_ALIGN(x)
 #endif
 
 /**
@@ -503,17 +504,17 @@
  * @note Utile pour les structures de protocole réseau ou formats binaires
  */
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_PACKED
-    #define NKENTSEU_PACK_BEGIN __pragma(pack(push, 1))
-    #define NKENTSEU_PACK_END __pragma(pack(pop))
+#define NKENTSEU_PACKED
+#define NKENTSEU_PACK_BEGIN __pragma(pack(push, 1))
+#define NKENTSEU_PACK_END __pragma(pack(pop))
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_PACKED __attribute__((packed))
-    #define NKENTSEU_PACK_BEGIN
-    #define NKENTSEU_PACK_END
+#define NKENTSEU_PACKED __attribute__((packed))
+#define NKENTSEU_PACK_BEGIN
+#define NKENTSEU_PACK_END
 #else
-    #define NKENTSEU_PACKED
-    #define NKENTSEU_PACK_BEGIN
-    #define NKENTSEU_PACK_END
+#define NKENTSEU_PACKED
+#define NKENTSEU_PACK_BEGIN
+#define NKENTSEU_PACK_END
 #endif
 
 /**
@@ -522,11 +523,11 @@
  * @ingroup CompilerAttributes
  */
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_RESTRICT __restrict
+#define NKENTSEU_RESTRICT __restrict
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_RESTRICT __restrict__
+#define NKENTSEU_RESTRICT __restrict__
 #else
-    #define NKENTSEU_RESTRICT
+#define NKENTSEU_RESTRICT
 #endif
 
 /**
@@ -535,13 +536,13 @@
  * @ingroup CompilerAttributes
  */
 #if defined(NKENTSEU_CPP11)
-    #define NKENTSEU_THREAD_LOCAL thread_local
+#define NKENTSEU_THREAD_LOCAL thread_local
 #elif defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_THREAD_LOCAL __declspec(thread)
+#define NKENTSEU_THREAD_LOCAL __declspec(thread)
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_THREAD_LOCAL __thread
+#define NKENTSEU_THREAD_LOCAL __thread
 #else
-    #define NKENTSEU_THREAD_LOCAL
+#define NKENTSEU_THREAD_LOCAL
 #endif
 
 /**
@@ -550,17 +551,17 @@
  * @ingroup CompilerAttributes
  */
 #if defined(NKENTSEU_CPP14)
-    #define NKENTSEU_DEPRECATED [[deprecated]]
-    #define NKENTSEU_DEPRECATED_MSG(msg) [[deprecated(msg)]]
+#define NKENTSEU_DEPRECATED [[deprecated]]
+#define NKENTSEU_DEPRECATED_MSG(msg) [[deprecated(msg)]]
 #elif defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_DEPRECATED __declspec(deprecated)
-    #define NKENTSEU_DEPRECATED_MSG(msg) __declspec(deprecated(msg))
+#define NKENTSEU_DEPRECATED __declspec(deprecated)
+#define NKENTSEU_DEPRECATED_MSG(msg) __declspec(deprecated(msg))
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_DEPRECATED __attribute__((deprecated))
-    #define NKENTSEU_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
+#define NKENTSEU_DEPRECATED __attribute__((deprecated))
+#define NKENTSEU_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
 #else
-    #define NKENTSEU_DEPRECATED
-    #define NKENTSEU_DEPRECATED_MSG(msg)
+#define NKENTSEU_DEPRECATED
+#define NKENTSEU_DEPRECATED_MSG(msg)
 #endif
 
 // ============================================================
@@ -578,11 +579,11 @@
  * @ingroup StandardMacros
  */
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_FUNCTION_NAME __FUNCSIG__
+#define NKENTSEU_FUNCTION_NAME __FUNCSIG__
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_FUNCTION_NAME __PRETTY_FUNCTION__
+#define NKENTSEU_FUNCTION_NAME __PRETTY_FUNCTION__
 #else
-    #define NKENTSEU_FUNCTION_NAME __func__
+#define NKENTSEU_FUNCTION_NAME __func__
 #endif
 
 /**
@@ -614,7 +615,7 @@
  * @ingroup SpecialCapabilities
  */
 #if defined(__GXX_RTTI) || defined(_CPPRTTI) || defined(__INTEL_RTTI__)
-    #define NKENTSEU_HAS_RTTI
+#define NKENTSEU_HAS_RTTI
 #endif
 
 /**
@@ -623,7 +624,7 @@
  * @ingroup SpecialCapabilities
  */
 #if defined(__EXCEPTIONS) || defined(_CPPUNWIND) || defined(__cpp_exceptions)
-    #define NKENTSEU_HAS_EXCEPTIONS
+#define NKENTSEU_HAS_EXCEPTIONS
 #endif
 
 /**
@@ -632,9 +633,9 @@
  * @ingroup SpecialCapabilities
  */
 #if defined(__SIZEOF_INT128__) && !defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_HAS_INT128
-    typedef __int128 NKENTSEU_int128;
-    typedef unsigned __int128 NKENTSEU_uint128;
+#define NKENTSEU_HAS_INT128
+typedef __int128 NKENTSEU_int128;
+typedef unsigned __int128 NKENTSEU_uint128;
 #endif
 
 // ============================================================
@@ -653,11 +654,11 @@
  * @ingroup Pragmas
  */
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_PRAGMA(x) __pragma(x)
+#define NKENTSEU_PRAGMA(x) __pragma(x)
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_PRAGMA(x) _Pragma(#x)
+#define NKENTSEU_PRAGMA(x) _Pragma(#x)
 #else
-    #define NKENTSEU_PRAGMA(x)
+#define NKENTSEU_PRAGMA(x)
 #endif
 
 /**
@@ -677,17 +678,17 @@
  * @ingroup Pragmas
  */
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_DISABLE_WARNING_PUSH NKENTSEU_PRAGMA(warning(push))
-    #define NKENTSEU_DISABLE_WARNING_POP NKENTSEU_PRAGMA(warning(pop))
-    #define NKENTSEU_DISABLE_WARNING(warningNumber) NKENTSEU_PRAGMA(warning(disable : warningNumber))
+#define NKENTSEU_DISABLE_WARNING_PUSH NKENTSEU_PRAGMA(warning(push))
+#define NKENTSEU_DISABLE_WARNING_POP NKENTSEU_PRAGMA(warning(pop))
+#define NKENTSEU_DISABLE_WARNING(warningNumber) NKENTSEU_PRAGMA(warning(disable : warningNumber))
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #define NKENTSEU_DISABLE_WARNING_PUSH NKENTSEU_PRAGMA(GCC diagnostic push)
-    #define NKENTSEU_DISABLE_WARNING_POP NKENTSEU_PRAGMA(GCC diagnostic pop)
-    #define NKENTSEU_DISABLE_WARNING(warningName) NKENTSEU_PRAGMA(GCC diagnostic ignored warningName)
+#define NKENTSEU_DISABLE_WARNING_PUSH NKENTSEU_PRAGMA(GCC diagnostic push)
+#define NKENTSEU_DISABLE_WARNING_POP NKENTSEU_PRAGMA(GCC diagnostic pop)
+#define NKENTSEU_DISABLE_WARNING(warningName) NKENTSEU_PRAGMA(GCC diagnostic ignored warningName)
 #else
-    #define NKENTSEU_DISABLE_WARNING_PUSH
-    #define NKENTSEU_DISABLE_WARNING_POP
-    #define NKENTSEU_DISABLE_WARNING(warning)
+#define NKENTSEU_DISABLE_WARNING_PUSH
+#define NKENTSEU_DISABLE_WARNING_POP
+#define NKENTSEU_DISABLE_WARNING(warning)
 #endif
 
 // ============================================================
@@ -696,7 +697,7 @@
 
 // S'assurer qu'au moins C++11 est supporté
 #if !defined(NKENTSEU_HAS_CPP11)
-    #error "NKCore requires at least C++11 compiler support"
+#error "NKCore requires at least C++11 compiler support"
 #endif
 
 #endif // NKENTSEU_CORE_NKCORE_SRC_NKCORE_NKCOMPILER_H_INCLUDED

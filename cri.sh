@@ -47,12 +47,22 @@ rm -rf build dist
 rm -rf *.egg-info
 
 # ─────────────────────────────────────────────────────────────────────────────
-echo "[3/6] Désinstallation du package Jenga ..."
-$PY -m pip uninstall Jenga -y 2>/dev/null || true
+echo "[3/6] Désinstallation de tous les anciens paquets Jenga ..."
+for pkg in Jenga jenga jenga-build-system; do
+    $PY -m pip uninstall -y "$pkg" 2>/dev/null || true
+done
+
+# Mise à jour de pip, setuptools et wheel (versions minimales garantissant PEP 660)
+echo "[3/6] Mise à jour de pip, setuptools et wheel..."
+$PY -m pip install --upgrade pip --quiet
+$PY -m pip install --upgrade "setuptools>=64.0" wheel --quiet
 
 echo "[3/6] Réinstallation en mode développement (editable) ..."
-$PY -m pip install -e . --quiet
-echo "[OK] Installation dev terminée."
+if ! $PY -m pip install -e . --quiet; then
+    echo "[AVERTISSEMENT] L'installation en mode éditable a échoué. Vous pourrez installer le wheel après le build."
+else
+    echo "[OK] Installation dev terminée."
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 if [ "$RUN_TESTS" = "1" ]; then

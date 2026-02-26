@@ -2249,6 +2249,10 @@ def frameworks(names: Union[str, List[str]]) -> None:
     else:
         _currentToolchain.frameworks.extend(names)
 
+def framework(name: str) -> None:
+    """Backward-compatible singular alias for frameworks()."""
+    frameworks(name)
+
 def frameworkpath(path: str) -> None:
     if _currentToolchain:
         _currentToolchain.frameworkPaths.append(path)
@@ -3341,7 +3345,7 @@ __all__ = [
     'settarget', 'sysroot', 'targettriple', 'ccompiler', 'cppcompiler',
     'linker', 'archiver', 'addcflag', 'addcxxflag', 'addldflag',
     'cflags', 'cxxflags', 'ldflags', 'asmflags', 'arflags',
-    'frameworks', 'frameworkpath', 'librarypath', 'library', 'rpath',
+    'framework', 'frameworks', 'frameworkpath', 'librarypath', 'library', 'rpath',
     'sanitize', 'nostdlib', 'nostdinc', 'pic', 'pie',
     'buildoption', 'buildoptions', 'linkoptions',
     'useproject', 'getprojectproperties',

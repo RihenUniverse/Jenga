@@ -1,226 +1,244 @@
-// =============================================================================
+// ============================================================================
 // Sandbox/src/main.cpp
-// Exemple complet NkWindow — fenêtre, renderer software, events, gamepad,
-// safe area, transforms 2D.
-//
-// Compile sur : Win32, macOS Cocoa, Linux XCB/XLib, WASM, Android*, iOS*
-// (*) Adapter l'entry point via NkMain.h
-// =============================================================================
+// ============================================================================
 
 #include "NKWindow/NkWindow.h"
 #include "NKWindow/Core/NkMain.h"
+#include "NKWindow/Time/NkClock.h"
+
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
+#include <memory>
 
-#if defined(NKENTSEU_PLATFORM_WASM) && defined(__EMSCRIPTEN__)
-#   include <emscripten.h>
+#ifndef NK_SANDBOX_RENDERER_API
+#define NK_SANDBOX_RENDERER_API nkentseu::NkRendererApi::NK_SOFTWARE
 #endif
 
-// --------------------------------------------------------------------------
-// nkmain — point d'entrée cross-platform
-// --------------------------------------------------------------------------
+/**
+ * @brief Internal anonymous namespace.
+ */
+namespace {
+using namespace nkentseu;
 
-int nkmain(const nkentseu::NkEntryState& /*state*/)
-{
-    using namespace nkentseu;
+float ClampUnit(float v) {
+	if (v < 0.f) {
+		return 0.f;
+	}
+	if (v > 1.f) {
+		return 1.f;
+	}
+	return v;
+}
 
-    // ========================================================================
-    // 1. Initialisation du framework
-    // ========================================================================
+/// @brief Convert normalized RGB wave values to packed RGBA.
+NkU32 PackWaveColor(float r, float g, float b) {
+	return NkRenderer::PackColor(static_cast<NkU8>(ClampUnit(r) * 255.f), static_cast<NkU8>(ClampUnit(g) * 255.f),
+								 static_cast<NkU8>(ClampUnit(b) * 255.f), 255);
+}
 
-    NkAppData app;
-    app.appName           = "NkWindow Sandbox";
-    app.preferredRenderer = NkRendererApi::NK_SOFTWARE;
+/// @brief Draw a time-animated plasma effect directly via SetPixel.
+void DrawPlasma(NkRenderer &renderer, NkU32 width, NkU32 height, float timeSeconds, const NkVec2f &phaseOffset,
+				float saturationBoost) {
+	if (width == 0 || height == 0) {
+		return;
+	}
 
-    if (!NkInitialise(app))
-        return -1;
+	const NkU32 block = (width * height > 1280u * 720u) ? 2u : 1u;
+	const float invW = 1.f / static_cast<float>(width);
+	const float invH = 1.f / static_cast<float>(height);
 
-    // ========================================================================
-    // 2. Fenêtre principale
-    // ========================================================================
+	for (NkU32 y = 0; y < height; y += block) {
+		const float fy = (static_cast<float>(y) * invH) - 0.5f;
+		for (NkU32 x = 0; x < width; x += block) {
+			const float fx = (static_cast<float>(x) * invW) - 0.5f;
+			const float radial = std::sqrt((fx * fx) + (fy * fy));
 
-    NkWindowConfig cfg;
-    cfg.title   = "NkWindow Sandbox";
-    cfg.width   = 1280;
-    cfg.height  = 720;
-    cfg.centered = true;
-    cfg.resizable    = true;
-    cfg.dropEnabled  = true;  // Activer le drag & drop
+			const float waveA = std::sin((fx + phaseOffset.x) * 13.5f + timeSeconds * 1.7f);
+			const float waveB = std::sin((fy + phaseOffset.y) * 11.0f - timeSeconds * 1.3f);
+			const float waveC = std::sin((radial * 24.0f) - timeSeconds * 2.1f);
+			const float mix = (waveA + waveB + waveC) * 0.33333334f;
 
-    nkentseu::Window window(cfg);
-    if (!window.IsOpen())
-    {
-        std::fprintf(stderr, "[Sandbox] Window creation failed: %s\n", window.GetLastError().ToString().c_str());
-        return -2;
-    }
+			float r = 0.5f + 0.5f * std::sin(6.2831853f * (mix + 0.00f));
+			float g = 0.5f + 0.5f * std::sin(6.2831853f * (mix + 0.33f));
+			float b = 0.5f + 0.5f * std::sin(6.2831853f * (mix + 0.66f));
 
-    // Safe area (utile sur mobile)
-    NkSafeAreaInsets safeArea = window.GetSafeAreaInsets();
+			// Increase saturation slightly to make the demo more vivid.
+			r = ClampUnit((r - 0.5f) * saturationBoost + 0.5f);
+			g = ClampUnit((g - 0.5f) * saturationBoost + 0.5f);
+			b = ClampUnit((b - 0.5f) * saturationBoost + 0.5f);
 
-    // ========================================================================
-    // 3. Renderer
-    // ========================================================================
+			const NkU32 color = PackWaveColor(r, g, b);
+			for (NkU32 by = 0; by < block && (y + by) < height; ++by) {
+				for (NkU32 bx = 0; bx < block && (x + bx) < width; ++bx) {
+					renderer.SetPixel(static_cast<NkI32>(x + bx), static_cast<NkI32>(y + by), color);
+				}
+			}
+		}
+	}
+}
 
-    NkRendererConfig rcfg;
-    rcfg.api = NkRendererApi::NK_SOFTWARE;
-    rcfg.autoResizeFramebuffer = true; // framebuffer suit la fenêtre automatiquement
+} // namespace
 
-    Renderer renderer(window, rcfg);
-    if (!renderer.IsValid())
-        return -3;
+/**
+ * @brief Sandbox entry point demonstrating direct pixel rendering.
+ *
+ * The demo creates a window, optionally creates a renderer backend,
+ * polls keyboard/gamepad events, and renders a procedural plasma frame.
+ */
+int nkmain(const nkentseu::NkEntryState & /*state*/) {
+	using namespace nkentseu;
 
-    renderer.SetBackgroundColor(Renderer::PackColor(20, 20, 30));
+	NkAppData app;
+	app.appName = "NkWindow Sandbox";
+	app.preferredRenderer = NK_SANDBOX_RENDERER_API;
 
-    // ========================================================================
-    // 4. Système d'événements
-    // ========================================================================
+	if (!NkInitialise(app)) {
+		return -1;
+	}
 
-    auto& es = EventSystem::Instance();
-    bool  running = true;
+	NkWindowConfig cfg;
+	cfg.title = "NkWindow Sandbox";
+	cfg.width = 1280;
+	cfg.height = 720;
+	cfg.centered = true;
+	cfg.resizable = true;
+	cfg.dropEnabled = true;
 
-    // ========================================================================
-    // 5. Système gamepad
-    // ========================================================================
+	nkentseu::Window window(cfg);
+	if (!window.IsOpen()) {
+		std::fprintf(stderr, "[Sandbox] Window creation failed: %s\n", window.GetLastError().ToString().c_str());
+		NkClose();
+		return -2;
+	}
 
-    auto& gp = NkGamepads();
+	NkRendererConfig rcfg;
+	rcfg.api = NK_SANDBOX_RENDERER_API;
+	rcfg.autoResizeFramebuffer = true;
 
-    gp.SetConnectCallback([](const NkGamepadInfo& info, bool connected)
-    {
-        // En production : afficher un message
-        (void)info; (void)connected;
-    });
+	std::unique_ptr<NkRenderer> renderer;
+	if (rcfg.api != NkRendererApi::NK_NONE) {
+		renderer = std::make_unique<NkRenderer>();
+		if (!renderer->Create(window, rcfg)) {
+			NkClose();
+			return -3;
+		}
+	}
 
-    gp.SetButtonCallback([](NkU32 /*idx*/, NkGamepadButton btn, NkButtonState st)
-    {
-        if (btn == NkGamepadButton::NK_GP_SOUTH && st == NkButtonState::NK_PRESSED)
-        {
-            // A/Cross pressé
-        }
-    });
+	auto &eventSystem = EventSystem::Instance();
+	auto &gamepads = NkGamepads();
 
-    gp.SetAxisCallback([](NkU32 /*idx*/, NkGamepadAxis ax, float value)
-    {
-        (void)ax; (void)value;
-        // Traiter les axes (sticks, gâchettes)
-    });
+	bool running = true;
+	bool neonMode = false;
+	float saturationBoost = 1.15f;
+	NkVec2f phaseOffset{0.f, 0.f};
+	float timeSeconds = 0.f;
 
-    // ========================================================================
-    // 6. Transforms 2D
-    // ========================================================================
+	NkClock::TimePoint previousTick = NkClock::Now();
 
-    NkTransform2D spinnerTransform;
-    spinnerTransform.position = {
-        static_cast<float>(cfg.width)  / 2.f,
-        static_cast<float>(cfg.height) / 2.f
-    };
-    spinnerTransform.scale = { 1.f, 1.f };
+	while (running) {
+		// Gamepad poll injects NK_GAMEPAD_* events into EventSystem.
+		gamepads.PollGamepads();
 
-    float angle = 0.f; // degrés, incrémenté chaque trame
+		while (NkEvent *event = eventSystem.PollEvent()) {
+			if (event->type == NkEventType::NK_WINDOW_CLOSE || event->type == NkEventType::NK_WINDOW_DESTROY) {
+				window.Close();
+				running = false;
+				break;
+			}
 
-    // Caméra 2D utilisée pour le view matrix (shake + pan/zoom possibles)
-    NkCamera2D camera(cfg.width, cfg.height);
-    camera.SetPosition(
-        static_cast<float>(cfg.width) * 0.5f,
-        static_cast<float>(cfg.height) * 0.5f
-    );
+			if (auto *resize = event->As<NkWindowResizeEvent>()) {
+				if (renderer) {
+					renderer->Resize(resize->GetWidth(), resize->GetHeight());
+				}
+				continue;
+			}
 
-    // ========================================================================
-    // 7. Boucle principale
-    // ========================================================================
+			if (auto *key = event->As<NkKeyEvent>()) {
+				if (!key->IsPress()) {
+					continue;
+				}
 
-#if defined(NKENTSEU_PLATFORM_NOOP)
-    int headlessFrames = 2;
-#endif
+				if (key->GetKey() == NkKey::NK_ESCAPE) {
+					window.Close();
+					running = false;
+					break;
+				}
 
-    while (running && window.IsOpen())
-    {
-#if defined(NKENTSEU_PLATFORM_NOOP)
-        if (--headlessFrames <= 0)
-        {
-            window.Close();
-            running = false;
-        }
-#endif
-        // --- Événements ---
-        while (NkEvent* event = es.PollEvent())
-        {
-            if (auto* e = event->As<NkWindowCloseEvent>())
-            {
-                (void)e;
-                window.Close();
-                running = false;
-                continue;
-            }
+				if (key->GetKey() == NkKey::NK_F11) {
+					window.SetFullscreen(!window.GetConfig().fullscreen);
+				}
+				if (key->GetKey() == NkKey::NK_SPACE) {
+					neonMode = !neonMode;
+				}
+			}
 
-            if (auto* e = event->As<NkWindowResizeEvent>())
-            {
-                renderer.Resize(e->GetWidth(), e->GetHeight());
-                continue;
-            }
+			if (auto *axisEvent = event->As<NkGamepadAxisEvent>()) {
+				const float value = axisEvent->GetValue();
+				switch (axisEvent->GetAxis()) {
+					case NkGamepadAxis::NK_GP_AXIS_LX:
+						phaseOffset.x += value * 0.02f;
+						break;
+					case NkGamepadAxis::NK_GP_AXIS_LY:
+						phaseOffset.y += value * 0.02f;
+						break;
+					case NkGamepadAxis::NK_GP_AXIS_RT:
+						saturationBoost = 1.0f + (ClampUnit(value) * 0.8f);
+						break;
+					default:
+						break;
+				}
+			}
 
-            if (auto* e = event->As<NkKeyEvent>())
-            {
-                if (!e->IsPress())
-                    continue;
+			if (auto *buttonEvent = event->As<NkGamepadButtonPressEvent>()) {
+				if (buttonEvent->GetButton() == NkGamepadButton::NK_GP_SOUTH) {
+					neonMode = !neonMode;
+					gamepads.Rumble(buttonEvent->GetGamepadIndex(), 0.35f, 0.45f, 0.f, 0.f, 40);
+				}
+			}
+		}
 
-                if (e->GetKey() == NkKey::NK_ESCAPE)
-                {
-                    window.Close();
-                    running = false;
-                }
-                else if (e->GetKey() == NkKey::NK_F11)
-                {
-                    window.SetFullscreen(!window.GetConfig().fullscreen);
-                }
-            }
-        }
-        if (!window.IsOpen())
-        {
-            running = false;
-            break;
-        }
+		if (!running || !window.IsOpen()) {
+			break;
+		}
 
-        // --- Gamepad polling ---
-        gp.PollGamepads();
+		const NkClock::TimePoint frameStart = NkClock::Now();
+		NkDuration delta = NkClock::ToNkDuration(frameStart - previousTick);
+		previousTick = frameStart;
 
-        // Déplacement avec stick gauche (joueur 0)
-        if (gp.IsConnected(0))
-        {
-            float lx = gp.GetAxis(0, NkGamepadAxis::NK_GP_AXIS_LX);
-            float ly = gp.GetAxis(0, NkGamepadAxis::NK_GP_AXIS_LY);
-            spinnerTransform.position.x += lx * 4.f;
-            spinnerTransform.position.y += ly * 4.f;
+		float dt = static_cast<float>(delta.ToSeconds());
+		if (dt <= 0.f || dt > 0.25f) {
+			dt = 1.f / 60.f;
+		}
 
-            // Vibration si bouton A
-            if (gp.IsButtonDown(0, NkGamepadButton::NK_GP_SOUTH))
-                gp.Rumble(0, 0.3f, 0.3f, 0.f, 0.f, 16);
-        }
+		timeSeconds += dt * (neonMode ? 1.8f : 1.0f);
 
-        // --- Mise à jour ---
-        angle += 1.5f;
-        if (angle >= 360.f) angle -= 360.f;
-        spinnerTransform.rotation = angle;
+		if (renderer) {
+			renderer->BeginFrame(NkRenderer::PackColor(8, 10, 18, 255));
 
-        // --- Rendu ---
-        // Mise à jour caméra shake
-        camera.Update(1.f / 60.f);  // dt fixe pour l'exemple
+			const NkFramebufferInfo &fb = renderer->GetFramebufferInfo();
+			const NkU32 width = fb.width ? fb.width : window.GetSize().x;
+			const NkU32 height = fb.height ? fb.height : window.GetSize().y;
 
-        renderer.BeginFrame(); // utilise SetBackgroundColor
+			DrawPlasma(*renderer, width, height, timeSeconds, phaseOffset, saturationBoost);
 
-        renderer.EndFrame();
-        renderer.Present(); // blit vers la fenêtre
+			renderer->EndFrame();
+			renderer->Present();
+		}
 
-#if defined(NKENTSEU_PLATFORM_WASM) && defined(__EMSCRIPTEN__)
-        // Yield to the browser for ~16 ms (≈60 fps) so the compositor has
-        // time to paint the canvas before the next frame starts.
-        emscripten_sleep(16);
-#endif
-    }
+		const NkDuration frameBudget = NkDuration::FromMilliseconds(static_cast<NkI64>(16));
+		const NkDuration elapsed = NkClock::ElapsedSince(frameStart);
+		if (elapsed < frameBudget) {
+			NkClock::Sleep(frameBudget - elapsed);
+		} else {
+			NkClock::YieldThread();
+		}
+	}
 
-    // ========================================================================
-    // 8. Nettoyage
-    // ========================================================================
+	if (renderer) {
+		renderer->Shutdown();
+	}
 
-    renderer.Shutdown();
-    NkClose();
-    return 0;
+	NkClose();
+	return 0;
 }

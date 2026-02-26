@@ -136,84 +136,113 @@ class EmscriptenBuilder(Builder):
 
     def _GenerateRunnerScripts(self, project: Project, output_path: Path) -> None:
         """
-        Génère <Project>.bat (Windows) et <Project>.sh (Linux/macOS)
-        dans le même répertoire que le .html produit.
-
-        Ces scripts démarrent un serveur HTTP local (python -m http.server),
-        puis ouvrent automatiquement le navigateur sur la page WASM.
-
-        Usage:
-          Windows : <Project>.bat [port]
-          Linux   : ./<Project>.sh [port]
-        Port par défaut : 8080
+        Génère des scripts de lancement robustes pour Windows (.bat) et Unix (.sh).
         """
         if project.kind not in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP, ProjectKind.TEST_SUITE):
-            return  # Runner scripts only for executables, not libraries
+            return
 
-        html_name = output_path.name          # e.g. "Sandbox.html"
+        html_name = output_path.name
         proj_name = project.name
-        out_dir   = output_path.parent
-        port_default = 8080
+        out_dir = output_path.parent
+        port_default = 9001
 
-        # ── Windows .bat ──────────────────────────────────────────────────
-        bat_content = (
-            "@echo off\n"
-            f"title {proj_name}\n"
-            "setlocal\n"
-            f"set PORT=%1\n"
-            f"if \"%PORT%\"==\"\" set PORT={port_default}\n"
-            "\n"
-            "echo ================================================\n"
-            f"echo  {proj_name} — WASM Runner\n"
-            "echo ================================================\n"
-            "echo.\n"
-            f"echo  Server: http://localhost:%PORT%/{html_name}\n"
-            "echo  CTRL+C to stop.\n"
-            "echo.\n"
-            "cd /d \"%~dp0\"\n"
-            ":: Start server in background, open browser after 1s delay, then restart\n"
-            ":: server in foreground so Ctrl+C stops it cleanly.\n"
-            f"start /B cmd /c \"ping -n 2 127.0.0.1 >nul & start \\\"\\\" \\\"http://localhost:%PORT%/{html_name}\\\"\"\n"
-            "python -m http.server %PORT% 2>nul\n"
-            "if errorlevel 1 py -m http.server %PORT% 2>nul\n"
-            "if errorlevel 1 python3 -m http.server %PORT%\n"
-            "endlocal\n"
+        # --- Script Windows (.bat) ---
+        bat_content = f'''@echo off
+    title {proj_name}
+    setlocal enabledelayedexpansion
+
+    set PORT=%1
+    if "%PORT%"=="" set PORT={port_default}
+
+    echo ================================================
+    echo  {proj_name} — WASM Runner
+    echo ================================================
+    echo.
+    echo  Server: http://localhost:!PORT!/{html_name}
+    echo  CTRL+C to stop.
+    echo.
+
+    :: Se placer dans le répertoire du script
+    pushd "%~dp0" || (
+        echo Erreur : impossible d'accéder au répertoire "%~dp0"
+        pause
+        exit /b 1
+    )
+
+    :: Vérifier que le fichier HTML existe
+    if not exist "{html_name}" (
+        echo Erreur : fichier {html_name} introuvable dans "%~dp0"
+        echo Assurez-vous que la compilation WebAssembly a réussi.
+        pause
+        exit /b 1
+    )
+
+    :: Lancer le navigateur après un délai (1 seconde)
+    start /B "" cmd /c "timeout /t 1 /nobreak >nul & start \"\" \"http://localhost:!PORT!/{html_name}\""
+
+    :: Démarrer le serveur HTTP
+    python -m http.server !PORT!
+    if errorlevel 1 (
+        py -m http.server !PORT!
+        if errorlevel 1 (
+            python3 -m http.server !PORT!
+            if errorlevel 1 (
+                echo Erreur : impossible de démarrer le serveur HTTP.
+                pause
+                exit /b 1
+            )
         )
+    )
+    popd
+    endlocal
+    '''
         bat_path = out_dir / f"{proj_name}.bat"
         try:
             bat_path.write_text(bat_content, encoding="utf-8")
         except OSError:
-            pass  # best-effort
+            pass  # ignore les erreurs d'écriture
 
-        # ── Linux / macOS .sh ─────────────────────────────────────────────
-        sh_content = (
-            "#!/usr/bin/env bash\n"
-            f'PORT="${{1:-{port_default}}}"\n'
-            'SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"\n'
-            "\n"
-            'echo "================================================"\n'
-            f'echo " {proj_name} — WASM Runner"\n'
-            'echo "================================================"\n'
-            'echo ""\n'
-            f'echo " Server: http://localhost:$PORT/{html_name}"\n'
-            'echo " CTRL+C to stop."\n'
-            'echo ""\n'
-            'cd "$SCRIPT_DIR"\n'
-            "# Open browser after 1s while server starts in foreground\n"
-            f'( sleep 1; xdg-open "http://localhost:$PORT/{html_name}" 2>/dev/null || open "http://localhost:$PORT/{html_name}" 2>/dev/null ) &\n'
-            'python3 -m http.server "$PORT" 2>/dev/null || python -m http.server "$PORT"\n'
-        )
+        # --- Script Unix (.sh) ---
+        sh_content = f'''#!/usr/bin/env bash
+    PORT="${{1:-{port_default}}}"
+    SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+
+    echo "================================================"
+    echo " {proj_name} — WASM Runner"
+    echo "================================================"
+    echo ""
+    echo " Server: http://localhost:$PORT/{html_name}"
+    echo " CTRL+C to stop."
+    echo ""
+
+    cd "$SCRIPT_DIR" || {{ echo "Erreur : impossible d'accéder à $SCRIPT_DIR"; exit 1; }}
+
+    # Vérifier que le fichier HTML existe
+    if [ ! -f "{html_name}" ]; then
+        echo "Erreur : fichier {html_name} introuvable dans $SCRIPT_DIR"
+        echo "Assurez-vous que la compilation WebAssembly a réussi."
+        exit 1
+    fi
+
+    # Lancer le navigateur après un délai
+    ( sleep 1; xdg-open "http://localhost:$PORT/{html_name}" 2>/dev/null || open "http://localhost:$PORT/{html_name}" 2>/dev/null ) &
+
+    # Démarrer le serveur HTTP
+    if command -v python3 &>/dev/null; then
+        python3 -m http.server "$PORT"
+    elif command -v python &>/dev/null; then
+        python -m http.server "$PORT"
+    else
+        echo "Erreur : Python introuvable."
+        exit 1
+    fi
+    '''
         sh_path = out_dir / f"{proj_name}.sh"
         try:
             sh_path.write_text(sh_content, encoding="utf-8")
-            # Make the .sh executable
-            try:
-                current_mode = sh_path.stat().st_mode
-                sh_path.chmod(current_mode | 0o111)
-            except OSError:
-                pass
+            sh_path.chmod(sh_path.stat().st_mode | 0o111)  # rendre exécutable
         except OSError:
-            pass  # best-effort
+            pass
 
     @staticmethod
     def _IsDirectLibPath(lib: str) -> bool:

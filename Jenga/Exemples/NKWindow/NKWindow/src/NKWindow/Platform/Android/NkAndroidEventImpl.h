@@ -10,39 +10,49 @@
 #include <android/keycodes.h>
 #include <unordered_map>
 
-namespace nkentseu
-{
+/**
+ * @brief Namespace nkentseu.
+ */
+namespace nkentseu {
 class NkAndroidWindowImpl;
 
-class NkAndroidEventImpl : public IEventImpl
-{
+/**
+ * @brief Class NkAndroidEventImpl.
+ */
+class NkAndroidEventImpl : public IEventImpl {
 public:
-    NkAndroidEventImpl()  = default;
-    ~NkAndroidEventImpl() override = default;
+	NkAndroidEventImpl() = default;
+	~NkAndroidEventImpl() override = default;
 
-    void Initialize(IWindowImpl* owner, void* nativeHandle) override;
-    void Shutdown  (void* nativeHandle)                     override;
+	void Initialize(IWindowImpl *owner, void *nativeHandle) override;
+	void Shutdown(void *nativeHandle) override;
 
-    void           PollEvents()                    override;
-    const NkEvent& Front()    const                override;
-    void           Pop()                           override;
-    bool           IsEmpty()  const                override;
-    void           PushEvent(const NkEvent& event) override;
-    std::size_t    Size()     const                override;
+	void PollEvents() override;
+	const NkEvent &Front() const override;
+	void Pop() override;
+	bool IsEmpty() const override;
+	void PushEvent(const NkEvent &event) override;
+	std::size_t Size() const override;
 
-    void SetEventCallback(NkEventCallback cb)                            override;
-    void SetWindowCallback(void* nativeHandle, NkEventCallback cb)       override;
-    void DispatchEvent(NkEvent& event, void* nativeHandle)               override;
+	void SetEventCallback(NkEventCallback cb) override;
+	void SetWindowCallback(void *nativeHandle, NkEventCallback cb) override;
+	void DispatchEvent(NkEvent &event, void *nativeHandle) override;
 
 private:
-    static void    OnAppCmd(android_app* app, int32_t cmd);
-    static int32_t OnInputEvent(android_app* app, AInputEvent* ev);
-    static NkKey   AkeyToNkKey(int32_t keycode);
+	static void OnAppCmd(android_app *app, int32_t cmd);
+	static int32_t OnInputEvent(android_app *app, AInputEvent *ev);
+	static NkKey AkeyToNkKey(int32_t keycode);
 
-    struct WindowEntry { NkAndroidWindowImpl* window = nullptr; NkEventCallback callback; };
-    android_app* mApp = nullptr;
-    NkEventCallback mGlobalCallback;
-    std::unordered_map<void*, WindowEntry> mWindowMap;
-    static NkAndroidEventImpl* sInstance;
+	/**
+	 * @brief Struct WindowEntry.
+	 */
+	struct WindowEntry {
+		NkAndroidWindowImpl *window = nullptr;
+		NkEventCallback callback;
+	};
+	android_app *mApp = nullptr;
+	NkEventCallback mGlobalCallback;
+	std::unordered_map<void *, WindowEntry> mWindowMap;
+	static NkAndroidEventImpl *sInstance;
 };
 } // namespace nkentseu

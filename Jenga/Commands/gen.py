@@ -75,8 +75,8 @@ class GenCommand:
 
         output_dir = Path(parsed.output).resolve()
         FileSystem.MakeDirectory(output_dir)
-
-        from .build import BuildCommand
+        
+        from .Build import BuildCommand
         try:
             cli_custom_options = BuildCommand.ParseCustomOptionArgs(unknown_args)
         except ValueError as e:

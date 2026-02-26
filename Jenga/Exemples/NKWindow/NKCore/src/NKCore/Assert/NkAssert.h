@@ -1,4 +1,4 @@
-// -----------------------------------------------------------------------------
+﻿// -----------------------------------------------------------------------------
 // FICHIER: Core\NKCore\src\NKCore\Assert\NkAssert.h
 // DESCRIPTION: Macros d'assertions
 // AUTEUR: Rihen
@@ -16,7 +16,7 @@
 #include "NKCore/NkConfig.h"
 #include "NKCore/NkPlatform.h"
 
-#include <cstdlib> // Pour std::abort()
+#include <stdlib.h> // Pour ::abort()
 
 // ============================================================
 // MACROS D'ASSERTION
@@ -24,44 +24,41 @@
 
 #if defined(NKENTSEU_ENABLE_ASSERTS)
 
-    // Dans NkAssert.h
-    #define NKENTSEU_ASSERT_IMPL(condition, message, file, line, func) \
-        do { \
-            if (!(condition)) { \
-                nkentseu::core::NkAssertionInfo info = { \
-                    #condition, message, file, line, func \
-                }; \
-                nkentseu::core::NkAssertAction action = \
-                    nkentseu::core::NkAssertHandler::HandleAssertion(info); \
-                if (action == nkentseu::core::NkAssertAction::NK_BREAK) { \
-                    NKENTSEU_DEBUG_BREAK(); \
-                } else if (action == nkentseu::core::NkAssertAction::NK_ABORT) { \
-                    ::std::abort(); \
-                } \
-            } \
-        } while (0)
+// Dans NkAssert.h
+#define NKENTSEU_ASSERT_IMPL(condition, message, file, line, func)                                                     \
+	do {                                                                                                               \
+		if (!(condition)) {                                                                                            \
+			nkentseu::core::NkAssertionInfo info = {#condition, message, file, line, func};                            \
+			nkentseu::core::NkAssertAction action = nkentseu::core::NkAssertHandler::HandleAssertion(info);            \
+			if (action == nkentseu::core::NkAssertAction::NK_BREAK) {                                                  \
+				NKENTSEU_DEBUG_BREAK();                                                                                \
+			} else if (action == nkentseu::core::NkAssertAction::NK_ABORT) {                                           \
+				::abort();                                                                                          \
+			}                                                                                                          \
+		}                                                                                                              \
+	} while (0)
 
-    // Version avec message
-    #define NKENTSEU_ASSERT_MSG(condition, message) \
-        NKENTSEU_ASSERT_IMPL(condition, message, NKENTSEU_FILE_NAME, NKENTSEU_LINE_NUMBER, NKENTSEU_FUNCTION_NAME)
+// Version avec message
+#define NKENTSEU_ASSERT_MSG(condition, message)                                                                        \
+	NKENTSEU_ASSERT_IMPL(condition, message, NKENTSEU_FILE_NAME, NKENTSEU_LINE_NUMBER, NKENTSEU_FUNCTION_NAME)
 
-    // Version sans message (par défaut)
-    #define NKENTSEU_ASSERT(condition) \
-        NKENTSEU_ASSERT_IMPL(condition, "", NKENTSEU_FILE_NAME, NKENTSEU_LINE_NUMBER, NKENTSEU_FUNCTION_NAME)
-    
-    /**
-     * @brief Vérification toujours exécutée (même en Release)
-     */
-    #define NKENTSEU_VERIFY(expression) NKENTSEU_ASSERT(expression)
-    #define NKENTSEU_VERIFY_MSG(expression, message) NKENTSEU_ASSERT_MSG(expression, message)
+// Version sans message (par dÃ©faut)
+#define NKENTSEU_ASSERT(condition)                                                                                     \
+	NKENTSEU_ASSERT_IMPL(condition, "", NKENTSEU_FILE_NAME, NKENTSEU_LINE_NUMBER, NKENTSEU_FUNCTION_NAME)
+
+/**
+ * @brief VÃ©rification toujours exÃ©cutÃ©e (mÃªme en Release)
+ */
+#define NKENTSEU_VERIFY(expression) NKENTSEU_ASSERT(expression)
+#define NKENTSEU_VERIFY_MSG(expression, message) NKENTSEU_ASSERT_MSG(expression, message)
 
 #else
 
-    // Assertions désactivées
-    #define NKENTSEU_ASSERT(expression) ((void)0)
-    #define NKENTSEU_ASSERT_MSG(expression, message) ((void)0)
-    #define NKENTSEU_VERIFY(expression) ((void)(expression))
-    #define NKENTSEU_VERIFY_MSG(expression, message) ((void)(expression))
+// Assertions dÃ©sactivÃ©es
+#define NKENTSEU_ASSERT(expression) ((void)0)
+#define NKENTSEU_ASSERT_MSG(expression, message) ((void)0)
+#define NKENTSEU_VERIFY(expression) ((void)(expression))
+#define NKENTSEU_VERIFY_MSG(expression, message) ((void)(expression))
 
 #endif
 
@@ -70,23 +67,22 @@
 // ============================================================
 
 #ifndef NKENTSEU_STATIC_ASSERT
-    #if defined(__cplusplus) && (__cplusplus >= 201103L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201103L))
-        // C++11 et supérieur
-        #define NKENTSEU_STATIC_ASSERT(condition, message) static_assert(condition, message)
-    #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
-        // C11 et supérieur
-        #define NKENTSEU_STATIC_ASSERT(condition, message) _Static_assert(condition, message)
-    #else
-        // Fallback pour anciens compilateurs
-        #define NKENTSEU_STATIC_ASSERT(condition, message) \
-            typedef char NKENTSEU_STATIC_ASSERT_##__LINE__[(condition) ? 1 : -1]
-    #endif
+#if defined(__cplusplus) && (__cplusplus >= 201103L || (defined(_MSVC_LANG) && _MSVC_LANG >= 201103L))
+// C++11 et supÃ©rieur
+#define NKENTSEU_STATIC_ASSERT(condition, message) static_assert(condition, message)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+// C11 et supÃ©rieur
+#define NKENTSEU_STATIC_ASSERT(condition, message) _Static_assert(condition, message)
+#else
+// Fallback pour anciens compilateurs
+#define NKENTSEU_STATIC_ASSERT(condition, message) typedef char NKENTSEU_STATIC_ASSERT_##__LINE__[(condition) ? 1 : -1]
+#endif
 #endif
 
 #endif // NKENTSEU_CORE_NKCORE_SRC_NKCORE_ASSERT_NKASSERT_H_INCLUDED
 
 // ============================================================
-// Copyright © 2024-2026 Rihen. All rights reserved.
+// Copyright Â© 2024-2026 Rihen. All rights reserved.
 // Proprietary License - Free to use and modify
 //
 // Generated by Rihen on 2026-02-05 22:26:13

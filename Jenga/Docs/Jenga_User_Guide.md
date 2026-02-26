@@ -1936,6 +1936,8 @@ Jenga build [options]
 - `--action <name>`: Action context used by `filter("action:...")` (default: `build`)
 - `--android-build-system <native|ndk-mk>`: Android build flow selector
 - `--use-android-mk`: Shortcut for `--android-build-system ndk-mk`
+- `--android-ndk-mk-mode <split|universal|both>`: ndk-mk APK output strategy
+- `--android-abis <list>`: Override ABIs for Android build (`arm64-v8a,x86_64`, etc.)
 - `--no-cache`: Disable caching
 - `--verbose` or `-v`: Verbose output
 - `--no-daemon`: Don't use daemon for incremental builds
@@ -1956,6 +1958,12 @@ Jenga build --platform Linux-ARM64
 
 # Android build using Android.mk / ndk-build
 Jenga build --platform Android-arm64 --target SDL3NativeDemo --android-build-system ndk-mk
+
+# Android ndk-mk: split APKs + universal APK in one pass (default for multi-ABI)
+Jenga build --platform Android-arm64 --target SDL3NativeDemo \
+  --android-build-system ndk-mk \
+  --android-ndk-mk-mode both \
+  --android-abis armeabi-v7a,arm64-v8a,x86,x86_64
 
 # Custom option values used by filter("options:...")
 Jenga build --with-sdl3 --sdl3-root /opt/sdl3
@@ -2004,6 +2012,18 @@ Jenga build --platform Android-arm64 --target SDL3NativeDemo
 
 # Android.mk/ndk-build flow
 Jenga build --platform Android-arm64 --target SDL3NativeDemo --android-build-system ndk-mk
+
+# Android.mk/ndk-build with split output only (APK per ABI)
+Jenga build --platform Android-arm64 --target SDL3NativeDemo \
+  --android-build-system ndk-mk \
+  --android-ndk-mk-mode split \
+  --android-abis arm64-v8a,x86_64
+
+# Android.mk/ndk-build with universal APK only
+Jenga build --platform Android-arm64 --target SDL3NativeDemo \
+  --android-build-system ndk-mk \
+  --android-ndk-mk-mode universal \
+  --android-abis arm64-v8a,x86_64
 
 # Option values for filters
 Jenga build --platform Android-arm64 --target SDL3NativeDemo \

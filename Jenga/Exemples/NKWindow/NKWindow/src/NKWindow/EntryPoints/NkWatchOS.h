@@ -9,21 +9,23 @@
 #import <WatchKit/WatchKit.h>
 #include "../Core/NkEntry.h"
 
+/**
+ * @brief Namespace nkentseu.
+ */
 namespace nkentseu {
-    NkEntryState* gState = nullptr;
+NkEntryState *gState = nullptr;
 }
 
 // ---------------------------------------------------------------------------
 // Arguments watchOS globaux
 // ---------------------------------------------------------------------------
 
-struct NkWatchOSArgs
-{
-    std::string              bundleId;
-    std::string              version;
-    std::string              build;
-    std::string              cachePath;
-    std::vector<std::string> args;
+struct NkWatchOSArgs {
+	std::string bundleId;
+	std::string version;
+	std::string build;
+	std::string cachePath;
+	std::vector<std::string> args;
 };
 
 static NkWatchOSArgs g_watchos_args;
@@ -37,17 +39,15 @@ static NkWatchOSArgs g_watchos_args;
 
 @implementation NkWatchAppDelegate
 
-- (void)applicationDidBecomeActive
-{
-    nkentseu::gState = new nkentseu::NkEntryState(g_watchos_args.args);
-    nkentseu::gState->appName = g_watchos_args.bundleId;
-    nkmain(*nkentseu::gState);
+- (void)applicationDidBecomeActive {
+	nkentseu::gState = new nkentseu::NkEntryState(g_watchos_args.args);
+	nkentseu::gState->appName = g_watchos_args.bundleId;
+	nkmain(*nkentseu::gState);
 }
 
-- (void)applicationWillResignActive
-{
-    delete nkentseu::gState;
-    nkentseu::gState = nullptr;
+- (void)applicationWillResignActive {
+	delete nkentseu::gState;
+	nkentseu::gState = nullptr;
 }
 
 @end
@@ -56,28 +56,23 @@ static NkWatchOSArgs g_watchos_args;
 // main()
 // ---------------------------------------------------------------------------
 
-int main(int argc, char* argv[])
-{
-    @autoreleasepool
-    {
-        NSBundle* bundle = [NSBundle mainBundle];
-        g_watchos_args.bundleId = [[bundle bundleIdentifier] UTF8String] ?: "unknown";
-        g_watchos_args.version  = [[bundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"]
-                                    description].UTF8String ?: "1.0";
-        g_watchos_args.build    = [[bundle objectForInfoDictionaryKey:@"CFBundleVersion"]
-                                    description].UTF8String ?: "1";
+int main(int argc, char *argv[]) {
+	@autoreleasepool {
+		NSBundle *bundle = [NSBundle mainBundle];
+		g_watchos_args.bundleId = [[bundle bundleIdentifier] UTF8String] ?: "unknown";
+		g_watchos_args.version =
+			[[bundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] description].UTF8String ?: "1.0";
+		g_watchos_args.build = [[bundle objectForInfoDictionaryKey:@"CFBundleVersion"] description].UTF8String ?: "1";
 
-        NSArray* paths = NSSearchPathForDirectoriesInDomains(
-            NSCachesDirectory, NSUserDomainMask, YES);
-        if ([paths count] > 0)
-            g_watchos_args.cachePath = [[paths firstObject] UTF8String];
+		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+		if ([paths count] > 0)
+			g_watchos_args.cachePath = [[paths firstObject] UTF8String];
 
-        for (int i = 0; i < argc; ++i)
-            g_watchos_args.args.push_back(argv[i]);
+		for (int i = 0; i < argc; ++i)
+			g_watchos_args.args.push_back(argv[i]);
 
-        NSLog(@"[NK] Platform: watchOS");
+		NSLog(@"[NK] Platform: watchOS");
 
-        return WKApplicationMain(argc, argv,
-                                 NSStringFromClass([NkWatchAppDelegate class]));
-    }
+		return WKApplicationMain(argc, argv, NSStringFromClass([NkWatchAppDelegate class]));
+	}
 }

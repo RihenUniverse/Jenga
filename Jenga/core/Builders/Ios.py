@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Apple Mobile Direct Builder.
-Builds iOS/tvOS/watchOS apps and libraries with Apple Clang/xcrun (without xcodebuild).
+Builds iOS/tvOS/watchOS/iPadOS/visionOS apps and libraries with Apple Clang/xcrun (without xcodebuild).
 """
 
 import os
@@ -77,6 +77,40 @@ class DirectIOSBuilder(Builder):
             "default_min": "8.0",
             "min_sdk_attr": "watchosMinSdk",  # à ajouter dans l'API
         },
+        TargetOS.IPADOS: {
+            "display": "iPadOS",
+            "sdk_device": "iphoneos",
+            "sdk_simulator": "iphonesimulator",
+            "triple_os": "ios",
+            "min_flag": "mios-version-min",
+            "min_flag_sim": "mios-simulator-version-min",
+            "platform_device": "iPhoneOS",
+            "platform_simulator": "iPhoneSimulator",
+            "requires_iphone_os": True,
+            "device_family": [2],  # iPad
+            "define": "IPADOS",
+            "frameworks": ["Foundation", "UIKit"],
+            "device_frameworks": ["OpenGLES"],
+            "default_min": "13.0",
+            "min_sdk_attr": "ipadosMinSdk",
+        },
+        TargetOS.VISIONOS: {
+            "display": "visionOS",
+            "sdk_device": "xros",
+            "sdk_simulator": "xrsimulator",
+            "triple_os": "xros",
+            "min_flag": "mxros-version-min",
+            "min_flag_sim": "mxros-simulator-version-min",
+            "platform_device": "XROS",
+            "platform_simulator": "XRSimulator",
+            "requires_iphone_os": False,
+            "device_family": [7],  # Apple visionOS family
+            "define": "VISIONOS",
+            "frameworks": ["Foundation"],
+            "device_frameworks": [],
+            "default_min": "1.0",
+            "min_sdk_attr": "visionosMinSdk",
+        },
     }
 
     def __init__(self, workspace, config, platform, targetOs, targetArch, targetEnv=None, verbose=False):
@@ -133,6 +167,10 @@ class DirectIOSBuilder(Builder):
             min_ver = getattr(project, 'tvosMinSdk', None)
         elif self.targetOs == TargetOS.WATCHOS:
             min_ver = getattr(project, 'watchosMinSdk', None)
+        elif self.targetOs == TargetOS.IPADOS:
+            min_ver = getattr(project, 'ipadosMinSdk', None)
+        elif self.targetOs == TargetOS.VISIONOS:
+            min_ver = getattr(project, 'visionosMinSdk', None)
         else:
             min_ver = None
 

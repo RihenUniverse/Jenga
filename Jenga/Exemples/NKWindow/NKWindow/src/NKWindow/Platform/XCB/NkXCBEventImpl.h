@@ -12,47 +12,53 @@
 #include <xcb/xcb_keysyms.h>
 #include <unordered_map>
 
-namespace nkentseu
-{
+/**
+ * @brief Namespace nkentseu.
+ */
+namespace nkentseu {
 
 class NkXCBWindowImpl;
 
-class NkXCBEventImpl : public IEventImpl
-{
+/**
+ * @brief Class NkXCBEventImpl.
+ */
+class NkXCBEventImpl : public IEventImpl {
 public:
-    NkXCBEventImpl();
-    ~NkXCBEventImpl() override;
+	NkXCBEventImpl();
+	~NkXCBEventImpl() override;
 
-    // Cycle de vie
-    void Initialize(IWindowImpl* owner, void* nativeHandle) override;
-    void Shutdown  (void* nativeHandle)                     override;
+	// Cycle de vie
+	void Initialize(IWindowImpl *owner, void *nativeHandle) override;
+	void Shutdown(void *nativeHandle) override;
 
-    // Queue
-    void           PollEvents()                    override;
-    const NkEvent& Front()    const                override;
-    void           Pop()                           override;
-    bool           IsEmpty()  const                override;
-    void           PushEvent(const NkEvent& event) override;
-    std::size_t    Size()     const                override;
+	// Queue
+	void PollEvents() override;
+	const NkEvent &Front() const override;
+	void Pop() override;
+	bool IsEmpty() const override;
+	void PushEvent(const NkEvent &event) override;
+	std::size_t Size() const override;
 
-    // Callbacks
-    void SetEventCallback(NkEventCallback cb)                            override;
-    void SetWindowCallback(void* nativeHandle, NkEventCallback cb)       override;
-    void DispatchEvent(NkEvent& event, void* nativeHandle)               override;
+	// Callbacks
+	void SetEventCallback(NkEventCallback cb) override;
+	void SetWindowCallback(void *nativeHandle, NkEventCallback cb) override;
+	void DispatchEvent(NkEvent &event, void *nativeHandle) override;
 
 private:
-    static NkKey           XcbKeysymToNkKey(xcb_keysym_t ks);
-    static NkModifierState XcbStateMods(uint16_t state);
+	static NkKey XcbKeysymToNkKey(xcb_keysym_t ks);
+	static NkModifierState XcbStateMods(uint16_t state);
 
-    struct WindowEntry
-    {
-        NkXCBWindowImpl* window   = nullptr;
-        NkEventCallback  callback;
-    };
+	/**
+	 * @brief Struct WindowEntry.
+	 */
+	struct WindowEntry {
+		NkXCBWindowImpl *window = nullptr;
+		NkEventCallback callback;
+	};
 
-    xcb_connection_t*  mConnection  = nullptr;
-    xcb_key_symbols_t* mKeySymbols  = nullptr;
-    std::unordered_map<xcb_window_t, WindowEntry> mWindowMap;
+	xcb_connection_t *mConnection = nullptr;
+	xcb_key_symbols_t *mKeySymbols = nullptr;
+	std::unordered_map<xcb_window_t, WindowEntry> mWindowMap;
 };
 
 } // namespace nkentseu

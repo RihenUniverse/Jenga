@@ -6,10 +6,10 @@ Ce module initialise le registre des commandes et expose l'interface publique.
 """
 
 # Importer d'abord le registre, puis les commandes
-from .registry import COMMANDS, ALIASES, get_command_class, execute_command
+from .Registry import COMMANDS, ALIASES, get_command_class, execute_command
 
 # Import de toutes les commandes (les classes sont enregistrées dans COMMANDS au fur et à mesure)
-from .build import BuildCommand
+from .Build import BuildCommand
 from .Run import RunCommand
 from .Test import TestCommand
 from .Clean import CleanCommand

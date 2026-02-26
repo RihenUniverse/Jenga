@@ -19,13 +19,16 @@
 
 #include "Events/NkDropEvents.h"
 
+/**
+ * @brief Namespace nkentseu.
+ */
 namespace nkentseu {
 
-    /// Active le support drag&drop sur la fenêtre donnée (handle natif).
-    /// Appelé automatiquement par IEventImpl::Initialize si DropEnabled=true dans NkWindowConfig.
-    void NkEnableDropTarget(void* nativeHandle);
+/// Active le support drag&drop sur la fenêtre donnée (handle natif).
+/// Appelé automatiquement par IEventImpl::Initialize si DropEnabled=true dans NkWindowConfig.
+void NkEnableDropTarget(void *nativeHandle);
 
-    /// Désactive le support drag&drop.
-    void NkDisableDropTarget(void* nativeHandle);
+/// Désactive le support drag&drop.
+void NkDisableDropTarget(void *nativeHandle);
 
 } // namespace nkentseu

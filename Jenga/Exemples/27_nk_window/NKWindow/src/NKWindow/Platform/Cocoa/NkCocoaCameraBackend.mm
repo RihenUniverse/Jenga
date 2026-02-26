@@ -106,10 +106,10 @@ bool NkCocoaCameraBackend::StartStreaming(const NkCameraConfig& config)
     [session commitConfiguration];
     [session startRunning];
 
-    mSession  = CFBridgingRetain(session);
-    mInput    = CFBridgingRetain(input);
-    mOutput   = CFBridgingRetain(output);
-    mDelegate = CFBridgingRetain(delegate);
+    mSession  = const_cast<void*>(CFBridgingRetain(session));
+    mInput    = const_cast<void*>(CFBridgingRetain(input));
+    mOutput   = const_cast<void*>(CFBridgingRetain(output));
+    mDelegate = const_cast<void*>(CFBridgingRetain(delegate));
 
     mWidth  = config.width;
     mHeight = config.height;
@@ -123,8 +123,9 @@ void NkCocoaCameraBackend::StopStreaming()
     StopVideoRecord();
     if (mSession)
     {
-        AVCaptureSession* session = (__bridge AVCaptureSession*)mSession; CFBridgingRelease(mSession); mSession=nullptr;
+        AVCaptureSession* session = (__bridge AVCaptureSession*)mSession;
         [session stopRunning];
+        CFBridgingRelease(mSession);
         mSession = nullptr;
     }
     mState = NkCameraState::NK_CAM_STATE_CLOSED;
@@ -215,8 +216,8 @@ bool NkCocoaCameraBackend::StartVideoRecord(const NkVideoRecordConfig& config)
     [writer startWriting];
     [writer startSessionAtSourceTime:kCMTimeZero];
 
-    mAssetWriter = CFBridgingRetain(writer);
-    mAssetInput  = CFBridgingRetain(input);
+    mAssetWriter = const_cast<void*>(CFBridgingRetain(writer));
+    mAssetInput  = const_cast<void*>(CFBridgingRetain(input));
     mRecordStart = std::chrono::steady_clock::now();
     mRecording   = true;
     mState       = NkCameraState::NK_CAM_STATE_RECORDING;

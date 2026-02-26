@@ -17,7 +17,9 @@ from ..Core import Api
 
 
 class DeployCommand:
-    """jenga deploy [--platform PLATFORM] [--target DEVICE] [--config CONFIG] [--project PROJECT]"""
+    """jenga deploy [--platform PLATFORM] [--target DEVICE] [--config CONFIG] [--project PROJECT]
+    Android direct install: jenga deploy --platform android --apk <file.apk> [--target SERIAL]
+    """
 
     @staticmethod
     def Execute(args: List[str]) -> int:
@@ -27,12 +29,59 @@ class DeployCommand:
         parser.add_argument("--ios-builder", choices=["direct", "xcode", "xbuilder"], default=None,
                             help="Apple mobile builder backend (direct or xcode/xbuilder).")
         parser.add_argument("--target", help="Device identifier (IP address, UDID, etc.)")
+        parser.add_argument("--device", help="Alias for --target (device serial/identifier)")
+        parser.add_argument("--apk", help="Direct APK path for Android install (skip build/project lookup)")
+        parser.add_argument("--list-devices", action="store_true", help="List Android adb devices and exit")
         parser.add_argument("--config", default="Release", help="Build configuration")
         parser.add_argument("--project", help="Project to deploy (default: first executable)")
         parser.add_argument("--no-daemon", action="store_true")
         parser.add_argument("--verbose", "-v", action="store_true")
         parser.add_argument("--jenga-file", help="Path to the workspace .jenga file (default: auto-detected)")
         parsed = parser.parse_args(args)
+
+        if parsed.apk and parsed.platform != 'android':
+            Colored.PrintError("--apk is only supported with --platform android.")
+            return 1
+        if parsed.list_devices and parsed.platform != 'android':
+            Colored.PrintError("--list-devices is only supported with --platform android.")
+            return 1
+
+        if parsed.device and not parsed.target:
+            parsed.target = parsed.device
+        elif parsed.device and parsed.target and parsed.device != parsed.target:
+            Colored.PrintWarning("--device and --target both provided, using --target.")
+
+        # Android direct mode: install an existing APK without loading/building workspace.
+        if parsed.platform == 'android' and (parsed.list_devices or parsed.apk):
+            adb = DeployCommand._ResolveAdb(workspace=None)
+            if not adb:
+                Colored.PrintError("adb not found. Set ANDROID_SDK_ROOT or add adb to PATH.")
+                return 1
+
+            if parsed.list_devices:
+                result = Process.ExecuteCommand([str(adb), "devices"], captureOutput=False, silent=False)
+                if result.returnCode != 0:
+                    Colored.PrintError("Failed to list adb devices.")
+                    return 1
+                if not parsed.apk:
+                    return 0
+
+            apk_path = Path(parsed.apk).expanduser().resolve()
+            if not apk_path.exists() or not apk_path.is_file():
+                Colored.PrintError(f"APK not found: {apk_path}")
+                return 1
+
+            cmd = [str(adb)]
+            if parsed.target:
+                cmd += ["-s", parsed.target]
+            cmd += ["install", "-r", str(apk_path)]
+            result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
+            if result.returnCode == 0:
+                Colored.PrintSuccess(f"APK installed successfully: {apk_path}")
+                return 0
+
+            Colored.PrintError("adb install failed.")
+            return 1
 
         # DÃ©terminer le rÃ©pertoire de travail (workspace root)
         workspace_root = Path.cwd()
@@ -117,22 +166,13 @@ class DeployCommand:
     @staticmethod
     def _DeployAndroid(workspace, project, parsed):
         """DÃ©ploiement sur appareil Android via adb."""
-        sdk_path = workspace.androidSdkPath or os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
-        if not sdk_path:
-            Colored.PrintError("Android SDK not found. Set androidSdkPath in workspace.")
-            return 1
-
-        adb = Path(sdk_path) / "platform-tools" / "adb"
-        if not adb.exists():
-            adb = Path(sdk_path) / "adb"
-        if not adb.exists():
-            adb = FileSystem.FindExecutable("adb")
+        adb = DeployCommand._ResolveAdb(workspace)
         if not adb:
             Colored.PrintError("adb not found.")
             return 1
 
         # Construire l'APK si nÃ©cessaire
-        from .build import BuildCommand
+        from .Build import BuildCommand
         build_args = ["--config", parsed.config, "--action", "deploy", "--platform", "Android", "--target", project.name]
         if parsed.jenga_file:
             build_args += ["--jenga-file", parsed.jenga_file]
@@ -173,6 +213,34 @@ class DeployCommand:
             return 1
 
     @staticmethod
+    def _ResolveAdb(workspace) -> Path:
+        sdk_path = None
+        if workspace is not None:
+            sdk_path = workspace.androidSdkPath or os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
+        else:
+            sdk_path = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
+
+        if sdk_path:
+            adb = Path(sdk_path) / "platform-tools" / "adb"
+            if sys.platform == "win32":
+                adb_exe = Path(str(adb) + ".exe")
+                if adb_exe.exists():
+                    return adb_exe
+            if adb.exists():
+                return adb
+
+            adb = Path(sdk_path) / "adb"
+            if sys.platform == "win32":
+                adb_exe = Path(str(adb) + ".exe")
+                if adb_exe.exists():
+                    return adb_exe
+            if adb.exists():
+                return adb
+
+        adb_path = FileSystem.FindExecutable("adb")
+        return Path(adb_path) if adb_path else None
+
+    @staticmethod
     def _DeployIOS(workspace, project, parsed, apple_platform: str = "ios"):
         """DÃ©ploiement Apple mobile (iOS/tvOS/watchOS)."""
         if Api.Platform.GetHostOS() != Api.TargetOS.MACOS:
@@ -185,7 +253,7 @@ class DeployCommand:
             "watchos": "watchOS",
         }.get((apple_platform or "ios").lower(), "iOS")
 
-        from .build import BuildCommand
+        from .Build import BuildCommand
         build_args = ["--config", parsed.config, "--action", "deploy", "--platform", platform_token, "--target", project.name]
         if parsed.ios_builder:
             build_args += [f"--ios-builder={parsed.ios_builder}"]
@@ -260,7 +328,7 @@ class DeployCommand:
             Colored.PrintError("XboxBuilder not available.")
             return 1
 
-        from .build import BuildCommand
+        from .Build import BuildCommand
         build_args = ["--config", parsed.config, "--action", "deploy", "--platform", "Xbox", "--target", project.name]
         if parsed.jenga_file:
             build_args += ["--jenga-file", parsed.jenga_file]
@@ -290,7 +358,7 @@ class DeployCommand:
     @staticmethod
     def _DeployLinux(workspace, project, parsed):
         """Déploiement Linux: build + export local/remote."""
-        from .build import BuildCommand
+        from .Build import BuildCommand
         build_args = ["--config", parsed.config, "--action", "deploy", "--platform", "Linux", "--target", project.name]
         if parsed.jenga_file:
             build_args += ["--jenga-file", parsed.jenga_file]
@@ -343,7 +411,7 @@ class DeployCommand:
     @staticmethod
     def _DeployMacOS(workspace, project, parsed):
         """DÃ©ploiement sur macOS (copie locale)."""
-        from .build import BuildCommand
+        from .Build import BuildCommand
         build_args = ["--config", parsed.config, "--action", "deploy", "--platform", "macOS", "--target", project.name]
         if parsed.jenga_file:
             build_args += ["--jenga-file", parsed.jenga_file]
@@ -376,7 +444,7 @@ class DeployCommand:
     @staticmethod
     def _DeployWindows(workspace, project, parsed):
         """DÃ©ploiement sur Windows (copie locale)."""
-        from .build import BuildCommand
+        from .Build import BuildCommand
         build_args = ["--config", parsed.config, "--action", "deploy", "--platform", "Windows", "--target", project.name]
         if parsed.jenga_file:
             build_args += ["--jenga-file", parsed.jenga_file]
@@ -399,4 +467,3 @@ class DeployCommand:
         if exe_path.exists():
             Colored.PrintInfo(f"Executable built at: {exe_path}")
         return 0    
-

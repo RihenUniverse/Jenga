@@ -1,211 +1,264 @@
 // =============================================================================
 // NkCocoaEventImpl.mm
-// Pompe d'événements NSApp pour macOS.
+// Pompe d'evenements NSApp pour macOS.
 // =============================================================================
 
 #import <Cocoa/Cocoa.h>
+
 #include "NkCocoaEventImpl.h"
+#include "NkCocoaWindowImpl.h"
+#include "../../Core/Events/NkKeycodeMap.h"
 #include "../../Core/Events/NkScancode.h"
 
-namespace nkentseu
-{
+#include <utility>
+
+/**
+ * @brief Namespace nkentseu.
+ */
+namespace nkentseu {
 
 // ---------------------------------------------------------------------------
-// IEventImpl
+// Initialize / Shutdown
 // ---------------------------------------------------------------------------
 
-const NkEvent& NkCocoaEventImpl::Front() const
-{ return mQueue.empty() ? mDummyEvent : mQueue.front(); }
+void NkCocoaEventImpl::Initialize(IWindowImpl *owner, void *nativeHandle) {
+	auto *window = static_cast<NkCocoaWindowImpl *>(owner);
 
-void        NkCocoaEventImpl::Pop()           { if (!mQueue.empty()) mQueue.pop(); }
-bool        NkCocoaEventImpl::IsEmpty() const { return mQueue.empty(); }
-std::size_t NkCocoaEventImpl::Size()    const { return mQueue.size(); }
-void        NkCocoaEventImpl::PushEvent(const NkEvent& e) { mQueue.push(e); }
+	if (!nativeHandle && window)
+		nativeHandle = reinterpret_cast<void *>(window->GetNSWindow());
+
+	if (!nativeHandle)
+		return;
+
+	mWindowMap[nativeHandle] = {window, {}};
+}
+
+void NkCocoaEventImpl::Shutdown(void *nativeHandle) {
+	if (nativeHandle) {
+		mWindowMap.erase(nativeHandle);
+		return;
+	}
+
+	if (!mWindowMap.empty())
+		mWindowMap.erase(mWindowMap.begin());
+}
+
+// ---------------------------------------------------------------------------
+// Queue
+// ---------------------------------------------------------------------------
+
+const NkEvent &NkCocoaEventImpl::Front() const {
+	return mQueue.empty() ? mDummyEvent : mQueue.front();
+}
+
+void NkCocoaEventImpl::Pop() {
+	if (!mQueue.empty())
+		mQueue.pop();
+}
+bool NkCocoaEventImpl::IsEmpty() const {
+	return mQueue.empty();
+}
+std::size_t NkCocoaEventImpl::Size() const {
+	return mQueue.size();
+}
+void NkCocoaEventImpl::PushEvent(const NkEvent &e) {
+	mQueue.push(e);
+}
+
+// ---------------------------------------------------------------------------
+// Callbacks
+// ---------------------------------------------------------------------------
+
+void NkCocoaEventImpl::SetEventCallback(NkEventCallback cb) {
+	mGlobalCallback = std::move(cb);
+}
+
+void NkCocoaEventImpl::SetWindowCallback(void *nativeHandle, NkEventCallback cb) {
+	if (!nativeHandle) {
+		for (auto it = mWindowMap.begin(); it != mWindowMap.end(); ++it)
+			it->second.callback = cb;
+		return;
+	}
+
+	auto it = mWindowMap.find(nativeHandle);
+	if (it != mWindowMap.end())
+		it->second.callback = std::move(cb);
+}
+
+void NkCocoaEventImpl::DispatchEvent(NkEvent &event, void *nativeHandle) {
+	if (nativeHandle) {
+		auto it = mWindowMap.find(nativeHandle);
+		if (it != mWindowMap.end() && it->second.callback)
+			it->second.callback(event);
+	} else {
+		for (auto it = mWindowMap.begin(); it != mWindowMap.end(); ++it) {
+			if (it->second.callback)
+				it->second.callback(event);
+		}
+	}
+
+	if (mGlobalCallback)
+		mGlobalCallback(event);
+}
 
 // ---------------------------------------------------------------------------
 // PollEvents
 // ---------------------------------------------------------------------------
 
-void NkCocoaEventImpl::PollEvents()
-{
-    @autoreleasepool
-    {
-        NSEvent* ev = nil;
-        while ((ev = [NSApp nextEventMatchingMask:NSEventMaskAny
-                                       untilDate:[NSDate distantPast]
-                                          inMode:NSDefaultRunLoopMode
-                                         dequeue:YES]) != nil)
-        {
-            [NSApp sendEvent:ev];
+void NkCocoaEventImpl::PollEvents() {
+	@autoreleasepool {
+		NSEvent *ev = nil;
+		while ((ev = [NSApp nextEventMatchingMask:NSEventMaskAny
+										untilDate:[NSDate distantPast]
+										   inMode:NSDefaultRunLoopMode
+										  dequeue:YES]) != nil) {
+			[NSApp sendEvent:ev];
 
-            NkEvent nkEv;
-            switch ([ev type])
-            {
-            case NSEventTypeKeyDown:
-            case NSEventTypeKeyUp:
-            {
-                unsigned short macKC = [ev keyCode];
+			NkEvent nkEv;
+			void *nativeHandle = (__bridge void *)[ev window];
+			if (!nativeHandle && !mWindowMap.empty())
+				nativeHandle = mWindowMap.begin()->first;
 
-                // Scancode USB HID depuis le keyCode macOS
-                NkScancode sc = NkScancodeFromMac(macKC);
-                NkKey k = NkScancodeToKey(sc);
+			switch ([ev type]) {
+				case NSEventTypeKeyDown:
+				case NSEventTypeKeyUp: {
+					const unsigned short macKC = [ev keyCode];
+					const NkScancode sc = NkScancodeFromMac(macKC);
 
-                // Fallback table interne si scancode inconnu
-                if (k == NkKey::NK_UNKNOWN)
-                    k = MacKeycodeToNkKey(macKC);
+					NkKey key = NkScancodeToKey(sc);
+					if (key == NkKey::NK_UNKNOWN)
+						key = MacKeycodeToNkKey(macKC);
 
-                if (k != NkKey::NK_UNKNOWN)
-                {
-                    bool isRepeat = ([ev isARepeat] == YES);
-                    NkButtonState st = ([ev type] == NSEventTypeKeyDown)
-                        ? (isRepeat ? NkButtonState::NK_REPEAT : NkButtonState::NK_PRESSED)
-                        : NkButtonState::NK_RELEASED;
+					if (key != NkKey::NK_UNKNOWN) {
+						const bool isRepeat = ([ev type] == NSEventTypeKeyDown) && ([ev isARepeat] == YES);
+						const NkButtonState st =
+							([ev type] == NSEventTypeKeyUp)
+								? NkButtonState::NK_RELEASED
+								: (isRepeat ? NkButtonState::NK_REPEAT : NkButtonState::NK_PRESSED);
 
-                    NkKeyData kd(k, st, NsModsToMods([ev modifierFlags]),
-                                 sc,
-                                 static_cast<NkU32>(macKC), // nativeKey = macOS keyCode
-                                 false, isRepeat);
-                    nkEv = NkEvent(kd);
-                }
-                break;
-            }
-            case NSEventTypeMouseMoved:
-            case NSEventTypeLeftMouseDragged:
-            case NSEventTypeRightMouseDragged:
-            case NSEventTypeOtherMouseDragged:
-            {
-                NSPoint p = [ev locationInWindow];
-                nkEv = NkEvent(NkMouseMoveData(
-                    static_cast<NkU32>(p.x), static_cast<NkU32>(p.y),
-                    static_cast<NkU32>(p.x), static_cast<NkU32>(p.y),
-                    static_cast<NkI32>([ev deltaX]),
-                    static_cast<NkI32>([ev deltaY])));
-                break;
-            }
-            case NSEventTypeLeftMouseDown:
-            case NSEventTypeLeftMouseUp:
-            {
-                NkButtonState st = ([ev type] == NSEventTypeLeftMouseDown)
-                    ? NkButtonState::NK_PRESSED : NkButtonState::NK_RELEASED;
-                nkEv = NkEvent(NkMouseInputData(
-                    NkMouseButton::NK_LEFT, st,
-                    NsModsToMods([ev modifierFlags])));
-                break;
-            }
-            case NSEventTypeRightMouseDown:
-            case NSEventTypeRightMouseUp:
-            {
-                NkButtonState st = ([ev type] == NSEventTypeRightMouseDown)
-                    ? NkButtonState::NK_PRESSED : NkButtonState::NK_RELEASED;
-                nkEv = NkEvent(NkMouseInputData(
-                    NkMouseButton::NK_RIGHT, st,
-                    NsModsToMods([ev modifierFlags])));
-                break;
-            }
-            case NSEventTypeOtherMouseDown:
-            case NSEventTypeOtherMouseUp:
-            {
-                NkButtonState st = ([ev type] == NSEventTypeOtherMouseDown)
-                    ? NkButtonState::NK_PRESSED : NkButtonState::NK_RELEASED;
-                nkEv = NkEvent(NkMouseInputData(
-                    NkMouseButton::NK_MIDDLE, st,
-                    NsModsToMods([ev modifierFlags])));
-                break;
-            }
-            case NSEventTypeScrollWheel:
-                nkEv = NkEvent(NkMouseWheelData(
-                    [ev scrollingDeltaY],
-                    NsModsToMods([ev modifierFlags])));
-                break;
-            default: break;
-            }
+						NkKeyData kd(key, st, NsModsToMods([ev modifierFlags]), sc, static_cast<NkU32>(macKC), false,
+									 isRepeat);
+						nkEv = NkEvent(kd);
+					}
+					break;
+				}
 
-            if (nkEv.IsValid()) mQueue.push(nkEv);
-        }
-    }
+				case NSEventTypeMouseMoved:
+				case NSEventTypeLeftMouseDragged:
+				case NSEventTypeRightMouseDragged:
+				case NSEventTypeOtherMouseDragged: {
+					const NSPoint p = [ev locationInWindow];
+					const NSPoint screenP = [NSEvent mouseLocation];
+
+					NkU32 buttonsDown = 0;
+					const NSUInteger pressedButtons = [NSEvent pressedMouseButtons];
+					if (pressedButtons & (1u << 0))
+						buttonsDown |= (1u << static_cast<NkU32>(NkMouseButton::NK_MB_LEFT));
+					if (pressedButtons & (1u << 1))
+						buttonsDown |= (1u << static_cast<NkU32>(NkMouseButton::NK_MB_RIGHT));
+					if (pressedButtons & (1u << 2))
+						buttonsDown |= (1u << static_cast<NkU32>(NkMouseButton::NK_MB_MIDDLE));
+					if (pressedButtons & (1u << 3))
+						buttonsDown |= (1u << static_cast<NkU32>(NkMouseButton::NK_MB_BACK));
+					if (pressedButtons & (1u << 4))
+						buttonsDown |= (1u << static_cast<NkU32>(NkMouseButton::NK_MB_FORWARD));
+
+					NkMouseMoveData md(static_cast<NkI32>(p.x), static_cast<NkI32>(p.y), static_cast<NkI32>(screenP.x),
+									   static_cast<NkI32>(screenP.y), static_cast<NkI32>([ev deltaX]),
+									   static_cast<NkI32>([ev deltaY]), buttonsDown, NsModsToMods([ev modifierFlags]));
+
+					nkEv = NkEvent(md);
+					break;
+				}
+
+				case NSEventTypeLeftMouseDown:
+				case NSEventTypeLeftMouseUp:
+				case NSEventTypeRightMouseDown:
+				case NSEventTypeRightMouseUp:
+				case NSEventTypeOtherMouseDown:
+				case NSEventTypeOtherMouseUp: {
+					NkMouseButton button = NkMouseButton::NK_MB_UNKNOWN;
+
+					if ([ev type] == NSEventTypeLeftMouseDown || [ev type] == NSEventTypeLeftMouseUp) {
+						button = NkMouseButton::NK_MB_LEFT;
+					} else if ([ev type] == NSEventTypeRightMouseDown || [ev type] == NSEventTypeRightMouseUp) {
+						button = NkMouseButton::NK_MB_RIGHT;
+					} else {
+						const NSInteger n = [ev buttonNumber];
+						if (n == 2)
+							button = NkMouseButton::NK_MB_MIDDLE;
+						else if (n == 3)
+							button = NkMouseButton::NK_MB_BACK;
+						else if (n == 4)
+							button = NkMouseButton::NK_MB_FORWARD;
+					}
+
+					if (button != NkMouseButton::NK_MB_UNKNOWN) {
+						const bool isDown = ([ev type] == NSEventTypeLeftMouseDown) ||
+											([ev type] == NSEventTypeRightMouseDown) ||
+											([ev type] == NSEventTypeOtherMouseDown);
+
+						const NSPoint p = [ev locationInWindow];
+						const NSPoint screenP = [NSEvent mouseLocation];
+
+						NkMouseButtonData bd(button, isDown ? NkButtonState::NK_PRESSED : NkButtonState::NK_RELEASED,
+											 static_cast<NkI32>(p.x), static_cast<NkI32>(p.y),
+											 static_cast<NkI32>(screenP.x), static_cast<NkI32>(screenP.y),
+											 NsModsToMods([ev modifierFlags]), static_cast<NkU32>([ev clickCount]));
+
+						nkEv = NkEvent(bd);
+					}
+					break;
+				}
+
+				case NSEventTypeScrollWheel: {
+					const NSPoint p = [ev locationInWindow];
+
+					NkMouseWheelData wd;
+					wd.delta = [ev scrollingDeltaY];
+					wd.deltaX = [ev scrollingDeltaX];
+					wd.deltaY = [ev scrollingDeltaY];
+					wd.x = static_cast<NkI32>(p.x);
+					wd.y = static_cast<NkI32>(p.y);
+					wd.modifiers = NsModsToMods([ev modifierFlags]);
+					wd.highPrecision = ([ev hasPreciseScrollingDeltas] == YES);
+					if (wd.highPrecision) {
+						wd.pixelDeltaX = wd.deltaX;
+						wd.pixelDeltaY = wd.deltaY;
+					}
+
+					nkEv = NkEvent(wd);
+					break;
+				}
+
+				default:
+					break;
+			}
+
+			if (nkEv.IsValid()) {
+				mQueue.push(nkEv);
+				DispatchEvent(nkEv, nativeHandle);
+			}
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
-// Mapping keycode macOS → NkKey
+// Helpers
 // ---------------------------------------------------------------------------
 
-NkKey NkCocoaEventImpl::MacKeycodeToNkKey(unsigned short code)
-{
-    switch (code)
-    {
-    case 0x35: return NkKey::NK_ESCAPE;
-    case 0x7A: return NkKey::NK_F1;  case 0x78: return NkKey::NK_F2;
-    case 0x63: return NkKey::NK_F3;  case 0x76: return NkKey::NK_F4;
-    case 0x60: return NkKey::NK_F5;  case 0x61: return NkKey::NK_F6;
-    case 0x62: return NkKey::NK_F7;  case 0x64: return NkKey::NK_F8;
-    case 0x65: return NkKey::NK_F9;  case 0x6D: return NkKey::NK_F10;
-    case 0x67: return NkKey::NK_F11; case 0x6F: return NkKey::NK_F12;
-    case 0x32: return NkKey::NK_GRAVE;
-    case 0x12: return NkKey::NK_NUM1; case 0x13: return NkKey::NK_NUM2;
-    case 0x14: return NkKey::NK_NUM3; case 0x15: return NkKey::NK_NUM4;
-    case 0x17: return NkKey::NK_NUM5; case 0x16: return NkKey::NK_NUM6;
-    case 0x1A: return NkKey::NK_NUM7; case 0x1C: return NkKey::NK_NUM8;
-    case 0x19: return NkKey::NK_NUM9; case 0x1D: return NkKey::NK_NUM0;
-    case 0x1B: return NkKey::NK_MINUS;
-    case 0x18: return NkKey::NK_EQUALS;
-    case 0x33: return NkKey::NK_BACK;
-    case 0x30: return NkKey::NK_TAB;
-    case 0x0C: return NkKey::NK_Q; case 0x0D: return NkKey::NK_W;
-    case 0x0E: return NkKey::NK_E; case 0x0F: return NkKey::NK_R;
-    case 0x11: return NkKey::NK_T; case 0x10: return NkKey::NK_Y;
-    case 0x20: return NkKey::NK_U; case 0x22: return NkKey::NK_I;
-    case 0x1F: return NkKey::NK_O; case 0x23: return NkKey::NK_P;
-    case 0x21: return NkKey::NK_LBRACKET;
-    case 0x1E: return NkKey::NK_RBRACKET;
-    case 0x2A: return NkKey::NK_BACKSLASH;
-    case 0x39: return NkKey::NK_CAPITAL;
-    case 0x00: return NkKey::NK_A; case 0x01: return NkKey::NK_S;
-    case 0x02: return NkKey::NK_D; case 0x03: return NkKey::NK_F_KEY;
-    case 0x05: return NkKey::NK_G; case 0x04: return NkKey::NK_H;
-    case 0x26: return NkKey::NK_J; case 0x28: return NkKey::NK_K;
-    case 0x25: return NkKey::NK_L;
-    case 0x29: return NkKey::NK_SEMICOLON;
-    case 0x27: return NkKey::NK_APOSTROPHE;
-    case 0x24: return NkKey::NK_ENTER;
-    case 0x38: return NkKey::NK_LSHIFT;
-    case 0x3C: return NkKey::NK_RSHIFT;
-    case 0x06: return NkKey::NK_Z; case 0x07: return NkKey::NK_X;
-    case 0x08: return NkKey::NK_C; case 0x09: return NkKey::NK_V;
-    case 0x0B: return NkKey::NK_B; case 0x2D: return NkKey::NK_N;
-    case 0x2E: return NkKey::NK_M;
-    case 0x2B: return NkKey::NK_COMMA;
-    case 0x2F: return NkKey::NK_PERIOD;
-    case 0x2C: return NkKey::NK_SLASH;
-    case 0x3B: return NkKey::NK_LCONTROL;
-    case 0x3E: return NkKey::NK_RCONTROL;
-    case 0x37: return NkKey::NK_LWIN;
-    case 0x36: return NkKey::NK_RWIN;
-    case 0x3A: return NkKey::NK_LALT;
-    case 0x3D: return NkKey::NK_RALT;
-    case 0x31: return NkKey::NK_SPACE;
-    case 0x72: return NkKey::NK_INSERT;
-    case 0x75: return NkKey::NK_DELETE;
-    case 0x73: return NkKey::NK_HOME;
-    case 0x77: return NkKey::NK_END;
-    case 0x74: return NkKey::NK_PGUP;
-    case 0x79: return NkKey::NK_PGDN;
-    case 0x7E: return NkKey::NK_UP;
-    case 0x7D: return NkKey::NK_DOWN;
-    case 0x7B: return NkKey::NK_LEFT;
-    case 0x7C: return NkKey::NK_RIGHT;
-    case 0x71: return NkKey::NK_SCROLL;
-    case 0x69: return NkKey::NK_PRINT_SCREEN;
-    default:   return NkKey::NK_KEY_MAX;
-    }
+NkKey NkCocoaEventImpl::MacKeycodeToNkKey(unsigned short code) {
+	return NkKeycodeMap::NkKeyFromMacKeyCode(static_cast<NkU16>(code));
 }
 
-NkModifierState NkCocoaEventImpl::NsModsToMods(unsigned long flags)
-{
-    return NkModifierState(
-        !!(flags & NSEventModifierFlagControl),
-        !!(flags & NSEventModifierFlagOption),
-        !!(flags & NSEventModifierFlagShift),
-        !!(flags & NSEventModifierFlagCommand));
+NkModifierState NkCocoaEventImpl::NsModsToMods(unsigned long flags) {
+	NkModifierState mods;
+	mods.ctrl = !!(flags & NSEventModifierFlagControl);
+	mods.alt = !!(flags & NSEventModifierFlagOption);
+	mods.shift = !!(flags & NSEventModifierFlagShift);
+	mods.super = !!(flags & NSEventModifierFlagCommand);
+	mods.capLock = !!(flags & NSEventModifierFlagCapsLock);
+	return mods;
 }
 
 } // namespace nkentseu

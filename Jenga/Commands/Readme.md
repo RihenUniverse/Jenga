@@ -230,12 +230,17 @@ Jenga package --platform web     --type zip
 #### `Jenga deploy`
 ```bash
 Jenga deploy --platform android [--target DEVICE_ID]
+Jenga deploy --platform android --list-devices
+Jenga deploy --platform android --apk Build/Android/MyApp.apk [--target DEVICE_ID|--device DEVICE_ID]
 Jenga deploy --platform ios    [--id UDID]
 Jenga deploy --platform xbox   [--target IP]
 Jenga deploy --platform macos  [--target /Applications]
 ```
 - Déploie l'application sur un appareil physique ou un émulateur.
 - **Android** : via `adb install -r`.
+- **Android direct APK** : utiliser `--apk` pour installer un APK existant sans build.
+- **Android device cible** : `--target` (ou alias `--device`).
+- **Android listing** : `--list-devices` pour afficher les serials adb.
 - **iOS** : via `ios-deploy`.
 - **Xbox** : via `xbapp deploy`.
 - **macOS** : copie dans `/Applications` (si `--target /Applications`).

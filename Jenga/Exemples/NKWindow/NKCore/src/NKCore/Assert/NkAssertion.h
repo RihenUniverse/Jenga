@@ -12,32 +12,38 @@
 
 #include "NKCore/NkTypes.h"
 
+/**
+ * @brief Namespace nkentseu.
+ */
 namespace nkentseu {
-    namespace core {
-        
-        /**
-         * @brief Informations sur une assertion échouée
-         */
-        struct NkAssertionInfo {
-            const nk_char* expression;  ///< Expression qui a échoué
-            const nk_char* message;     ///< Message custom
-            const nk_char* file;        ///< Fichier source
-            nk_int32 line;                ///< Ligne source
-            const nk_char* function;    ///< Nom de la fonction
-        };
-        
-        /**
-         * @brief Action à prendre lors d'une assertion échouée
-         */
-        enum class NkAssertAction {
-            NK_CONTINUE,  // Continue execution
-            NK_BREAK,     // Break into debugger
-            NK_ABORT,     // Abort program
-            NK_IGNORE,     // Ignore this assertion from now on
-            NK_IGNORE_ALL ///< Ignorer toutes
-        };
-        
-    } // namespace core
+/**
+ * @brief Namespace core.
+ */
+namespace core {
+
+/**
+ * @brief Informations sur une assertion échouée
+ */
+struct NkAssertionInfo {
+	const nk_char *expression; ///< Expression qui a échoué
+	const nk_char *message;	   ///< Message custom
+	const nk_char *file;	   ///< Fichier source
+	nk_int32 line;			   ///< Ligne source
+	const nk_char *function;   ///< Nom de la fonction
+};
+
+/**
+ * @brief Action à prendre lors d'une assertion échouée
+ */
+enum class NkAssertAction {
+	NK_CONTINUE,  // Continue execution
+	NK_BREAK,	  // Break into debugger
+	NK_ABORT,	  // Abort program
+	NK_IGNORE,	  // Ignore this assertion from now on
+	NK_IGNORE_ALL ///< Ignorer toutes
+};
+
+} // namespace core
 } // namespace nkentseu
 
 #endif

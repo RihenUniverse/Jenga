@@ -8,29 +8,32 @@
 #include "NkCompilerDetect.h"
 
 #if defined(NKENTSEU_COMPILER_MSVC)
-    #define NKENTSEU_DEBUGBREAK() __debugbreak()
+#define NKENTSEU_DEBUGBREAK() __debugbreak()
 #elif defined(NKENTSEU_COMPILER_GCC) || defined(NKENTSEU_COMPILER_CLANG)
-    #if defined(NKENTSEU_ARCH_X86) || defined(NKENTSEU_ARCH_X86_64)
-        #define NKENTSEU_DEBUGBREAK() __asm__ volatile("int $0x03")
-    #elif defined(NKENTSEU_ARCH_ARM) || defined(NKENTSEU_ARCH_ARM64)
-        #define NKENTSEU_DEBUGBREAK() __builtin_trap()
-    #else
-        #define NKENTSEU_DEBUGBREAK() __builtin_trap()
-    #endif
+#if defined(NKENTSEU_ARCH_X86) || defined(NKENTSEU_ARCH_X86_64)
+#define NKENTSEU_DEBUGBREAK() __asm__ volatile("int $0x03")
+#elif defined(NKENTSEU_ARCH_ARM) || defined(NKENTSEU_ARCH_ARM64)
+#define NKENTSEU_DEBUGBREAK() __builtin_trap()
 #else
-    #include <signal.h>
-    #define NKENTSEU_DEBUGBREAK() raise(SIGTRAP)
+#define NKENTSEU_DEBUGBREAK() __builtin_trap()
+#endif
+#else
+#include <signal.h>
+#define NKENTSEU_DEBUGBREAK() raise(SIGTRAP)
 #endif
 
 #define NKENTSEU_DEBUG_BREAK() NKENTSEU_DEBUGBREAK()
 
 #if defined(NKENTSEU_DEBUG)
-    #define NKENTSEU_DEBUGBREAK_IF(condition) \
-        do { if (condition) NKENTSEU_DEBUGBREAK(); } while(0)
-    #define NKENTSEU_DEBUG_BREAK_IF(condition) NKENTSEU_DEBUGBREAK_IF(condition)
+#define NKENTSEU_DEBUGBREAK_IF(condition)                                                                              \
+	do {                                                                                                               \
+		if (condition)                                                                                                 \
+			NKENTSEU_DEBUGBREAK();                                                                                     \
+	} while (0)
+#define NKENTSEU_DEBUG_BREAK_IF(condition) NKENTSEU_DEBUGBREAK_IF(condition)
 #else
-    #define NKENTSEU_DEBUGBREAK_IF(condition) ((void)0)
-    #define NKENTSEU_DEBUG_BREAK_IF(condition) ((void)0)
+#define NKENTSEU_DEBUGBREAK_IF(condition) ((void)0)
+#define NKENTSEU_DEBUG_BREAK_IF(condition) ((void)0)
 #endif
 
 #endif // NKENTSEU_CORE_NKCORE_SRC_NKCORE_ASSERT_NKDEBUGBREAK_H_INCLUDED

@@ -107,8 +107,24 @@ class ToolchainLoader:
             from ..GlobalToolchains import RegisterJengaGlobalToolchains
             # TODO: Extraire la liste des toolchains globaux
             global_toolchains = [
-                "android-ndk", "clang-cl", "clang-cross-linux", "clang-mingw",
-                "emscripten", "host-clang", "mingw", "zig-linux-x64"
+                "android-ndk",
+                "clang-cl",
+                "clang-cross-linux",
+                "clang-mingw",
+                "emscripten",
+                "host-apple-clang",
+                "host-clang",
+                "host-gcc",
+                "mingw",
+                "msvc",
+                "zig-android-arm64",
+                "zig-linux-x64",
+                "zig-linux-x86_64",
+                "zig-macos-arm64",
+                "zig-macos-x86_64",
+                "zig-web-wasm32",
+                "zig-windows-x64",
+                "zig-windows-x86_64",
             ]
         except:
             global_toolchains = []

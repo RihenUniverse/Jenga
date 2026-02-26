@@ -9,6 +9,8 @@ Registry location (global to Jenga installation):
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -34,6 +36,18 @@ def _EnumByValue(enum_cls, value: Optional[str]):
         return enum_cls[str(value).upper().replace("-", "_")]
     except Exception:
         return None
+
+
+def _ExecutableExists(path_or_cmd: Optional[str]) -> bool:
+    value = str(path_or_cmd or "").strip()
+    if not value:
+        return False
+    expanded = os.path.expandvars(os.path.expanduser(value))
+    candidate = Path(expanded)
+    has_sep = (os.sep and os.sep in expanded) or (os.altsep and os.altsep in expanded)
+    if has_sep or candidate.is_absolute() or expanded.startswith("."):
+        return candidate.exists()
+    return shutil.which(expanded) is not None
 
 
 def LoadGlobalRegistry(path: Optional[Path] = None) -> Dict[str, Any]:
@@ -68,6 +82,23 @@ def BuildToolchainFromRegistryEntry(entry: Dict[str, Any]) -> Optional[Toolchain
     tc.ranlibPath = entry.get("ranlibPath") or None
     tc.asmPath = entry.get("asmPath") or None
     tc.toolchainDir = entry.get("toolchainDir") or None
+
+    # Skip stale toolchains pointing to non-existent compilers (common when
+    # copying registry files across machines).
+    if tc.ccPath and not _ExecutableExists(tc.ccPath):
+        return None
+    if tc.cxxPath and not _ExecutableExists(tc.cxxPath):
+        return None
+    if not tc.ccPath and not tc.cxxPath:
+        return None
+    if not tc.ccPath:
+        tc.ccPath = tc.cxxPath
+    if not tc.cxxPath:
+        tc.cxxPath = tc.ccPath
+    if tc.ldPath and not _ExecutableExists(tc.ldPath):
+        tc.ldPath = None
+    if tc.arPath and not _ExecutableExists(tc.arPath):
+        tc.arPath = None
 
     tc.cflags = list(entry.get("cflags", []) or [])
     tc.cxxflags = list(entry.get("cxxflags", []) or [])

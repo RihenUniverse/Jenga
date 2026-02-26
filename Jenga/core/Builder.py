@@ -123,18 +123,18 @@ class Builder(abc.ABC):
                 self.toolchainManager.AddToolchain(tc)
         prefer = []
         if self.targetOs == TargetOS.WINDOWS:
-            prefer = ['clang-mingw', 'mingw', 'clang-cl', 'host-clang', 'host-gcc']
+            prefer = ['clang-mingw', 'mingw', 'clang-cl', 'msvc', 'zig-windows-x64', 'host-clang', 'host-gcc']
         elif self.targetOs == TargetOS.LINUX:
             if Platform.GetHostOS() == TargetOS.LINUX:
                 # Native Linux: prefer system compilers, then zig
-                prefer = ['host-clang', 'host-gcc', 'zig-linux-x64', 'clang-cross-linux', 'gcc-cross-linux']
+                prefer = ['host-clang', 'host-gcc', 'zig-linux-x64', 'zig-linux-x86_64', 'clang-cross-linux', 'gcc-cross-linux']
             else:
                 # Cross-compile from Windows/macOS: prefer zig
-                prefer = ['zig-linux-x64', 'clang-cross-linux', 'gcc-cross-linux', 'host-clang', 'host-gcc']
+                prefer = ['zig-linux-x64', 'zig-linux-x86_64', 'clang-cross-linux', 'gcc-cross-linux', 'host-clang', 'host-gcc']
         elif self.targetOs == TargetOS.MACOS:
-            prefer = ['host-apple-clang']
+            prefer = ['host-apple-clang', 'host-clang', 'zig-macos-arm64', 'zig-macos-x86_64', 'host-gcc']
         elif self.targetOs == TargetOS.ANDROID:
-            prefer = ['android-ndk']
+            prefer = ['android-ndk', 'zig-android-arm64']
         elif self.targetOs == TargetOS.IOS:
             prefer = ['host-apple-clang']
         elif self.targetOs == TargetOS.TVOS:
@@ -144,7 +144,7 @@ class Builder(abc.ABC):
         elif self.targetOs == TargetOS.VISIONOS:
             prefer = ['host-apple-clang']
         elif self.targetOs == TargetOS.WEB:
-            prefer = ['emscripten']
+            prefer = ['emscripten', 'zig-web-wasm32']
         tc_name = self.toolchainManager.ResolveForTarget(self.targetOs, self.targetArch, self.targetEnv, prefer=prefer)
         # Apple mobile targets (iOS/tvOS/watchOS) are compiled with host Apple Clang.
         # Detected host toolchain is usually tagged as macOS; fallback to macOS lookup.
@@ -1260,6 +1260,11 @@ class Builder(abc.ABC):
             logger.PrintStats()
             return False
 
+        # Helpful visibility for incremental builds: all regular sources were
+        # cache hits, so no compile command was executed for this project.
+        if regular_files and logger.cached == len(regular_files):
+            logger.LogUpToDate()
+
         # Auto-wire local library dependencies for link phase while preserving
         # the user-declared link order (important for GNU-like linkers).
         dep_link_map: Dict[str, str] = {}
@@ -1325,7 +1330,9 @@ class Builder(abc.ABC):
     def GetSourceFileExtensions(language: Api.Language) -> List[str]:
         extensions = {
             Api.Language.C:        ['.c'],
-            Api.Language.CPP:      ['.cpp', '.cc', '.cxx', '.c++', '.cppm', '.ixx', '.mpp', '.c++m'],
+            # Keep `.mm` for Apple entry points/backends that are selected via filters
+            # while the project language remains C++.
+            Api.Language.CPP:      ['.cpp', '.cc', '.cxx', '.c++', '.cppm', '.ixx', '.mpp', '.c++m', '.mm'],
             Api.Language.OBJC:     ['.m'],
             Api.Language.OBJCPP:   ['.mm'],
             Api.Language.ASM:      ['.s', '.asm', '.S'],

@@ -14,88 +14,91 @@
 // ============================================================
 
 namespace nkentseu {
-    namespace core {
-        
-        // Utiliser union pour créer les valeurs spéciales
-        union NkFloat32Union {
-            nk_float32 f;
-            nk_uint32 u;
-        };
-        
-        constexpr nk_float32 NkNumericLimits<nk_float32>::min() {
-            // Plus petite valeur normalisée: 2^-126 ≈ 1.175494e-38
-            return NKENTSEU_FLOAT32_MIN;
-        }
-        
-        constexpr nk_float32 NkNumericLimits<nk_float32>::max() {
-            // Plus grande valeur: (2-2^-23) × 2^127 ≈ 3.402823e+38
-            return NKENTSEU_FLOAT32_MAX;
-        }
-        
-        constexpr nk_float32 NkNumericLimits<nk_float32>::lowest() {
-            return -NKENTSEU_FLOAT32_MAX;
-        }
-        
-        constexpr nk_float32 NkNumericLimits<nk_float32>::epsilon() {
-            // Epsilon machine: 2^-23 ≈ 1.192093e-07
-            return 1.192092896e-07f;
-        }
-        
-        nk_float32 NkNumericLimits<nk_float32>::infinity() {
-            // Infini positif: exposant = 0xFF, mantisse = 0
-            NkFloat32Union u;
-            u.u = 0x7F800000;
-            return u.f;
-        }
-        
-        nk_float32 NkNumericLimits<nk_float32>::quiet_NaN() {
-            // NaN silencieux: exposant = 0xFF, mantisse != 0
-            NkFloat32Union u;
-            u.u = 0x7FC00000;
-            return u.f;
-        }
-        
-        // ============================================================
-        // LIMITES FLOAT64
-        // ============================================================
-        
-        union NkFloat64Union {
-            nk_float64 f;
-            nk_uint64 u;
-        };
-        
-        constexpr nk_float64 NkNumericLimits<nk_float64>::min() {
-            // Plus petite valeur normalisée: 2^-1022
-            return NKENTSEU_FLOAT64_MIN;
-        }
-        
-        constexpr nk_float64 NkNumericLimits<nk_float64>::max() {
-            // Plus grande valeur
-            return NKENTSEU_FLOAT64_MAX;
-        }
-        
-        constexpr nk_float64 NkNumericLimits<nk_float64>::lowest() {
-            return -NKENTSEU_FLOAT64_MAX;
-        }
-        
-        constexpr nk_float64 NkNumericLimits<nk_float64>::epsilon() {
-            // Epsilon machine: 2^-52
-            return 2.2204460492503131e-16;
-        }
-        
-        nk_float64 NkNumericLimits<nk_float64>::infinity() {
-            NkFloat64Union u;
-            u.u = 0x7FF0000000000000ULL;
-            return u.f;
-        }
-        
-        nk_float64 NkNumericLimits<nk_float64>::quiet_NaN() {
-            NkFloat64Union u;
-            u.u = 0x7FF8000000000000ULL;
-            return u.f;
-        }
-        
-    } // namespace core
+/**
+ * @brief Namespace core.
+ */
+namespace core {
+
+// Utiliser union pour créer les valeurs spéciales
+union NkFloat32Union {
+	nk_float32 f;
+	nk_uint32 u;
+};
+
+constexpr nk_float32 NkNumericLimits<nk_float32>::min() {
+	// Plus petite valeur normalisée: 2^-126 ≈ 1.175494e-38
+	return NKENTSEU_FLOAT32_MIN;
+}
+
+constexpr nk_float32 NkNumericLimits<nk_float32>::max() {
+	// Plus grande valeur: (2-2^-23) × 2^127 ≈ 3.402823e+38
+	return NKENTSEU_FLOAT32_MAX;
+}
+
+constexpr nk_float32 NkNumericLimits<nk_float32>::lowest() {
+	return -NKENTSEU_FLOAT32_MAX;
+}
+
+constexpr nk_float32 NkNumericLimits<nk_float32>::epsilon() {
+	// Epsilon machine: 2^-23 ≈ 1.192093e-07
+	return 1.192092896e-07f;
+}
+
+nk_float32 NkNumericLimits<nk_float32>::infinity() {
+	// Infini positif: exposant = 0xFF, mantisse = 0
+	NkFloat32Union u;
+	u.u = 0x7F800000;
+	return u.f;
+}
+
+nk_float32 NkNumericLimits<nk_float32>::quiet_NaN() {
+	// NaN silencieux: exposant = 0xFF, mantisse != 0
+	NkFloat32Union u;
+	u.u = 0x7FC00000;
+	return u.f;
+}
+
+// ============================================================
+// LIMITES FLOAT64
+// ============================================================
+
+union NkFloat64Union {
+	nk_float64 f;
+	nk_uint64 u;
+};
+
+constexpr nk_float64 NkNumericLimits<nk_float64>::min() {
+	// Plus petite valeur normalisée: 2^-1022
+	return NKENTSEU_FLOAT64_MIN;
+}
+
+constexpr nk_float64 NkNumericLimits<nk_float64>::max() {
+	// Plus grande valeur
+	return NKENTSEU_FLOAT64_MAX;
+}
+
+constexpr nk_float64 NkNumericLimits<nk_float64>::lowest() {
+	return -NKENTSEU_FLOAT64_MAX;
+}
+
+constexpr nk_float64 NkNumericLimits<nk_float64>::epsilon() {
+	// Epsilon machine: 2^-52
+	return 2.2204460492503131e-16;
+}
+
+nk_float64 NkNumericLimits<nk_float64>::infinity() {
+	NkFloat64Union u;
+	u.u = 0x7FF0000000000000ULL;
+	return u.f;
+}
+
+nk_float64 NkNumericLimits<nk_float64>::quiet_NaN() {
+	NkFloat64Union u;
+	u.u = 0x7FF8000000000000ULL;
+	return u.f;
+}
+
+} // namespace core
 } // namespace nkentseu
 
 // ============================================================

@@ -128,13 +128,24 @@ class Loader:
         if workspace is None:
             return
 
-        if not workspace.location:
-            workspace.location = str(entryFile.parent)
+        # Normalize workspace.location to an absolute path anchored to the
+        # entry .jenga directory. This keeps build outputs/cache stable even
+        # when Jenga is invoked from different current working directories.
+        location_raw = str(getattr(workspace, "location", "") or "").strip()
+        if not location_raw or location_raw.startswith('%{'):
+            workspace_dir = entryFile.parent.resolve()
+        else:
+            workspace_dir = Path(location_raw)
+            if not workspace_dir.is_absolute():
+                workspace_dir = (entryFile.parent / workspace_dir).resolve()
+            else:
+                workspace_dir = workspace_dir.resolve()
+        workspace.location = str(workspace_dir)
 
         # Inject global Jenga toolchains (shared registry) before expansions.
         ApplyGlobalRegistryToWorkspace(workspace)
 
-        baseDir = Path(workspace.location).resolve()
+        baseDir = workspace_dir
         expander = self._CreateExpanderForWorkspace(workspace)
         self._expandCache[str(entryFile)] = expander
 
