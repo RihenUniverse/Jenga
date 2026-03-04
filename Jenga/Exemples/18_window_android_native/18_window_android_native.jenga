@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
+
+with workspace("AndroidWindowDemo"):
+    RegisterJengaGlobalToolchains()
+    configurations(["Debug", "Release"])
+    targetoses([TargetOS.ANDROID])
+    # Toutes les architectures pour multi-ABI APK
+    targetarchs([TargetArch.X86, TargetArch.X86_64, TargetArch.ARM, TargetArch.ARM64])
+
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
+
+    with project("AndroidWindow"):
+        windowedapp()
+        language("C++")
+        cppdialect("C++17")
+        files(["src/**.cpp"])
+        androidapplicationid("com.jenga.window")
+        androidminsdk(24)
+        androidtargetsdk(34)
+        # Toutes les ABIs pour compatibilité maximale (MEmu, BlueStacks, smartphones)
+        androidabis(["armeabi-v7a", "arm64-v8a", "x86", "x86_64"])
+        androidnativeactivity(True)
+
+        usetoolchain("android-ndk")

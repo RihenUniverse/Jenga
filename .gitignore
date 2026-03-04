@@ -1,0 +1,69 @@
+# Python caches/bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+# Environnement virtuel
+jenga_venv/
+
+# Packaging/build (Python)
+build/
+Build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Coverage/test artifacts
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Jenga build artifacts and local caches
+.jenga/
+**/.jenga/
+**/Build/
+
+# Local/generated sysroots
+sysroot/
+
+# Temporary docs/work folders
+docs/tmps/
+tmps/
+
+# CMake (if generated)
+CMakeFiles/
+CMakeCache.txt
+cmake-build-*/
+compile_commands.json
+
+# Logs and runtime temp files
+*.log
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local env files
+.env
+.env.*

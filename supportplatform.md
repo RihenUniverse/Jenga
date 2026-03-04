@@ -1,0 +1,30 @@
+* [Android](https://wiki.libsdl.org/SDL3/README-android)
+* [Emscripten](https://wiki.libsdl.org/SDL3/README-emscripten) (Web browsers)
+* [FreeBSD](https://wiki.libsdl.org/SDL3/README-bsd)
+* [Haiku OS](https://wiki.libsdl.org/SDL3/README-haiku)
+* [iOS](https://wiki.libsdl.org/SDL3/README-ios)
+* [Linux](https://wiki.libsdl.org/SDL3/README-linux)
+* [macOS](https://wiki.libsdl.org/SDL3/README-macos) (10.14 and later)
+* [NetBSD](https://wiki.libsdl.org/SDL3/README-bsd)
+* [Nintendo Switch](https://wiki.libsdl.org/SDL3/README-switch) (Separate NDA-only fork)
+* [Nintendo 3DS](https://wiki.libsdl.org/SDL3/README-n3ds) (Homebrew)
+* [Nokia N-Gage](https://wiki.libsdl.org/SDL3/README-ngage)
+* [OpenBSD](https://wiki.libsdl.org/SDL3/README-bsd)
+* [PlayStation 2](https://wiki.libsdl.org/SDL3/README-ps2) (Homebrew)
+* [PlayStation 4](https://wiki.libsdl.org/SDL3/README-ps4) (Separate NDA-only fork)
+* [PlayStation 5](https://wiki.libsdl.org/SDL3/README-ps5) (Separate NDA-only fork)
+* [PlayStation Portable](https://wiki.libsdl.org/SDL3/README-psp) (Homebrew)
+* [PlayStation Vita](https://wiki.libsdl.org/SDL3/README-vita) (Homebrew)
+* [QNX](https://wiki.libsdl.org/SDL3/README-qnx)
+* [RISC OS](https://wiki.libsdl.org/SDL3/README-riscos)
+* [SteamOS](https://wiki.libsdl.org/SDL3/README-steamos)
+* [tvOS](https://wiki.libsdl.org/SDL3/README-ios)
+* [visionOS](https://wiki.libsdl.org/SDL3/README-ios)
+* [Windows](https://wiki.libsdl.org/SDL3/README-windows) (XP and later)
+* [Windows GDK](https://wiki.libsdl.org/SDL3/README-gdk)
+* [Xbox](https://wiki.libsdl.org/SDL3/README-gdk)
+* Google Stadia
+* NaCL
+* OS/2
+* WinPhone
+* WinRT/UWP

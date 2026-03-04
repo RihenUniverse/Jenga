@@ -1,0 +1,388 @@
+#!/usr/bin/env python3
+"""
+Jenga Example 27 — NK Window Framework
+Multi-Platform Windowing & Event System (7 platforms)
+
+Demonstrates a complete cross-platform windowing framework with:
+  - 7 platforms: Windows, Linux, macOS, Android, iOS, Web, HarmonyOS
+  - Unified API for window creation, events, rendering
+  - Platform-specific backends (Win32, X11/XCB, Cocoa, UIKit, Emscripten, etc.)
+  - Production-ready architecture
+
+Projects:
+  - NKWindow: Static library with platform abstraction
+  - Sandbox: Demo application using NKWindow API
+
+Usage:
+  jenga build                           # Build for host platform
+  jenga build --platform windows        # Windows (Win32)
+  jenga build --platform linux          # Linux (X11/XCB)
+  jenga build --platform android        # Android (NativeActivity + EGL)
+  jenga build --platform web            # Web (Emscripten + Canvas)
+  jenga build --platform harmonyos      # HarmonyOS (ArkUI Native)
+  jenga build --platform jengaall       # ALL platforms (except macOS for now)
+  jenga build --config Release          # Release build
+"""
+
+import os
+from Jenga import *
+from Jenga.GlobalToolchains import RegisterJengaGlobalToolchains
+
+with workspace("NKWindow", location="."):
+    RegisterJengaGlobalToolchains()
+
+    configurations(["Debug", "Release"])
+
+    newoption(
+        trigger="headless",
+        description="Linux NOOP backend (no X11 window, useful for CI/WSL sans display)"
+    )
+
+    # Toutes les plateformes supportées
+    targetoses([
+        TargetOS.WINDOWS,
+        TargetOS.LINUX,
+        TargetOS.MACOS,
+        TargetOS.ANDROID,
+        TargetOS.WEB,
+        TargetOS.IOS,
+        TargetOS.HARMONYOS,
+    ])
+
+    targetarchs([
+        TargetArch.X86_64,
+        TargetArch.ARM64,
+        TargetArch.WASM32,
+    ])
+
+    # Emscripten shell fullscreen (workspace default for all Web projects).
+    # Toggle globally:
+    #   emscriptenfullscreenshell(True)   -> use templates/emscripten_fullscreen.html
+    #   emscriptenfullscreenshell(False)  -> keep Emscripten default shell
+    emscriptenfullscreenshell(True)
+
+    with unitest() as u:
+        u.Compile()
+
+    # Chemins Android SDK/NDK depuis environnement
+    androidsdkpath(os.getenv("ANDROID_SDK_ROOT", ""))
+    androidndkpath(os.getenv("ANDROID_NDK_ROOT", os.getenv("ANDROID_NDK_HOME", "")))
+
+    # =========================================================================
+    # NKWindow — Bibliothèque statique multi-plateformes
+    # =========================================================================
+
+    with project("NKWindow"):
+        staticlib()
+        language("C++")
+        cppdialect("C++17")
+        location("NKWindow")
+
+        # Répertoires d'inclusion
+        includedirs([
+            "src",
+            "../Externals",
+        ])
+
+        # Fichiers C++ communs (tous systèmes)
+        files([
+            "src/NKWindow/Core/**.cpp",
+            "src/NKWindow/Core/**.h",
+            "src/NKWindow/Core/**.hpp",
+            "src/NKWindow/Renderer/**.cpp",
+            "src/NKWindow/Renderer/**.h",
+        ])
+
+        # Chemins de sortie
+        objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+        targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+
+        # ── Windows (Win32 backend) ──────────────────────────────────────
+        with filter("system:Windows"):
+            usetoolchain("clang-mingw")
+            defines([
+                "NKENTSEU_PLATFORM_WIN32=1",
+                "NKENTSEU_PLATFORM_WINDOWS=1",
+                "WIN32_LEAN_AND_MEAN",
+                "_UNICODE",
+                "UNICODE",
+            ])
+            files([
+                "src/NKWindow/Platform/Win32/**.cpp",
+                "src/NKWindow/Platform/Win32/**.h",
+            ])
+            links([
+                "user32",
+                "gdi32",
+                "opengl32",
+                "dwmapi",
+                "shell32",
+                "xinput",
+                "mf",
+                "mfplat",
+                "mfreadwrite",
+                "mfuuid",
+                "uuid",
+                "ole32",
+            ])
+
+        # ── Linux headless (NOOP backend) ─────────────────────────────────
+        with filter("system:Linux && options:headless"):
+            usetoolchain("zig-linux-x64")
+            defines([
+                "NKENTSEU_PLATFORM_NOOP=1",
+                "NKENTSEU_FAMILY_LINUX=1",
+            ])
+            # Keep headless artifacts separate from windowed Linux binaries.
+            objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}-headless/%{prj.name}")
+            targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}-headless/%{prj.name}")
+            files([
+                "src/NKWindow/Platform/Linux/**.h",
+                "src/NKWindow/Platform/Noop/**.h",
+            ])
+            links(["pthread"])
+
+        # ── Linux fenêtré (X11/XLib backend) ──────────────────────────────
+        with filter("system:Linux && !options:headless"):
+            usetoolchain("zig-linux-x64")
+            defines([
+                "NKENTSEU_PLATFORM_XLIB=1",
+                "NKENTSEU_FAMILY_LINUX=1",
+            ])
+            files([
+                "src/NKWindow/Platform/Linux/**.h",
+                "src/NKWindow/Platform/XLib/**.cpp",
+                "src/NKWindow/Platform/XLib/**.h",
+            ])
+            links(["pthread", "X11"])
+
+        # ── macOS (Cocoa backend) ────────────────────────────────────────
+        with filter("system:macOS"):
+            usetoolchain("clang-native")  # Direct par défaut
+            defines([
+                "NKENTSEU_PLATFORM_MACOS=1",
+                "NKENTSEU_FAMILY_APPLE=1",
+            ])
+            files([
+                "src/NKWindow/Platform/Cocoa/**.cpp",
+                "src/NKWindow/Platform/Cocoa/**.mm",
+                "src/NKWindow/Platform/Cocoa/**.h",
+            ])
+            frameworks(["Cocoa", "QuartzCore", "OpenGL", "Metal"])
+
+        # ── Android (NativeActivity + EGL) ───────────────────────────────
+        with filter("system:Android"):
+            usetoolchain("android-ndk")
+            defines([
+                "NKENTSEU_PLATFORM_ANDROID=1",
+            ])
+            files([
+                "src/NKWindow/Platform/Android/**.cpp",
+                "src/NKWindow/Platform/Android/**.h",
+            ])
+            links(["android", "log", "EGL", "GLESv3", "camera2ndk", "mediandk"])
+            # Configuration Android (pour app finale)
+            androidapplicationid("com.nkentseu.window")
+            androidminsdk(24)
+            androidtargetsdk(34)
+            androidcompilesdk(34)
+            # Multi-ABI, aligné sur l'exemple 25 (émulateurs + devices physiques)
+            androidabis(["armeabi-v7a", "arm64-v8a", "x86", "x86_64"])
+            androidnativeactivity(True)
+            # Rotation Android:
+            # - autoriser la rotation (par défaut) :
+            androidallowrotation(True)
+            # - verrouiller en portrait :
+            # androidallowrotation(False)
+            # - forcer une orientation Android précise :
+            # androidscreenorientation("sensorLandscape")
+
+        # ── iOS (UIKit backend) ──────────────────────────────────────────
+        with filter("system:iOS"):
+            # usetoolchain("ios-clang")  # TODO: Créer toolchain iOS
+            defines([
+                "NKENTSEU_PLATFORM_IOS=1",
+                "NKENTSEU_FAMILY_APPLE=1",
+            ])
+            files([
+                "src/NKWindow/Platform/UIKit/**.cpp",
+                "src/NKWindow/Platform/UIKit/**.mm",
+                "src/NKWindow/Platform/UIKit/**.h",
+            ])
+            frameworks(["UIKit", "QuartzCore", "OpenGLES", "AVFoundation"])
+            # Configuration iOS
+            iosbundleid("com.nkentseu.window")
+            iosversion("1.0")
+            iosminsdk("14.0")
+            iosbuildnumber(1)
+
+        # ── Web (Emscripten + Canvas) ────────────────────────────────────
+        with filter("system:Web"):
+            usetoolchain("emscripten")
+            defines([
+                "NKENTSEU_PLATFORM_WASM=1",
+                "__EMSCRIPTEN__=1",
+            ])
+            files([
+                "src/NKWindow/Platform/WASM/**.cpp",
+                "src/NKWindow/Platform/WASM/**.h",
+            ])
+            # Pas de links spécifiques (gérés par Emscripten)
+            emscripteninitialmemory(32)  # 32 MB
+
+        # ── HarmonyOS (ArkUI Native) ─────────────────────────────────────
+        with filter("system:HarmonyOS"):
+            # usetoolchain("harmonyos-ndk")  # TODO: Créer toolchain HarmonyOS
+            defines([
+                "NKENTSEU_PLATFORM_HARMONYOS=1",
+                "__HARMONY__=1",
+            ])
+            files([
+                "src/NKWindow/Platform/Noop/**.cpp",  # Fallback si pas implémenté
+                "src/NKWindow/Platform/Noop/**.h",
+            ])
+            # TODO: Ajouter backend HarmonyOS réel quand disponible
+            # files(["NKWindow/src/NKWindow/Platform/HarmonyOS/**.cpp"])
+            links(["log", "EGL", "GLESv3"])
+
+        # ── Configurations Debug/Release ─────────────────────────────────
+        with filter("config:Debug"):
+            defines(["_DEBUG", "DEBUG"])
+            optimize("Off")
+            symbols(True)
+            runtime("Debug")
+
+        with filter("config:Release"):
+            defines(["NDEBUG", "RELEASE"])
+            optimize("Speed")
+            symbols(False)
+            runtime("Release")
+
+        # Les tests natifs restent sur desktop; on ne force pas de target test Android/Web.
+        with filter("system:Windows || system:Linux || system:macOS"):
+            with test():
+                testfiles(["tests/**.cpp"])
+
+    # =========================================================================
+    # Sandbox apps — 3 exécutables séparés
+    # =========================================================================
+
+    startproject("Sandbox")
+
+    def configure_sandbox_app(project_name: str, source_file: str, app_id_suffix: str, needs_camera: bool = False):
+        with project(project_name):
+            windowedapp()
+            language("C++")
+            cppdialect("C++17")
+            location("Sandbox")
+
+            files([source_file])
+
+            includedirs([
+                "../NKWindow/src",
+                "../Externals",
+            ])
+
+            links(["NKWindow"])
+            dependson(["NKWindow"])
+
+            objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+            targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}/%{prj.name}")
+
+            with filter("system:Windows"):
+                windowedapp()
+                usetoolchain("clang-mingw")
+                defines(["NKENTSEU_PLATFORM_WIN32=1"])
+                links([
+                    "user32",
+                    "gdi32",
+                    "opengl32",
+                    "dwmapi",
+                    "shell32",
+                    "xinput",
+                    "mf",
+                    "mfplat",
+                    "mfreadwrite",
+                    "mfuuid",
+                    "uuid",
+                    "ole32",
+                ])
+
+            with filter("system:Linux && options:headless"):
+                windowedapp()
+                usetoolchain("host-clang")
+                defines(["NKENTSEU_PLATFORM_NOOP=1"])
+                # Keep headless app binaries in a dedicated output tree.
+                objdir("%{wks.location}/Build/Obj/%{cfg.buildcfg}-%{cfg.system}-headless/%{prj.name}")
+                targetdir("%{wks.location}/Build/Bin/%{cfg.buildcfg}-%{cfg.system}-headless/%{prj.name}")
+                links(["pthread"])
+
+            with filter("system:Linux && !options:headless"):
+                windowedapp()
+                usetoolchain("host-clang")
+                defines(["NKENTSEU_PLATFORM_XLIB=1"])
+                links(["pthread", "X11"])
+
+            with filter("system:macOS"):
+                windowedapp()
+                usetoolchain("clang-native")
+                defines(["NKENTSEU_PLATFORM_MACOS=1"])
+                frameworks(["Cocoa", "QuartzCore", "OpenGL"])
+
+            with filter("system:Android"):
+                windowedapp()
+                usetoolchain("android-ndk")
+                defines(["NKENTSEU_PLATFORM_ANDROID=1"])
+                links(["android", "log", "EGL", "GLESv3", "camera2ndk", "mediandk"])
+                androidapplicationid(f"com.nkentseu.{app_id_suffix}")
+                androidminsdk(24)
+                androidtargetsdk(34)
+                androidcompilesdk(34)
+                # Multi-ABI, aligné sur l'exemple 25.
+                androidabis(["armeabi-v7a", "arm64-v8a", "x86", "x86_64"])
+                androidnativeactivity(True)
+                # Autoriser la rotation (mettre False pour verrouiller en portrait)
+                androidallowrotation(True)
+                if needs_camera:
+                    androidpermissions([
+                        "android.permission.CAMERA",
+                    ])
+
+            with filter("system:iOS"):
+                windowedapp()
+                # usetoolchain("ios-clang")  # TODO: Créer toolchain iOS
+                defines(["NKENTSEU_PLATFORM_IOS=1"])
+                frameworks(["UIKit", "QuartzCore", "OpenGLES"])
+                iosbundleid(f"com.nkentseu.{app_id_suffix}")
+                iosversion("1.0")
+                iosminsdk("14.0")
+                iosbuildnumber(1)
+
+            with filter("system:Web"):
+                consoleapp()
+                usetoolchain("emscripten")
+                defines(["NKENTSEU_PLATFORM_WASM=1"])
+                emscriptencanvasid("canvas")
+                emscripteninitialmemory(32)
+                # Required for synchronous desktop-style loops on Web.
+                emscriptenextraflags(["-s", "ASYNCIFY"])
+
+            with filter("system:HarmonyOS"):
+                windowedapp()
+                # usetoolchain("harmonyos-ndk")  # TODO: Créer toolchain HarmonyOS
+                defines(["NKENTSEU_PLATFORM_HARMONYOS=1"])
+                links(["log", "EGL", "GLESv3"])
+
+            with filter("config:Debug"):
+                defines(["_DEBUG"])
+                optimize("Off")
+                symbols(True)
+
+            with filter("config:Release"):
+                defines(["NDEBUG"])
+                optimize("Speed")
+                symbols(False)
+
+    configure_sandbox_app("Sandbox", "src/main.cpp", "sandbox")
+    configure_sandbox_app("SandboxCamera", "src/camera_example.cpp", "sandbox.camera", True)
+    configure_sandbox_app("SandboxCameraFull", "src/camera_full_example.cpp", "sandbox.camerafull", True)
