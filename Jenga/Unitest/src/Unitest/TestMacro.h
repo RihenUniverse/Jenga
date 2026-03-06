@@ -155,6 +155,22 @@ void TestName##TestCase::Run()
 #define BENCHMARK_CUSTOM(name, function, iterations, warmup) \
     nkentseu::benchmark::BenchmarkRunner::Run(name, function, iterations, warmup)
 
+// Version options explicites
+#define RUN_BENCHMARK_WITH_OPTIONS(name, function, options) \
+    nkentseu::benchmark::BenchmarkRunner::RunWithOptions(name, function, options)
+
+#define RUN_BENCHMARK_WITH_SETUP_OPTIONS(name, setup, function, teardown, options) \
+    nkentseu::benchmark::BenchmarkRunner::RunWithSetupOptions(name, setup, function, teardown, options)
+
+// Mode stable (plus d'itérations + filtre outliers)
+#define RUN_BENCHMARK_STABLE(name, function, iterations) \
+    ([&]() { \
+        nkentseu::benchmark::BenchmarkOptions _nk_opts; \
+        _nk_opts.mIterations = (iterations); \
+        _nk_opts.mStableMode = true; \
+        return nkentseu::benchmark::BenchmarkRunner::RunWithOptions(name, function, _nk_opts); \
+    }())
+
 // ---------------------------------------------------------------------
 // ASSERTIONS DE BENCHMARK
 // ---------------------------------------------------------------------

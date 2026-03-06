@@ -52,8 +52,18 @@ namespace nkentseu {
                 file << "        \"mean_time_ms\": " << entry.mBenchmarkResult.mMeanTimeMs << ",\n";
                 file << "        \"min_time_ms\": " << entry.mBenchmarkResult.mMinTimeMs << ",\n";
                 file << "        \"max_time_ms\": " << entry.mBenchmarkResult.mMaxTimeMs << ",\n";
+                file << "        \"median_time_ms\": " << entry.mBenchmarkResult.mMedianTimeMs << ",\n";
+                file << "        \"p95_time_ms\": " << entry.mBenchmarkResult.mP95TimeMs << ",\n";
+                file << "        \"p99_time_ms\": " << entry.mBenchmarkResult.mP99TimeMs << ",\n";
                 file << "        \"std_dev_ms\": " << entry.mBenchmarkResult.mStdDevMs << ",\n";
+                file << "        \"cv_percent\": " << entry.mBenchmarkResult.mCvPercent << ",\n";
                 file << "        \"iterations\": " << entry.mBenchmarkResult.mIterations << ",\n";
+                file << "        \"effective_samples\": " << entry.mBenchmarkResult.mEffectiveSamples << ",\n";
+                file << "        \"operations_per_iteration\": " << entry.mBenchmarkResult.mOperationsPerIteration << ",\n";
+                file << "        \"outliers_removed\": " << entry.mBenchmarkResult.mOutliersRemoved << ",\n";
+                file << "        \"outlier_filtering_applied\": "
+                     << (entry.mBenchmarkResult.mOutlierFilteringApplied ? "true" : "false") << ",\n";
+                file << "        \"mode\": \"" << entry.mBenchmarkResult.mMode << "\",\n";
                 file << "        \"performance_regression\": " 
                      << (entry.mPerformanceRegression ? "true" : "false") << ",\n";
                 file << "        \"regression_percentage\": " << entry.mRegressionPercentage << "\n";
