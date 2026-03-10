@@ -126,28 +126,41 @@ class LinuxBuilder(Builder):
             ar = self.toolchain.arPath or "ar"
             args = [ar, "rcs", str(out)]
             args.extend(self.toolchain.arflags)
-            args.extend(project.ldflags) 
+            args.extend(project.ldflags)
             args.extend(objectFiles)
         else:
             linker = self.toolchain.cxxPath
             args = [linker, "-o", str(out)]
             if project.kind == ProjectKind.SHARED_LIB:
                 args.append("-shared")
-            # Object files first; static libs are order-sensitive on GNU linkers.
+
+            # Object files first.
             args.extend(objectFiles)
+
+            # Linker flags before libraries.
+            args.extend(self.toolchain.ldflags)
+            args.extend(project.ldflags)
+
             # RPATH
             if project.targetDir:
-                args.append(f"-Wl,-rpath,$ORIGIN")
-            # Bibliothèques
+                args.append("-Wl,-rpath,$ORIGIN")
+
+            # Library search paths.
             for libdir in project.libDirs:
                 args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
+
+            # Group libraries to resolve cyclic static dependencies.
+            lib_args: List[str] = []
             for lib in project.links:
                 if self._IsDirectLibPath(lib):
-                    args.append(self.ResolveProjectPath(project, lib))
+                    lib_args.append(self.ResolveProjectPath(project, lib))
                 else:
-                    args.append(f"-l{lib}")
-            args.extend(self.toolchain.ldflags)
-            args.extend(project.ldflags) 
+                    lib_args.append(f"-l{lib}")
+
+            if lib_args:
+                args.append("-Wl,--start-group")
+                args.extend(lib_args)
+                args.append("-Wl,--end-group")
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result

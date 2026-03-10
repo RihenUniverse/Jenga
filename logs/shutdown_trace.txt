@@ -1,0 +1,432 @@
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=000001fe23107510
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=0000023304ef4c10
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=00000198cf971ca0
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=000002a82d11fd50
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=00000252c7111b00
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=00000203da057c50
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=000001a4d42ad4e0
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=0000015529c39420
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=000001dbf6551e40
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=0000029362432b30
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=00000287d1becd80
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=0000018448e9eab0
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=0000022592ef3250
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=000001ff09d1eba0
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=00000171d141b3d0
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=0000024a87cc4470
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=00000228d77ce840
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=000001bfa86dcfb0
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=000001c6cc0d4e40
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=0000025e734b2130
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=000002d751deca50
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=000001c028562090
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkSystem::Close begin
+[TRACE] NkGamepadSystem::Shutdown begin
+[TRACE] NkGamepadSystem::Shutdown end
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkSystem::Close end
+[TRACE] NkEventSystem::~NkEventSystem begin
+[TRACE] NkEventSystem::Shutdown begin
+[TRACE] NkEventSystem::Shutdown end
+[TRACE] NkEventSystem::~NkEventSystem end
+[TRACE] NkLog::~NkLog begin
+[TRACE] NkLog::~NkLog end
+[TRACE] NkLogger::~NkLogger begin
+[TRACE] NkLogger::~NkLogger releasing sinks count=1
+[TRACE] NkLogger::~NkLogger sink[0] reset begin ptr=0000013fa09fe610
+[TRACE] NkConsoleSink::~NkConsoleSink begin
+[TRACE] NkConsoleSink::~NkConsoleSink end
+[TRACE] NkLogger::~NkLogger sink[0] reset end
+[TRACE] NkLogger::~NkLogger sinks cleared
+[TRACE] NkLogger::~NkLogger end

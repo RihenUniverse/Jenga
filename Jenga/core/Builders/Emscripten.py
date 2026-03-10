@@ -153,19 +153,22 @@ class EmscriptenBuilder(Builder):
             args.append("-sSIDE_MODULE=1")
             args.append("-sEXPORT_ALL=1")
         elif project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
-            args.append("-sMAIN_MODULE=1")
-            args.append("-sERROR_ON_UNDEFINED_SYMBOLS=0")
-
-            # RUNTIME_LINKED_LIBS : indique à Emscripten quels .wasm charger au démarrage
+            # N'activer MAIN_MODULE que si des side-modules existent réellement.
+            # Forcer MAIN_MODULE pour une app standalone dégrade le runtime JS
+            # (callbacks indirects/dynCall) et peut casser les entrées HTML5.
             side_module_names = self._CollectSideModuleNames(project)
             if side_module_names:
+                args.append("-sMAIN_MODULE=1")
+                args.append("-sERROR_ON_UNDEFINED_SYMBOLS=0")
+
+                # RUNTIME_LINKED_LIBS : indique à Emscripten quels .wasm charger au démarrage
                 libs_list = ",".join(f'"{name}.wasm"' for name in side_module_names)
                 args.append(f"-sRUNTIME_LINKED_LIBS=[{libs_list}]")
 
-            # Passer les .wasm au linker pour résoudre les symboles à la compilation
-            # (sans ça, Emscripten génère "external symbol is missing" au runtime)
-            for wasm_path in self._CollectSideModulePaths(project):
-                args.append(str(wasm_path))
+                # Passer les .wasm au linker pour résoudre les symboles à la compilation
+                # (sans ça, Emscripten génère "external symbol is missing" au runtime)
+                for wasm_path in self._CollectSideModulePaths(project):
+                    args.append(str(wasm_path))
 
         args += ["-o", str(out)]
         args.extend(self._GetLinkerFlags(project))

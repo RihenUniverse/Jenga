@@ -527,6 +527,10 @@ class DirectIOSBuilder(Builder):
         return v.value if hasattr(v, "value") else v
 
     def BuildProject(self, project: Project) -> bool:
+        # TEST_SUITE projects cannot run on iOS — skip compilation and linking entirely.
+        if project.kind == ProjectKind.TEST_SUITE:
+            return True
+
         # Récupération de la version minimum depuis le projet
         # On utilise l'attribut approprié si disponible, sinon la valeur par défaut
         min_attr = self.target_profile.get("min_sdk_attr", "iosMinSdk")

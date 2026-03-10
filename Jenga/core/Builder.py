@@ -123,7 +123,11 @@ class Builder(abc.ABC):
                 self.toolchainManager.AddToolchain(tc)
         prefer = []
         if self.targetOs == TargetOS.WINDOWS:
-            prefer = ['clang-mingw', 'mingw', 'clang-cl', 'msvc', 'zig-windows-x64', 'host-clang', 'host-gcc']
+            if Platform.GetHostOS() != TargetOS.WINDOWS:
+                # Cross-compile from Linux/macOS: prefer mingw (has full STL headers)
+                prefer = ['mingw', 'clang-mingw', 'clang-cl', 'msvc', 'zig-windows-x64', 'host-clang', 'host-gcc']
+            else:
+                prefer = ['clang-mingw', 'mingw', 'clang-cl', 'msvc', 'zig-windows-x64', 'host-clang', 'host-gcc']
         elif self.targetOs == TargetOS.LINUX:
             if Platform.GetHostOS() == TargetOS.LINUX:
                 # Native Linux: prefer system compilers, then zig
@@ -483,30 +487,116 @@ class Builder(abc.ABC):
         if not raw:
             return False
 
+        try:
+            tokens = self._TokenizeFilterExpr(raw)
+            result, _ = self._ParseFilterOr(tokens, 0, project)
+            return result
+        except Exception:
+            return False
+
+    def _TokenizeFilterExpr(self, expr: str) -> List[str]:
+        """Tokenize a filter expression: handles ||, &&, !, (), and/or/not keywords."""
+        tokens: List[str] = []
+        i = 0
+        n = len(expr)
+        while i < n:
+            c = expr[i]
+            if c in ' \t\r\n':
+                i += 1
+                continue
+            if expr[i:i+2] == '||':
+                tokens.append('||')
+                i += 2
+                continue
+            if expr[i:i+2] == '&&':
+                tokens.append('&&')
+                i += 2
+                continue
+            if c == '(':
+                tokens.append('(')
+                i += 1
+                continue
+            if c == ')':
+                tokens.append(')')
+                i += 1
+                continue
+            if c == '!':
+                tokens.append('!')
+                i += 1
+                continue
+            # Read atom/keyword until delimiter
+            j = i
+            while j < n and expr[j] not in ' \t\r\n()!':
+                if expr[j:j+2] in ('||', '&&'):
+                    break
+                j += 1
+            atom = expr[i:j]
+            i = j
+            if not atom:
+                i += 1
+                continue
+            al = atom.lower()
+            if al == 'or':
+                tokens.append('||')
+            elif al == 'and':
+                tokens.append('&&')
+            elif al == 'not':
+                tokens.append('!')
+            else:
+                tokens.append(atom)
+        return tokens
+
+    def _ParseFilterOr(self, tokens: List[str], pos: int, project) -> Tuple[bool, int]:
+        """or_expr = and_expr ('||' and_expr)*"""
+        result, pos = self._ParseFilterAnd(tokens, pos, project)
+        while pos < len(tokens) and tokens[pos] == '||':
+            pos += 1
+            right, pos = self._ParseFilterAnd(tokens, pos, project)
+            result = result or right
+        return result, pos
+
+    def _ParseFilterAnd(self, tokens: List[str], pos: int, project) -> Tuple[bool, int]:
+        """and_expr = not_expr ('&&' not_expr)*"""
+        result, pos = self._ParseFilterNot(tokens, pos, project)
+        while pos < len(tokens) and tokens[pos] == '&&':
+            pos += 1
+            right, pos = self._ParseFilterNot(tokens, pos, project)
+            result = result and right
+        return result, pos
+
+    def _ParseFilterNot(self, tokens: List[str], pos: int, project) -> Tuple[bool, int]:
+        """not_expr = '!' not_expr | atom_expr"""
+        if pos < len(tokens) and tokens[pos] == '!':
+            pos += 1
+            val, pos = self._ParseFilterNot(tokens, pos, project)
+            return not val, pos
+        return self._ParseFilterAtom(tokens, pos, project)
+
+    def _ParseFilterAtom(self, tokens: List[str], pos: int, project) -> Tuple[bool, int]:
+        """atom_expr = '(' or_expr ')' | term"""
+        if pos < len(tokens) and tokens[pos] == '(':
+            pos += 1
+            val, pos = self._ParseFilterOr(tokens, pos, project)
+            if pos < len(tokens) and tokens[pos] == ')':
+                pos += 1
+            return val, pos
+        if pos < len(tokens) and tokens[pos] not in ('||', '&&', '!', '(', ')'):
+            atom = tokens[pos]
+            pos += 1
+            return self._EvalFilterAtom(atom, project), pos
+        return False, pos
+
+    def _EvalFilterAtom(self, raw: str, project) -> bool:
+        """Evaluate a single leaf filter term."""
+        if not raw:
+            return False
         lowered = raw.lower()
 
-        # Support grouped filters: "a && b", "a and b", "a || b", "a or b".
-        if "||" in raw:
-            return any(self._FilterMatches(part.strip(), project) for part in raw.split("||") if part.strip())
-        if re.search(r"\s+or\s+", lowered):
-            parts = [part.strip() for part in re.split(r"(?i)\s+or\s+", raw) if part.strip()]
-            return any(self._FilterMatches(part, project) for part in parts)
-        if "&&" in raw:
-            return all(self._FilterMatches(part.strip(), project) for part in raw.split("&&") if part.strip())
-        if re.search(r"\s+and\s+", lowered):
-            parts = [part.strip() for part in re.split(r"(?i)\s+and\s+", raw) if part.strip()]
-            return all(self._FilterMatches(part, project) for part in parts)
-
-        # "filter({a,b})" canonicalized as "a && b" by API; this is a fallback.
+        # "filter({a,b})" canonicalized fallback: "a,b" means "a && b"
         if "," in raw and ":" in raw:
-            parts = [part.strip() for part in raw.split(",") if part.strip()]
+            parts = [p.strip() for p in raw.split(",") if p.strip()]
             if len(parts) > 1:
-                return all(self._FilterMatches(part, project) for part in parts)
-
-        if raw.startswith("!"):
-            return not self._FilterMatches(raw[1:].strip(), project)
-        if lowered.startswith("not "):
-            return not self._FilterMatches(raw[4:].strip(), project)
+                return all(self._EvalFilterAtom(p, project) for p in parts)
 
         # system:Windows
         if lowered.startswith("system:"):
@@ -540,7 +630,6 @@ class Builder(abc.ABC):
                 active_platform = (self.platform or "").strip().lower()
                 if active_platform:
                     return fnmatch.fnmatch(active_platform, platform_pattern)
-                # fallback: compare against target os when --platform not explicitly set
                 return fnmatch.fnmatch(self.targetOs.value.lower(), platform_pattern)
 
         # action:build / action:gen-cmake
@@ -548,7 +637,7 @@ class Builder(abc.ABC):
             action_pattern = raw.split(":", 1)[1].strip().lower()
             return fnmatch.fnmatch(self.action, action_pattern)
 
-        # options:foo (Premake-like custom options context)
+        # options:foo
         if lowered.startswith("options:") or lowered.startswith("option:"):
             _, value = raw.split(":", 1)
             opt_pattern = value.strip().lower()
@@ -559,22 +648,16 @@ class Builder(abc.ABC):
         # kind:StaticLib / kind:ConsoleApp
         if lowered.startswith("kind:") and project is not None:
             kind_pattern = raw.split(":", 1)[1].strip().lower()
-            kind_tokens = {
-                project.kind.value.lower(),
-                project.kind.name.lower(),
-            }
+            kind_tokens = {project.kind.value.lower(), project.kind.name.lower()}
             return any(fnmatch.fnmatch(token, kind_pattern) for token in kind_tokens)
 
         # language:C++ / language:C
         if lowered.startswith("language:") and project is not None:
             lang_pattern = raw.split(":", 1)[1].strip().lower()
-            lang_tokens = {
-                project.language.value.lower(),
-                project.language.name.lower(),
-            }
+            lang_tokens = {project.language.value.lower(), project.language.name.lower()}
             return any(fnmatch.fnmatch(token, lang_pattern) for token in lang_tokens)
 
-        # toolset:clang / toolset:gcc (best effort mapping to selected toolchain)
+        # toolset:clang / toolset:gcc
         if lowered.startswith("toolset:") and self.toolchain is not None:
             toolset_pattern = raw.split(":", 1)[1].strip().lower()
             tool_tokens = {
@@ -584,7 +667,7 @@ class Builder(abc.ABC):
             }
             return any(token and fnmatch.fnmatch(token, toolset_pattern) for token in tool_tokens)
 
-        # Premake-style shorthand tokens: "windows", "Debug", "x86_64".
+        # Premake-style shorthand tokens: "windows", "Debug", "x86_64"
         token = lowered
         active_os = self._NormalizeSystemName(self.targetOs.value)
         if token == self.config.lower() or fnmatch.fnmatch(self.config.lower(), token):
@@ -1628,6 +1711,10 @@ class Builder(abc.ABC):
             seen: set[str] = set()
 
             for link in project.links:
+                # Skip WINDOWED_APP/CONSOLE_APP deps — they produce executables, not linkable libraries
+                dep_for_link = self.workspace.projects.get(link)
+                if dep_for_link and dep_for_link.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+                    continue
                 resolved = dep_link_map.get(link, link)
                 if resolved not in seen:
                     new_links.append(resolved)
@@ -1639,7 +1726,9 @@ class Builder(abc.ABC):
                     missing_dep_outputs.append(dep_out)
                     seen.add(dep_out)
 
-            project.links = missing_dep_outputs + new_links
+            # Preserve explicit project link order first (important for GNU-like
+            # one-pass linkers). Only append missing dependency outputs.
+            project.links = new_links + missing_dep_outputs
 
         if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP,
                             ProjectKind.SHARED_LIB, ProjectKind.STATIC_LIB,

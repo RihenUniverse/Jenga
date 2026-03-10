@@ -160,12 +160,71 @@
             }
         };
 
+        // Compatibility shim for legacy Emscripten outputs that still
+        // reference dynCall_* globals at startup.
+        (function installDynCallCompat() {
+            var root = (typeof globalThis !== 'undefined')
+                ? globalThis
+                : (typeof window !== 'undefined' ? window : this);
+
+            function makeLegacyDynCall(signature) {
+                return function() {
+                    var dynCaller = null;
+                    if (Module && typeof Module.dynCall === "function") {
+                        dynCaller = Module.dynCall;
+                    } else if (typeof root.dynCall === "function") {
+                        dynCaller = root.dynCall;
+                    }
+                    if (!dynCaller) {
+                        throw new Error("dynCall_" + signature + " requested before dynCall runtime is ready");
+                    }
+                    var argc = arguments.length;
+                    var index = argc > 0 ? arguments[0] : 0;
+                    var callArgs = [];
+                    for (var i = 1; i < argc; ++i) {
+                        callArgs.push(arguments[i]);
+                    }
+                    return dynCaller(signature, index, callArgs);
+                };
+            }
+
+            var signatures = ["v", "vi", "vii", "viii", "viiii", "ii", "iii", "iiii"];
+            for (var i = 0; i < signatures.length; ++i) {
+                var sig = signatures[i];
+                var symbol = "dynCall_" + sig;
+                if (typeof root[symbol] !== "function") {
+                    root[symbol] = makeLegacyDynCall(sig);
+                }
+            }
+        })();
+
         Module.setStatus('Downloading...');
 
         window.onerror = function() {
             Module.setStatus('Exception thrown, see JavaScript console');
             document.getElementById('spinner').style.display = 'none';
         };
+
+        window.addEventListener('unhandledrejection', function(event) {
+            var reason = event && event.reason;
+            var reasonText = '';
+            if (typeof reason === 'string') {
+                reasonText = reason;
+            } else if (reason && reason.message) {
+                reasonText = reason.message;
+            } else if (reason && reason.stack) {
+                reasonText = reason.stack;
+            } else {
+                try {
+                    reasonText = JSON.stringify(reason);
+                } catch (_) {
+                    reasonText = String(reason);
+                }
+            }
+            console.error('Unhandled promise rejection:', reason);
+            Module.setStatus('Unhandled promise rejection: ' + reasonText);
+            document.getElementById('spinner').style.display = 'none';
+        });
     </script>
     {{{ SCRIPT }}}
 </body>

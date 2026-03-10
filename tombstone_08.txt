@@ -1,0 +1,2666 @@
+*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+Build fingerprint: 'Asus/Asus/ASUS_I003DD:9/mv-dev103041042:user/release-keys'
+Revision: '0'
+ABI: 'x86'
+pid: 18148, tid: 18169, name: Thread-2  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x7fffffff
+    eax 5a5cf800  ebx cc3d13ac  ecx 00000030  edx 7fffffff
+    edi 5a5cf82e  esi 0a18be60
+    ebp cc184718  esp cc1846c0  eip cc3494be
+
+backtrace:
+    #00 pc 000864be  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so (offset 0x79000) (_ZN8nkentseu13NkEventSystem16AddEventCallbackINS_21NkHidButtonPressEventEEEvNSt6__ndk18functionIFvPT_EEEy+638)
+    #01 pc 000862f1  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so (offset 0x79000) (_ZN8nkentseu13NkEventSystem16AddEventCallbackINS_21NkHidButtonPressEventEEEvNSt6__ndk18functionIFvPT_EEEy+177)
+    #02 pc 000863b8  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so (offset 0x79000) (_ZN8nkentseu13NkEventSystem16AddEventCallbackINS_21NkHidButtonPressEventEEEvNSt6__ndk18functionIFvPT_EEEy+376)
+    #03 pc 0008494d  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so (offset 0x79000) (_ZNKSt6__ndk110__function12__alloc_funcIZ6nkmainRKN8nkentseu12NkEntryStateEE3$_4NS_9allocatorIS6_EEFvPNS2_14NkHidAxisEventEEE15__get_allocatorB8ne180000Ev+29)
+    #04 pc 000796bf  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so (offset 0x79000)
+
+stack:
+         cc184680  f4db9dbc  <anonymous:f4db7000>
+         cc184684  f4db9dbc  <anonymous:f4db7000>
+         cc184688  cc1846e8  <anonymous:cc089000>
+         cc18468c  f4d761e1  /system/lib/libc.so
+         cc184690  ecdd5b90  <anonymous:ecd80000>
+         cc184694  ec8e8184  <anonymous:ec880000>
+         cc184698  e6eba3bb  /system/framework/framework-res.apk
+         cc18469c  cc1846b8  <anonymous:cc089000>
+         cc1846a0  00000000
+         cc1846a4  f3361a00  <anonymous:f3280000>
+         cc1846a8  cc308126  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so
+         cc1846ac  f2dcccc1  /system/lib/libart.so (_ZN3art22IndirectReferenceTable6RemoveENS_15IRTSegmentStateEPv+17)
+         cc1846b0  ec8e8180  <anonymous:ec880000>
+         cc1846b4  f4db2734  /system/lib/libc.so
+         cc1846b8  f322985c  /system/lib/libart.so
+         cc1846bc  cc34940e  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so (_ZN8nkentseu13NkEventSystem16AddEventCallbackINS_21NkHidButtonPressEventEEEvNSt6__ndk18functionIFvPT_EEEy+462)
+    #00  cc1846c0  f4a11000
+         ........  ........
+    #01  cc184720  cc184848  <anonymous:cc089000>
+         ........  ........
+    #02  cc184750  cc184848  <anonymous:cc089000>
+         ........  ........
+    #03  cc184790  cc184848  <anonymous:cc089000>
+         ........  ........
+    #04  cc1847b0  cc184848  <anonymous:cc089000>
+         cc1847b4  cc18487c  <anonymous:cc089000>
+         cc1847b8  ecdd5b90  <anonymous:ecd80000>
+         cc1847bc  cc308126  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so
+         cc1847c0  00000001
+         cc1847c4  00000021
+         cc1847c8  00000000
+         cc1847cc  ecdd5b90  <anonymous:ecd80000>
+         cc1847d0  00000019
+         cc1847d4  7171a370  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         cc1847d8  00000001
+         cc1847dc  00000000
+         cc1847e0  cc3d13ac  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so
+         cc1847e4  f3287e34  <anonymous:f3280000>
+         cc1847e8  00000021
+         cc1847ec  00000021
+
+memory near eax:
+    5a5cf7e0 -------- -------- -------- --------  ................
+    5a5cf7f0 -------- -------- -------- --------  ................
+    5a5cf800 -------- -------- -------- --------  ................
+    5a5cf810 -------- -------- -------- --------  ................
+    5a5cf820 -------- -------- -------- --------  ................
+    5a5cf830 -------- -------- -------- --------  ................
+    5a5cf840 -------- -------- -------- --------  ................
+    5a5cf850 -------- -------- -------- --------  ................
+    5a5cf860 -------- -------- -------- --------  ................
+    5a5cf870 -------- -------- -------- --------  ................
+    5a5cf880 -------- -------- -------- --------  ................
+    5a5cf890 -------- -------- -------- --------  ................
+    5a5cf8a0 -------- -------- -------- --------  ................
+    5a5cf8b0 -------- -------- -------- --------  ................
+    5a5cf8c0 -------- -------- -------- --------  ................
+    5a5cf8d0 -------- -------- -------- --------  ................
+
+memory near ebx (/data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so):
+    cc3d138c cc3d0df8 cc3d0e24 cc3d0e50 cc3d0e7c  ..=.$.=.P.=.|.=.
+    cc3d139c cc3d0ea8 cc3d0ed4 cc3c4220 f4db4200  ..=...=. B<..B..
+    cc3d13ac 0010f094 00000000 00000000 f4d57ef0  .............~..
+    cc3d13bc f4d57d90 f4d534d0 f76dab90 ef8adf90  .}...4....m.....
+    cc3d13cc ef8adff0 ef8ad870 ef8ad820 ef8b1dc0  ....p... .......
+    cc3d13dc ef8ad1e0 ef8ad1a0 ef8ae020 ef8adf30  ........ ...0...
+    cc3d13ec ef8b1e20 ef8b1d60 ef8ad260 ef8ad910   ...`...`.......
+    cc3d13fc ef8ae370 ef8b1ee0 ef8b1f50 ef8ad2a0  p.......P.......
+    cc3d140c ef8ad340 ef8ad1c0 ef8ad000 ef8ad850  @...........P...
+    cc3d141c ef8ad180 ef8ae0d0 ef8adc40 ef8b1d90  ........@.......
+    cc3d142c ef8ada90 ef8ad360 ef8adac0 ef8ad2c0  ....`...........
+    cc3d143c ef8acf30 ef8ad9f0 ef8ada30 ef8ad160  0.......0...`...
+    cc3d144c ef8ada60 ef8adef0 ef8ad300 ef8ad240  `...........@...
+    cc3d145c ef8ad200 ef8b1f80 ef8ad860 ef8ad280  ........`.......
+    cc3d146c ef8ad8b0 ef8ad9e0 ef8acfd0 ef8ad2e0  ................
+    cc3d147c ef8ad890 ef8ae1c0 ef8ad220 cc33c2c0  ........ .....3.
+
+memory near edx:
+    7fffffdc -------- -------- -------- --------  ................
+    7fffffec -------- -------- -------- --------  ................
+    7ffffffc -------- -------- -------- --------  ................
+    8000000c -------- -------- -------- --------  ................
+    8000001c -------- -------- -------- --------  ................
+    8000002c -------- -------- -------- --------  ................
+    8000003c -------- -------- -------- --------  ................
+    8000004c -------- -------- -------- --------  ................
+    8000005c -------- -------- -------- --------  ................
+    8000006c -------- -------- -------- --------  ................
+    8000007c -------- -------- -------- --------  ................
+    8000008c -------- -------- -------- --------  ................
+    8000009c -------- -------- -------- --------  ................
+    800000ac -------- -------- -------- --------  ................
+    800000bc -------- -------- -------- --------  ................
+    800000cc -------- -------- -------- --------  ................
+
+memory near ebp (<anonymous:cc089000>):
+    cc1846f8 cc184748 cc34980a f58b2ea2 ec8c9a80  HG....4.........
+    cc184708 f58b2ea2 ec8c9a80 cc184970 cc3d13ac  ........pI....=.
+    cc184718 cc184748 cc3492f2 cc184848 f58b2ea2  HG....4.HH......
+    cc184728 ec8c9a80 ec8c9a80 cc3d13ac cc184848  ..........=.HH..
+    cc184738 f58b2ea2 ec8c9a80 ec8c9a80 cc3d13ac  ..............=.
+    cc184748 cc184788 cc3493b9 cc184848 f58b2ea2  .G....4.HH......
+    cc184758 ec8c9a80 cc34929d 00430000 f322985c  ......4...C.\.".
+    cc184768 f58b2ea2 ec8c9a80 cc3d13ac cc184848  ..........=.HH..
+    cc184778 f58b2ea2 ec8c9a80 ecdd5b90 cc3d13ac  .........[....=.
+    cc184788 cc1847a8 cc34794e cc184848 cc18487c  .G..Ny4.HH..|H..
+    cc184798 00000000 cc3d13ac cc184848 cc3d13ac  ......=.HH....=.
+    cc1847a8 cc1848c8 cc33c6c0 cc184848 cc18487c  .H....3.HH..|H..
+    cc1847b8 ecdd5b90 cc308126 00000001 00000021  .[..&.0.....!...
+    cc1847c8 00000000 ecdd5b90 00000019 7171a370  .....[......p.qq
+    cc1847d8 00000001 00000000 cc3d13ac f3287e34  ..........=.4~(.
+    cc1847e8 00000021 00000021 00000001 00000001  !...!...........
+
+memory near edi:
+    5a5cf80c -------- -------- -------- --------  ................
+    5a5cf81c -------- -------- -------- --------  ................
+    5a5cf82c -------- -------- -------- --------  ................
+    5a5cf83c -------- -------- -------- --------  ................
+    5a5cf84c -------- -------- -------- --------  ................
+    5a5cf85c -------- -------- -------- --------  ................
+    5a5cf86c -------- -------- -------- --------  ................
+    5a5cf87c -------- -------- -------- --------  ................
+    5a5cf88c -------- -------- -------- --------  ................
+    5a5cf89c -------- -------- -------- --------  ................
+    5a5cf8ac -------- -------- -------- --------  ................
+    5a5cf8bc -------- -------- -------- --------  ................
+    5a5cf8cc -------- -------- -------- --------  ................
+    5a5cf8dc -------- -------- -------- --------  ................
+    5a5cf8ec -------- -------- -------- --------  ................
+    5a5cf8fc -------- -------- -------- --------  ................
+
+memory near esi:
+    0a18be40 -------- -------- -------- --------  ................
+    0a18be50 -------- -------- -------- --------  ................
+    0a18be60 -------- -------- -------- --------  ................
+    0a18be70 -------- -------- -------- --------  ................
+    0a18be80 -------- -------- -------- --------  ................
+    0a18be90 -------- -------- -------- --------  ................
+    0a18bea0 -------- -------- -------- --------  ................
+    0a18beb0 -------- -------- -------- --------  ................
+    0a18bec0 -------- -------- -------- --------  ................
+    0a18bed0 -------- -------- -------- --------  ................
+    0a18bee0 -------- -------- -------- --------  ................
+    0a18bef0 -------- -------- -------- --------  ................
+    0a18bf00 -------- -------- -------- --------  ................
+    0a18bf10 -------- -------- -------- --------  ................
+    0a18bf20 -------- -------- -------- --------  ................
+    0a18bf30 -------- -------- -------- --------  ................
+
+memory near esp (<anonymous:cc089000>):
+    cc1846a0 00000000 f3361a00 cc308126 f2dcccc1  ......6.&.0.....
+    cc1846b0 ec8e8180 f4db2734 f322985c cc34940e  ....4'..\."...4.
+    cc1846c0 f4a11000 f4db9dbc cc3d13ac cc3be04b  ..........=.K.;.
+    cc1846d0 00000000 f4db9dbc 00000001 00000000  ................
+    cc1846e0 ecdd5e00 ec8c9a80 7fffffff cc3d13ac  .^............=.
+    cc1846f0 cc184848 ecdd5b90 cc184748 cc34980a  HH...[..HG....4.
+    cc184700 f58b2ea2 ec8c9a80 f58b2ea2 ec8c9a80  ................
+    cc184710 cc184970 cc3d13ac cc184748 cc3492f2  pI....=.HG....4.
+    cc184720 cc184848 f58b2ea2 ec8c9a80 ec8c9a80  HH..............
+    cc184730 cc3d13ac cc184848 f58b2ea2 ec8c9a80  ..=.HH..........
+    cc184740 ec8c9a80 cc3d13ac cc184788 cc3493b9  ......=..G....4.
+    cc184750 cc184848 f58b2ea2 ec8c9a80 cc34929d  HH............4.
+    cc184760 00430000 f322985c f58b2ea2 ec8c9a80  ..C.\.".........
+    cc184770 cc3d13ac cc184848 f58b2ea2 ec8c9a80  ..=.HH..........
+    cc184780 ecdd5b90 cc3d13ac cc1847a8 cc34794e  .[....=..G..Ny4.
+    cc184790 cc184848 cc18487c 00000000 cc3d13ac  HH..|H........=.
+
+memory near eip (/data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so):
+    cc34949c 8be8458b 4d89ec4d 0030b9cc e1f70000  .E..M..M..0.....
+    cc3494ac 458bc689 8bd789cc 048dd055 04e0c140  ...E....U...@...
+    cc3494bc 028bc701 8908408b 087989e1 89047189  .....@....y..q..
+    cc3494cc 1041c711 00000000 040c41c7 ff000000  ..A......A......
+    cc3494dc e44589d0 00e47d83 0071850f 5d8b0000  ..E..}....q....]
+    cc3494ec c7e089d4 00001000 f646e800 5d8b0007  ..........F....]
+    cc3494fc 89c189d4 c84589c8 8be8558b e089ec75  ......E..U..u...
+    cc34950c 89087089 08890450 07f637e8 0000e900  .p..P....7......
+    cc34951c 5d8b0000 c84d8bd4 fdf0838b d231ffff  ...]..M.......1.
+    cc34952c 89240c89 c7042444 00082444 e8000000  ..$.D$..D$......
+    cc34953c 0007f620 89d45d8b c8458bc1 89e04d89   ....]....E..M..
+    cc34954c 0489dc55 f61ae824 88e90007 8b000000  U...$...........
+    cc34955c 3883d845 62840f00 8b000000 458bd45d  E..8...b....]..E
+    cc34956c e4558bd8 788b308b 08488b04 4889e089  ..U..0.x..H....H
+    cc34957c d84d8b10 890c7889 50890870 e8088904  ..M..x..p..P....
+    cc34958c 0007f5f0 8bd45d8b 028bd855 8904728b  .....]..U....r..
+
+memory map (1564 entries): (fault address prefixed with --->)
+    12c00000-32bfffff rw-         0  20000000  /dev/ashmem/dalvik-main space (region space) (deleted)
+    5655d000-56561fff r-x         0      5000  /system/bin/app_process32 (BuildId: f6da4abad817224be9a5dadd4700ee1d)
+    56562000-56562fff r--      4000      1000  /system/bin/app_process32
+    56563000-56563fff rw-         0      1000
+    70c7f000-70ea3fff rw-         0    225000  /data/dalvik-cache/x86/system@framework@boot.art
+    70ea4000-70eb9fff r--    225000     16000  /data/dalvik-cache/x86/system@framework@boot.art
+    70eba000-70fb0fff rw-         0     f7000  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+    70fb1000-70fc2fff r--     f7000     12000  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+    70fc3000-70ff3fff rw-         0     31000  /data/dalvik-cache/x86/system@framework@boot-conscrypt.art
+    70ff4000-70ff6fff r--     31000      3000  /data/dalvik-cache/x86/system@framework@boot-conscrypt.art
+    70ff7000-71023fff rw-         0     2d000  /data/dalvik-cache/x86/system@framework@boot-okhttp.art
+    71024000-71026fff r--     2d000      3000  /data/dalvik-cache/x86/system@framework@boot-okhttp.art
+    71027000-7107cfff rw-         0     56000  /data/dalvik-cache/x86/system@framework@boot-bouncycastle.art
+    7107d000-71083fff r--     56000      7000  /data/dalvik-cache/x86/system@framework@boot-bouncycastle.art
+    71084000-710d8fff rw-         0     55000  /data/dalvik-cache/x86/system@framework@boot-apache-xml.art
+    710d9000-710dffff r--     55000      7000  /data/dalvik-cache/x86/system@framework@boot-apache-xml.art
+    710e0000-7111afff rw-         0     3b000  /data/dalvik-cache/x86/system@framework@boot-ext.art
+    7111b000-71125fff r--     3b000      b000  /data/dalvik-cache/x86/system@framework@boot-ext.art
+    71126000-71928fff rw-         0    803000  /data/dalvik-cache/x86/system@framework@boot-framework.art
+    71929000-71988fff r--    803000     60000  /data/dalvik-cache/x86/system@framework@boot-framework.art
+    71989000-71a6afff rw-         0     e2000  /data/dalvik-cache/x86/system@framework@boot-telephony-common.art
+    71a6b000-71a7cfff r--     e2000     12000  /data/dalvik-cache/x86/system@framework@boot-telephony-common.art
+    71a7d000-71a87fff rw-         0      b000  /data/dalvik-cache/x86/system@framework@boot-voip-common.art
+    71a88000-71a89fff r--      b000      2000  /data/dalvik-cache/x86/system@framework@boot-voip-common.art
+    71a8a000-71a9efff rw-         0     15000  /data/dalvik-cache/x86/system@framework@boot-ims-common.art
+    71a9f000-71aa0fff r--     15000      2000  /data/dalvik-cache/x86/system@framework@boot-ims-common.art
+    71aa1000-71aa3fff rw-         0      3000  /data/dalvik-cache/x86/system@framework@boot-android.hidl.base-V1.0-java.art
+    71aa4000-71aa7fff rw-         0      4000  /data/dalvik-cache/x86/system@framework@boot-android.hidl.manager-V1.0-java.art
+    71aa8000-71aa9fff r--      4000      2000  /data/dalvik-cache/x86/system@framework@boot-android.hidl.manager-V1.0-java.art
+    71aaa000-71aaafff rw-         0      1000  /data/dalvik-cache/x86/system@framework@boot-framework-oahl-backward-compatibility.art
+    71aab000-71aabfff r--      1000      1000  /data/dalvik-cache/x86/system@framework@boot-framework-oahl-backward-compatibility.art
+    71aac000-71aaefff rw-         0      3000  /data/dalvik-cache/x86/system@framework@boot-android.test.base.art
+    71aaf000-71ab0fff r--      3000      2000  /data/dalvik-cache/x86/system@framework@boot-android.test.base.art
+    71ab1000-71bc4fff r--         0    114000  /system/framework/x86/boot.oat (BuildId: 54de4b0e132c146c2159702d458069c01bcb03d6)
+    71bc5000-71f25fff r-x    114000    361000  /system/framework/x86/boot.oat
+    71f26000-71f26fff rw-         0      1000
+    71f27000-723a4fff r--         0    47e000  /system/framework/boot.vdex
+    723a5000-723a5fff r--    475000      1000  /system/framework/x86/boot.oat
+    723a6000-723a6fff rw-    476000      1000  /system/framework/x86/boot.oat
+    723a7000-72420fff r--         0     7a000  /system/framework/x86/boot-core-libart.oat (BuildId: 8609cfcf18b2ecced8827324f38e3f406cef3818)
+    72421000-72573fff r-x     7a000    153000  /system/framework/x86/boot-core-libart.oat
+    72574000-72574fff rw-         0      1000
+    72575000-7286cfff r--         0    2f8000  /system/framework/boot-core-libart.vdex
+    7286d000-7286dfff r--    1cd000      1000  /system/framework/x86/boot-core-libart.oat
+    7286e000-7286efff rw-    1ce000      1000  /system/framework/x86/boot-core-libart.oat
+    7286f000-72881fff r--         0     13000  /system/framework/x86/boot-conscrypt.oat (BuildId: 965d4f01903fbd8d8bd3f3a7ce968131c4396a90)
+    72882000-728b2fff r-x     13000     31000  /system/framework/x86/boot-conscrypt.oat
+    728b3000-728b3fff rw-         0      1000
+    728b4000-72914fff r--         0     61000  /system/framework/boot-conscrypt.vdex
+    72915000-72915fff r--     44000      1000  /system/framework/x86/boot-conscrypt.oat
+    72916000-72916fff rw-     45000      1000  /system/framework/x86/boot-conscrypt.oat
+    72917000-72930fff r--         0     1a000  /system/framework/x86/boot-okhttp.oat (BuildId: 090bc48aad4bf1fd2c422f02e715b04c580d3ab8)
+    72931000-72974fff r-x     1a000     44000  /system/framework/x86/boot-okhttp.oat
+    72975000-72975fff rw-         0      1000
+    72976000-729d4fff r--         0     5f000  /system/framework/boot-okhttp.vdex
+    729d5000-729d5fff r--     5e000      1000  /system/framework/x86/boot-okhttp.oat
+    729d6000-729d6fff rw-     5f000      1000  /system/framework/x86/boot-okhttp.oat
+    729d7000-729effff r--         0     19000  /system/framework/x86/boot-bouncycastle.oat (BuildId: faa73465e49635453be5ba2a94bd05e3286de69f)
+    729f0000-72a2afff r-x     19000     3b000  /system/framework/x86/boot-bouncycastle.oat
+    72a2b000-72a2bfff rw-         0      1000
+    72a2c000-72b6dfff r--         0    142000  /system/framework/boot-bouncycastle.vdex
+    72b6e000-72b6efff r--     54000      1000  /system/framework/x86/boot-bouncycastle.oat
+    72b6f000-72b6ffff rw-     55000      1000  /system/framework/x86/boot-bouncycastle.oat
+    72b70000-72b7cfff r--         0      d000  /system/framework/x86/boot-apache-xml.oat (BuildId: 89beefe21def11d8df95a453dfac107c654db545)
+    72b7d000-72b96fff r-x      d000     1a000  /system/framework/x86/boot-apache-xml.oat
+    72b97000-72b97fff rw-         0      1000
+    72b98000-72cb9fff r--         0    122000  /system/framework/boot-apache-xml.vdex
+    72cba000-72cbafff r--     27000      1000  /system/framework/x86/boot-apache-xml.oat
+    72cbb000-72cbbfff rw-     28000      1000  /system/framework/x86/boot-apache-xml.oat
+    72cbc000-72cc9fff r--         0      e000  /system/framework/x86/boot-ext.oat (BuildId: e0913e7f82cd41b0708aad59d9d50d1b004ded21)
+    72cca000-72ce4fff r-x      e000     1b000  /system/framework/x86/boot-ext.oat
+    72ce5000-72ce5fff rw-         0      1000
+    72ce6000-72dd0fff r--         0     eb000  /system/framework/boot-ext.vdex
+    72dd1000-72dd1fff r--     29000      1000  /system/framework/x86/boot-ext.oat
+    72dd2000-72dd2fff rw-     2a000      1000  /system/framework/x86/boot-ext.oat
+    72dd3000-7319dfff r--         0    3cb000  /system/framework/x86/boot-framework.oat (BuildId: 7509d02d49ca4823f609a09c9e832b6adb30ec41)
+    7319e000-73c03fff r-x    3cb000    a66000  /system/framework/x86/boot-framework.oat
+    73c04000-73c05fff rw-         0      2000
+    73c06000-74fb6fff r--         0   13b1000  /system/framework/boot-framework.vdex
+    74fb7000-74fb7fff r--    e31000      1000  /system/framework/x86/boot-framework.oat
+    74fb8000-74fb8fff rw-    e32000      1000  /system/framework/x86/boot-framework.oat
+    74fb9000-7503efff r--         0     86000  /system/framework/x86/boot-telephony-common.oat (BuildId: 143f03b023a330832d75cd73595758cc9eaaaca1)
+    7503f000-7519afff r-x     86000    15c000  /system/framework/x86/boot-telephony-common.oat
+    7519b000-7519bfff rw-         0      1000
+    7519c000-7546cfff r--         0    2d1000  /system/framework/boot-telephony-common.vdex
+    7546d000-7546dfff r--    1e2000      1000  /system/framework/x86/boot-telephony-common.oat
+    7546e000-7546efff rw-    1e3000      1000  /system/framework/x86/boot-telephony-common.oat
+    7546f000-75471fff r--         0      3000  /system/framework/x86/boot-voip-common.oat (BuildId: d66a025766a890c2ed1fc182f5b30cb87a2488a2)
+    75472000-75472fff r-x      3000      1000  /system/framework/x86/boot-voip-common.oat
+    75473000-75473fff rw-         0      1000
+    75474000-75498fff r--         0     25000  /system/framework/boot-voip-common.vdex
+    75499000-75499fff r--      4000      1000  /system/framework/x86/boot-voip-common.oat
+    7549a000-7549afff rw-      5000      1000  /system/framework/x86/boot-voip-common.oat
+    7549b000-754a2fff r--         0      8000  /system/framework/x86/boot-ims-common.oat (BuildId: 53d0b1a7f37cf8e1d78f80b4572946c6b8519700)
+    754a3000-754b1fff r-x      8000      f000  /system/framework/x86/boot-ims-common.oat
+    754b2000-754b2fff rw-         0      1000
+    754b3000-754d3fff r--         0     21000  /system/framework/boot-ims-common.vdex
+    754d4000-754d4fff r--     17000      1000  /system/framework/x86/boot-ims-common.oat
+    754d5000-754d5fff rw-     18000      1000  /system/framework/x86/boot-ims-common.oat
+    754d6000-754d8fff r--         0      3000  /system/framework/x86/boot-android.hidl.base-V1.0-java.oat (BuildId: d02ee84098e8f7c707aaae3f4ebe007b6f13806f)
+    754d9000-754d9fff r-x      3000      1000  /system/framework/x86/boot-android.hidl.base-V1.0-java.oat
+    754da000-754e0fff r--         0      7000  /system/framework/boot-android.hidl.base-V1.0-java.vdex
+    754e1000-754e1fff r--      4000      1000  /system/framework/x86/boot-android.hidl.base-V1.0-java.oat
+    754e2000-754e2fff rw-      5000      1000  /system/framework/x86/boot-android.hidl.base-V1.0-java.oat
+    754e3000-754e5fff r--         0      3000  /system/framework/x86/boot-android.hidl.manager-V1.0-java.oat (BuildId: 0376b4ca3c236412569b30ac8f43df3f8fb936b7)
+    754e6000-754e7fff r-x      3000      2000  /system/framework/x86/boot-android.hidl.manager-V1.0-java.oat
+    754e8000-754f2fff r--         0      b000  /system/framework/boot-android.hidl.manager-V1.0-java.vdex
+    754f3000-754f3fff r--      5000      1000  /system/framework/x86/boot-android.hidl.manager-V1.0-java.oat
+    754f4000-754f4fff rw-      6000      1000  /system/framework/x86/boot-android.hidl.manager-V1.0-java.oat
+    754f5000-754f7fff r--         0      3000  /system/framework/x86/boot-framework-oahl-backward-compatibility.oat (BuildId: b38afbed379b92aa593ba4165347c004cd87d831)
+    754f8000-754f8fff r-x      3000      1000  /system/framework/x86/boot-framework-oahl-backward-compatibility.oat
+    754f9000-754f9fff r--         0      1000  /system/framework/boot-framework-oahl-backward-compatibility.vdex
+    754fa000-754fafff r--      4000      1000  /system/framework/x86/boot-framework-oahl-backward-compatibility.oat
+    754fb000-754fbfff rw-      5000      1000  /system/framework/x86/boot-framework-oahl-backward-compatibility.oat
+    754fc000-754fefff r--         0      3000  /system/framework/x86/boot-android.test.base.oat (BuildId: 820125fe99e0b16e680da705441c48b6f299e220)
+    754ff000-754fffff r-x      3000      1000  /system/framework/x86/boot-android.test.base.oat
+    75500000-75507fff r--         0      8000  /system/framework/boot-android.test.base.vdex
+    75508000-75508fff r--      4000      1000  /system/framework/x86/boot-android.test.base.oat
+    75509000-75509fff rw-      5000      1000  /system/framework/x86/boot-android.test.base.oat
+    7550a000-7565efff rw-         0    155000  /dev/ashmem/dalvik-zygote space (deleted)
+    7565f000-7565ffff rw-         0      1000  /dev/ashmem/dalvik-non moving space (deleted)
+    75660000-75662fff rw-      1000      3000  /dev/ashmem/dalvik-non moving space (deleted)
+    75663000-7850afff ---      4000   2ea8000  /dev/ashmem/dalvik-non moving space (deleted)
+    7850b000-79509fff rw-   2eac000    fff000  /dev/ashmem/dalvik-non moving space (deleted)
+--->Fault address falls at 7fffffff between mapped regions
+    cc087000-cc087fff ---         0      1000
+    cc088000-cc088fff ---         0      1000
+    cc089000-cc184fff rw-         0     fc000
+    cc185000-cc219fff r--         0     95000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libc++_shared.so (BuildId: 8573915238d3b6a27bcc7434f639b7a909a3fb54)
+    cc21a000-cc2b3fff r-x     94000     9a000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libc++_shared.so
+    cc2b4000-cc2b8fff r--    12d000      5000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libc++_shared.so
+    cc2b9000-cc2b9fff rw-    131000      1000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libc++_shared.so
+    cc2ba000-cc2bffff rw-         0      6000
+    cc2c2000-cc33bfff r--         0     7a000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so
+    cc33c000-cc3cefff r-x     79000     93000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so
+    cc3cf000-cc3d2fff r--    10b000      4000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so
+    cc3d3000-cc3d3fff rw-    10e000      1000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/lib/x86/libSandboxGamepadPS3.so
+    cc3d4000-cc3dbfff rw-         0      8000
+    cc400000-cc47ffff rw-         0     80000
+    cc49e000-ce49dfff rw-         0   2000000  /dev/ashmem/dalvik-data-code-cache (deleted)
+    ce49e000-d049dfff r-x         0   2000000  /dev/ashmem/dalvik-jit-code-cache (deleted)
+    d049e000-e577ffff ---         0  152e2000
+    e5780000-e5781fff r-x         0      2000  /system/lib/libwebviewchromium_loader.so (BuildId: 35a27165fbbe848ecafeaa55d1931a0e)
+    e5782000-e5782fff r--      1000      1000  /system/lib/libwebviewchromium_loader.so
+    e5783000-e5783fff rw-      2000      1000  /system/lib/libwebviewchromium_loader.so
+    e57d2000-e5d51fff r-x         0    580000  /system/vendor/lib/libvulkan_enc.so (BuildId: 2a92f2f36176e6ee0ee71c02f780cfd4) (load bias 0x7000)
+    e5d52000-e5d5bfff r--    57f000      a000  /system/vendor/lib/libvulkan_enc.so (load bias 0x7000)
+    e5d5c000-e5d5cfff rw-    589000      1000  /system/vendor/lib/libvulkan_enc.so (load bias 0x7000)
+    e5dad000-e5dbafff r-x         0      e000  /system/vendor/lib/lib_renderControl_enc2.so (BuildId: 5054243ef9ace61047ad6dadf7be84c6)
+    e5dbb000-e5dbbfff r--      d000      1000  /system/vendor/lib/lib_renderControl_enc2.so
+    e5dbc000-e5dbcfff rw-      e000      1000  /system/vendor/lib/lib_renderControl_enc2.so
+    e5dc3000-e5df5fff r-x         0     33000  /system/vendor/lib/libOpenglCodecCommon2.so (BuildId: d25840315b482a5e02f8986e7eddde55)
+    e5df6000-e5df6fff r--     32000      1000  /system/vendor/lib/libOpenglCodecCommon2.so
+    e5df7000-e5df7fff rw-     33000      1000  /system/vendor/lib/libOpenglCodecCommon2.so
+    e5e17000-e5e27fff r-x         0     11000  /system/lib/libdrm.so (BuildId: 184f8b05a28834aec1593ba048d321aa)
+    e5e28000-e5e28fff ---         0      1000
+    e5e29000-e5e29fff r--     11000      1000  /system/lib/libdrm.so
+    e5e2a000-e5e2afff rw-     12000      1000  /system/lib/libdrm.so
+    e5e40000-e5e71fff r-x         0     32000  /system/vendor/lib/libGLESv1_enc2.so (BuildId: 99068739f670dc4ba802ab379cd63fd3)
+    e5e72000-e5e72fff r--     31000      1000  /system/vendor/lib/libGLESv1_enc2.so
+    e5e73000-e5e73fff rw-     32000      1000  /system/vendor/lib/libGLESv1_enc2.so
+    e5eb5000-e7a72fff r--    989000   1bbe000  /system/framework/framework-res.apk
+    e7a73000-e920ffff r--         0   179d000  /system/fonts/NotoSerifCJK-Regular.ttc
+    e9210000-ea3dffff r--         0   11d0000  /system/fonts/NotoSansCJK-Regular.ttc
+    ea3e0000-ebad5fff r--         0   16f6000  /system/usr/icu/icudt60l.dat
+    ebad6000-ebad6fff ---         0      1000  /dev/ashmem/dalvik-Sentinel fault page (deleted)
+    ebb05000-ebb1cfff r-x         0     18000  /system/vendor/lib/libOpenglSystemCommon2.so (BuildId: c8206998d32d499f345999ab4db6c956)
+    ebb1d000-ebb1dfff r--     17000      1000  /system/vendor/lib/libOpenglSystemCommon2.so
+    ebb1e000-ebb1efff rw-     18000      1000  /system/vendor/lib/libOpenglSystemCommon2.so
+    ebb5f000-ebb75fff r-x         0     17000  /system/vendor/lib/egl/lib2EGL_emulation.so (BuildId: 299fe23d61dd56049070173964442185)
+    ebb76000-ebb76fff ---         0      1000
+    ebb77000-ebb77fff r--     17000      1000  /system/vendor/lib/egl/lib2EGL_emulation.so
+    ebb78000-ebb78fff rw-     18000      1000  /system/vendor/lib/egl/lib2EGL_emulation.so
+    ebb80000-ebbfffff rw-         0     80000
+    ebc41000-ebc41fff r-x         0      1000  /system/vendor/lib/libGoldfishProfiler2.so (BuildId: 8669bd2f7a8fe8bf954910af6558e9e3)
+    ebc42000-ebc42fff r--         0      1000  /system/vendor/lib/libGoldfishProfiler2.so (BuildId: 8669bd2f7a8fe8bf954910af6558e9e3)
+    ebc43000-ebc43fff rw-      1000      1000  /system/vendor/lib/libGoldfishProfiler2.so
+    ebc8b000-ebd12fff r-x         0     88000  /system/vendor/lib/libGLESv2_enc2.so (BuildId: 816246c09043ce06a4e0de2c89da5852)
+    ebd13000-ebd13fff ---         0      1000
+    ebd14000-ebd14fff r--     88000      1000  /system/vendor/lib/libGLESv2_enc2.so
+    ebd15000-ebd15fff rw-     89000      1000  /system/vendor/lib/libGLESv2_enc2.so
+    ebd46000-ebd5dfff r-x         0     18000  /system/vendor/lib/libandroidemu2.so (BuildId: ef89b19eee50d425694908ffafcb6d4a)
+    ebd5e000-ebd5efff r--     17000      1000  /system/vendor/lib/libandroidemu2.so
+    ebd5f000-ebd5ffff rw-     18000      1000  /system/vendor/lib/libandroidemu2.so
+    ebd73000-ebdc0fff r--         0     4e000  /system/usr/hyphen-data/hyph-hu.hyb
+    ebdc1000-ebde0fff r-x         0     20000  /system/lib/libcompiler_rt.so (BuildId: 7790c37cd20022e8a7307bf77c2926b5)
+    ebde1000-ebde1fff r--     1f000      1000  /system/lib/libcompiler_rt.so
+    ebde2000-ebde2fff rw-     20000      1000  /system/lib/libcompiler_rt.so
+    ebde3000-ebdf5fff rw-         0     13000
+    ebe16000-ebe2efff r-x         0     19000  /system/vendor/lib/egl/lib2GLESv2_emulation.so (BuildId: 61ad6b961a1a091b6307424a48a789fc) (load bias 0x1000)
+    ebe2f000-ebe2ffff ---         0      1000
+    ebe30000-ebe31fff r--     19000      2000  /system/vendor/lib/egl/lib2GLESv2_emulation.so (load bias 0x1000)
+    ebe32000-ebe32fff rw-     1b000      1000  /system/vendor/lib/egl/lib2GLESv2_emulation.so (load bias 0x1000)
+    ebe47000-ebe57fff r-x         0     11000  /system/vendor/lib/egl/lib2GLESv1_CM_emulation.so (BuildId: 4ec495b74fade6a92346c0cab46c9ec5)
+    ebe58000-ebe58fff ---         0      1000
+    ebe59000-ebe59fff r--     11000      1000  /system/vendor/lib/egl/lib2GLESv1_CM_emulation.so
+    ebe5a000-ebe5afff rw-     12000      1000  /system/vendor/lib/egl/lib2GLESv1_CM_emulation.so
+    ebe89000-ebe8efff r-x         0      6000  /system/vendor/lib/hw/android.hardware.graphics.mapper@2.0-impl.so (BuildId: 7fa1a25620d863f5e107682a8a4570ba)
+    ebe8f000-ebe8ffff r--      5000      1000  /system/vendor/lib/hw/android.hardware.graphics.mapper@2.0-impl.so
+    ebe90000-ebe90fff rw-      6000      1000  /system/vendor/lib/hw/android.hardware.graphics.mapper@2.0-impl.so
+    ebec5000-ebf7ffff r--   267e000     bb000  /system/framework/framework-res.apk
+    ebf80000-ebfbcfff r-x         0     3d000  /system/lib/libjavacrypto.so (BuildId: 3aad264b81c3b5bf22935ea829287af2) (load bias 0x1000)
+    ebfbd000-ebfbdfff ---         0      1000
+    ebfbe000-ebfbefff r--     3d000      1000  /system/lib/libjavacrypto.so (load bias 0x1000)
+    ebfbf000-ebfbffff rw-     3e000      1000  /system/lib/libjavacrypto.so (load bias 0x1000)
+    ebfec000-ebff6fff r-x         0      b000  /system/lib/libsoundpool.so (BuildId: b492f32db00a98c79dc9781966982aed)
+    ebff7000-ebff7fff r--      a000      1000  /system/lib/libsoundpool.so
+    ebff8000-ebff8fff rw-      b000      1000  /system/lib/libsoundpool.so
+    ec02e000-ec096fff rw-         0     69000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    ec097000-ec111fff r--         0     7b000  /system/usr/share/zoneinfo/tzdata
+    ec112000-ec87ffff r--         0    76e000  /system/fonts/NotoColorEmoji.ttf
+    ec880000-ec8fffff rw-         0     80000
+    ec949000-ec9f6fff r--         0     ae000  /system/fonts/NotoSansSymbols-Regular-Subsetted.ttf
+    ec9f7000-eca52fff r--         0     5c000  /system/fonts/NotoSansTibetan-Bold.ttf
+    eca53000-ecab5fff r--         0     63000  /system/fonts/NotoSansTibetan-Regular.ttf
+    ecab6000-ecb31fff r--         0     7c000  /system/fonts/NotoSansEgyptianHieroglyphs-Regular.ttf
+    ecb32000-ecbacfff r--         0     7b000  /system/fonts/NotoSansCuneiform-Regular.ttf
+    ecbad000-ecbfdfff r--         0     51000  /system/fonts/RobotoCondensed-BoldItalic.ttf
+    ecbfe000-ecc48fff r--         0     4b000  /system/fonts/RobotoCondensed-Bold.ttf
+    ecc49000-ecc99fff r--         0     51000  /system/fonts/RobotoCondensed-MediumItalic.ttf
+    ecc9a000-ecce4fff r--         0     4b000  /system/fonts/RobotoCondensed-Medium.ttf
+    ecce5000-ecd35fff r--         0     51000  /system/fonts/RobotoCondensed-Italic.ttf
+    ecd36000-ecd7ffff r--         0     4a000  /system/fonts/RobotoCondensed-Regular.ttf
+    ecd80000-ecf7ffff rw-         0    200000
+    ecf96000-ecfe7fff r--         0     52000  /system/fonts/RobotoCondensed-LightItalic.ttf
+    ed00e000-ed00efff ---         0      1000
+    ed00f000-ed00ffff ---         0      1000
+    ed010000-ed10bfff rw-         0     fc000
+    ed10c000-ed10cfff ---         0      1000
+    ed10d000-ed10dfff ---         0      1000
+    ed10e000-ed209fff rw-         0     fc000
+    ed20a000-ed304fff rw-         0     fb000  /dev/ashmem/dalvik-allocspace non moving space mark-bitmap 1 (deleted)
+    ed305000-ed3fffff rw-         0     fb000  /dev/ashmem/dalvik-allocspace non moving space live-bitmap 1 (deleted)
+    ed400000-ed6dffff r-x         0    2e0000  /system/lib/libart-compiler.so (BuildId: abbcd8e63c73aff42f28c935d6c3fae7) (load bias 0x10000)
+    ed6e0000-ed6e0fff ---         0      1000
+    ed6e1000-ed6ebfff r--    2e0000      b000  /system/lib/libart-compiler.so (load bias 0x10000)
+    ed6ec000-ed6ecfff rw-    2eb000      1000  /system/lib/libart-compiler.so (load bias 0x10000)
+    ed726000-ed775fff r-x         0     50000  /system/lib/libssl.so (BuildId: f8a56f52d2a8181c80ebe4c8923313d1)
+    ed776000-ed777fff r--     4f000      2000  /system/lib/libssl.so
+    ed778000-ed778fff rw-     51000      1000  /system/lib/libssl.so
+    ed784000-ed7b8fff r-x         0     35000  /system/lib/libopenjdk.so (BuildId: 309cf057f042a6a73de4987e2b51db46)
+    ed7b9000-ed7b9fff r--     34000      1000  /system/lib/libopenjdk.so
+    ed7ba000-ed7bafff rw-     35000      1000  /system/lib/libopenjdk.so
+    ed7c4000-ed7cafff r-x         0      7000  /system/lib/libopenjdkjvm.so (BuildId: 99cd3b98f090ba43d8441daf1d883b6c)
+    ed7cb000-ed7cbfff ---         0      1000
+    ed7cc000-ed7ccfff r--      7000      1000  /system/lib/libopenjdkjvm.so
+    ed7cd000-ed7cdfff rw-      8000      1000  /system/lib/libopenjdkjvm.so
+    ed7cf000-ed820fff r--         0     52000  /system/fonts/Roboto-BoldItalic.ttf
+    ed821000-eef16fff r--         0   16f6000  /system/usr/icu/icudt60l.dat
+    eef17000-eef58fff r-x         0     42000  /system/lib/libjavacore.so (BuildId: 685552b2267ef91d7c8d5f59b8bf84a2) (load bias 0x1000)
+    eef59000-eef59fff ---         0      1000
+    eef5a000-eef5afff r--     42000      1000  /system/lib/libjavacore.so (load bias 0x1000)
+    eef5b000-eef5bfff rw-     43000      1000  /system/lib/libjavacore.so (load bias 0x1000)
+    eef5c000-eef5cfff rw-         0      1000
+    eef84000-eef86fff r-x         0      3000  /system/lib/libwebviewchromium_plat_support.so (BuildId: 480d8629487d844ee98778258729e74f)
+    eef87000-eef87fff r--      2000      1000  /system/lib/libwebviewchromium_plat_support.so
+    eef88000-eef88fff rw-      3000      1000  /system/lib/libwebviewchromium_plat_support.so
+    eefc5000-ef014fff r-x         0     50000  /system/lib/android.hardware.renderscript@1.0.so (BuildId: 852807e719e1ae143453e88ce8123977) (load bias 0x1000)
+    ef015000-ef017fff r--     4f000      3000  /system/lib/android.hardware.renderscript@1.0.so (load bias 0x1000)
+    ef018000-ef018fff rw-     52000      1000  /system/lib/android.hardware.renderscript@1.0.so (load bias 0x1000)
+    ef058000-ef068fff r-x         0     11000  /system/lib/libRS.so (BuildId: 0795669a36184a9a22f3ed22d99b01ff)
+    ef069000-ef069fff r--     10000      1000  /system/lib/libRS.so
+    ef06a000-ef06afff rw-     11000      1000  /system/lib/libRS.so
+    ef09d000-ef09efff r-x         0      2000  /system/lib/libOpenSLES.so (BuildId: 23423c6bd7f4428ab9837d3077c1c4fd)
+    ef09f000-ef09ffff r--      1000      1000  /system/lib/libOpenSLES.so
+    ef0a0000-ef0a0fff rw-      2000      1000  /system/lib/libOpenSLES.so
+    ef0a2000-ef0ebfff r--         0     4a000  /system/fonts/RobotoCondensed-Light.ttf
+    ef0ec000-ef0edfff r-x         0      2000  /system/lib/libOpenMAXAL.so (BuildId: 4e880368517bbb2389ff59df1f9c7626)
+    ef0ee000-ef0eefff r--      1000      1000  /system/lib/libOpenMAXAL.so
+    ef0ef000-ef0effff rw-      2000      1000  /system/lib/libOpenMAXAL.so
+    ef125000-ef129fff r-x         0      5000  /system/lib/libtextclassifier_hash.so (BuildId: ae4b45b336c08e167c657537be1277cc)
+    ef12a000-ef12afff r--      4000      1000  /system/lib/libtextclassifier_hash.so
+    ef12b000-ef12bfff rw-      5000      1000  /system/lib/libtextclassifier_hash.so
+    ef14e000-ef22bfff r-x         0     de000  /system/lib/libneuralnetworks.so (BuildId: d264688442f5987250662a870c7e2a56) (load bias 0x2000)
+    ef22c000-ef22cfff ---         0      1000
+    ef22d000-ef22dfff r--     de000      1000  /system/lib/libneuralnetworks.so (load bias 0x2000)
+    ef22e000-ef22ffff rw-     df000      2000  /system/lib/libneuralnetworks.so (load bias 0x2000)
+    ef230000-ef3b9fff rw-         0    18a000
+    ef3c6000-ef3f9fff r-x         0     34000  /system/lib/android.hardware.neuralnetworks@1.0.so (BuildId: c4f4e0518672327d6046c3a3f113f4f6) (load bias 0x2000)
+    ef3fa000-ef3fafff ---         0      1000
+    ef3fb000-ef3fdfff r--     34000      3000  /system/lib/android.hardware.neuralnetworks@1.0.so (load bias 0x2000)
+    ef3fe000-ef3fefff rw-     37000      1000  /system/lib/android.hardware.neuralnetworks@1.0.so (load bias 0x2000)
+    ef404000-ef41bfff r-x         0     18000  /system/lib/android.hardware.neuralnetworks@1.1.so (BuildId: 7f75aeaafc29a034b055f69a22419d3c)
+    ef41c000-ef41dfff r--     17000      2000  /system/lib/android.hardware.neuralnetworks@1.1.so
+    ef41e000-ef41efff rw-     19000      1000  /system/lib/android.hardware.neuralnetworks@1.1.so
+    ef442000-ef442fff r-x         0      1000  /system/lib/libjnigraphics.so (BuildId: ccfa6b9eab25b8ef65a15d1720324e66)
+    ef443000-ef443fff r--         0      1000  /system/lib/libjnigraphics.so (BuildId: ccfa6b9eab25b8ef65a15d1720324e66)
+    ef444000-ef444fff rw-      1000      1000  /system/lib/libjnigraphics.so
+    ef449000-ef493fff r--         0     4b000  /system/fonts/Roboto-Bold.ttf
+    ef494000-ef4aafff r-x         0     17000  /system/lib/libGLESv3.so (BuildId: 3cc1a6c7863f5bee2fd8d176506deff9)
+    ef4ab000-ef4abfff r--     16000      1000  /system/lib/libGLESv3.so
+    ef4ac000-ef4acfff rw-     17000      1000  /system/lib/libGLESv3.so
+    ef4d1000-ef52dfff r-x         0     5d000  /system/lib/android.hardware.drm@1.0.so (BuildId: 5375ead5081c428341752913b96d1a1d) (load bias 0x3000)
+    ef52e000-ef52efff ---         0      1000
+    ef52f000-ef532fff r--     5d000      4000  /system/lib/android.hardware.drm@1.0.so (load bias 0x3000)
+    ef533000-ef533fff rw-     61000      1000  /system/lib/android.hardware.drm@1.0.so (load bias 0x3000)
+    ef56a000-ef56afff r-x         0      1000  /system/lib/libasyncio.so (BuildId: c8663072ff1ad5d271647fa908d8b6ae)
+    ef56b000-ef56bfff r--         0      1000  /system/lib/libasyncio.so (BuildId: c8663072ff1ad5d271647fa908d8b6ae)
+    ef56c000-ef56cfff rw-      1000      1000  /system/lib/libasyncio.so
+    ef586000-ef5a1fff r-x         0     1c000  /system/lib/libmediandk.so (BuildId: a97d5fba8ae41733ebf4bb0b4d22ef01)
+    ef5a2000-ef5a2fff ---         0      1000
+    ef5a3000-ef5a3fff r--     1c000      1000  /system/lib/libmediandk.so
+    ef5a4000-ef5a4fff rw-     1d000      1000  /system/lib/libmediandk.so
+    ef5d3000-ef611fff r-x         0     3f000  /system/lib/android.hardware.drm@1.1.so (BuildId: 8443bafb512d0f615cefb9fbafeb168f) (load bias 0x2000)
+    ef612000-ef612fff ---         0      1000
+    ef613000-ef615fff r--     3f000      3000  /system/lib/android.hardware.drm@1.1.so (load bias 0x2000)
+    ef616000-ef616fff rw-     42000      1000  /system/lib/android.hardware.drm@1.1.so (load bias 0x2000)
+    ef645000-ef6aafff r-x         0     66000  /system/lib/libmedia_jni.so (BuildId: 5a6b25a89dcc12144745907700ff3d90) (load bias 0x2000)
+    ef6ab000-ef6aefff r--     65000      4000  /system/lib/libmedia_jni.so (load bias 0x2000)
+    ef6af000-ef6affff rw-     69000      1000  /system/lib/libmedia_jni.so (load bias 0x2000)
+    ef6dc000-ef6fafff r-x         0     1f000  /system/lib/libcamera2ndk.so (BuildId: ec923c691c5031d70e0f5e45f44df08f)
+    ef6fb000-ef6fcfff r--     1e000      2000  /system/lib/libcamera2ndk.so
+    ef6fd000-ef6fdfff rw-     20000      1000  /system/lib/libcamera2ndk.so
+    ef702000-ef72bfff r-x         0     2a000  /system/lib/libmtp.so (BuildId: de830bd220e9a696cd64cf3186f031d4)
+    ef72c000-ef72cfff ---         0      1000
+    ef72d000-ef72efff r--     2a000      2000  /system/lib/libmtp.so
+    ef72f000-ef72ffff rw-     2c000      1000  /system/lib/libmtp.so
+    ef743000-ef772fff r-x         0     30000  /system/lib/libmediadrm.so (BuildId: 425fc4a0ca9cbea2dcf796a006965a22) (load bias 0x3000)
+    ef773000-ef776fff r--     2f000      4000  /system/lib/libmediadrm.so (load bias 0x3000)
+    ef777000-ef777fff rw-     33000      1000  /system/lib/libmediadrm.so (load bias 0x3000)
+    ef799000-ef7bbfff r-x         0     23000  /system/lib/libmediadrmmetrics_lite.so (BuildId: a29ce4e08ec5053903f848a7e0930d00)
+    ef7bc000-ef7bcfff ---         0      1000
+    ef7bd000-ef7bdfff r--     23000      1000  /system/lib/libmediadrmmetrics_lite.so
+    ef7be000-ef7befff rw-     24000      1000  /system/lib/libmediadrmmetrics_lite.so
+    ef7c5000-ef7ebfff r-x         0     27000  /system/lib/libexif.so (BuildId: 79c5d9585e9d38e0dea7b9176ad2111e) (load bias 0x3000)
+    ef7ec000-ef7ecfff ---         0      1000
+    ef7ed000-ef7f8fff r--     27000      c000  /system/lib/libexif.so (load bias 0x3000)
+    ef7f9000-ef7f9fff rw-     33000      1000  /system/lib/libexif.so (load bias 0x3000)
+    ef80c000-ef81cfff r-x         0     11000  /system/lib/libmidi.so (BuildId: 16b1b0c2abc6aeb7f43902a394e10296)
+    ef81d000-ef81dfff ---         0      1000
+    ef81e000-ef81efff r--     11000      1000  /system/lib/libmidi.so
+    ef81f000-ef81ffff rw-     12000      1000  /system/lib/libmidi.so
+    ef849000-ef876fff r-x         0     2e000  /system/lib/libaaudio.so (BuildId: 8d158316ec627a2bba64d886486e0406) (load bias 0x1000)
+    ef877000-ef877fff ---         0      1000
+    ef878000-ef87afff r--     2e000      3000  /system/lib/libaaudio.so (load bias 0x1000)
+    ef87b000-ef87bfff rw-     31000      1000  /system/lib/libaaudio.so (load bias 0x1000)
+    ef8a0000-ef8bafff r-x         0     1b000  /system/lib/libandroid.so (BuildId: 6d82bac55c37eeded3db690b0dfbf18d)
+    ef8bb000-ef8bcfff r--     1a000      2000  /system/lib/libandroid.so
+    ef8bd000-ef8bdfff rw-     1c000      1000  /system/lib/libandroid.so
+    ef94a000-ef94afff ---         0      1000
+    ef94b000-ef94bfff ---         0      1000
+    ef94c000-efa47fff rw-         0     fc000
+    efb46000-efb46fff ---         0      1000
+    efb47000-efb47fff ---         0      1000
+    efb48000-efc4bfff rw-         0    104000
+    efc4c000-efc4cfff ---         0      1000
+    efc4d000-efc4dfff ---         0      1000
+    efc4e000-efd51fff rw-         0    104000
+    efd52000-efd52fff ---         0      1000
+    efd53000-efd53fff ---         0      1000
+    efd54000-efe57fff rw-         0    104000
+    efe58000-efe58fff ---         0      1000
+    efe59000-efe59fff ---         0      1000
+    efe5a000-eff5dfff rw-         0    104000
+    eff5e000-eff5efff ---         0      1000
+    eff5f000-eff5ffff ---         0      1000
+    eff60000-f005bfff rw-         0     fc000
+    f005c000-f005cfff ---         0      1000  /dev/ashmem/dalvik-Jit thread pool worker thread 0 (deleted)
+    f005d000-f005dfff ---      1000      1000  /dev/ashmem/dalvik-Jit thread pool worker thread 0 (deleted)
+    f005e000-f015cfff rw-      2000     ff000  /dev/ashmem/dalvik-Jit thread pool worker thread 0 (deleted)
+    f015d000-f0167fff r-x         0      b000  /system/lib/libadbconnection.so (BuildId: d8d83e0fc3842d9fb5912a4c00107c90)
+    f0168000-f0168fff r--      a000      1000  /system/lib/libadbconnection.so
+    f0169000-f0169fff rw-      b000      1000  /system/lib/libadbconnection.so
+    f018b000-f0252fff rw-         0     c8000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f0253000-f031afff rw-         0     c8000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f031b000-f051afff rw-         0    200000  /dev/ashmem/dalvik-rb copying gc mark stack (deleted)
+    f051b000-f0d1afff rw-         0    800000  /dev/ashmem/dalvik-concurrent copying gc mark stack (deleted)
+    f0d1b000-f151bfff rw-         0    801000  /dev/ashmem/dalvik-live stack (deleted)
+    f151c000-f1d1cfff rw-         0    801000  /dev/ashmem/dalvik-allocation stack (deleted)
+    f1d1d000-f211dfff rw-         0    401000  /dev/ashmem/dalvik-card table (deleted)
+    f211e000-f291dfff rw-         0    800000  /dev/ashmem/dalvik-region space live bitmap (deleted)
+    f291e000-f2a1dfff rw-         0    100000  /dev/ashmem/dalvik-allocspace zygote / non moving space mark-bitmap 0 (deleted)
+    f2a1e000-f2b1dfff rw-         0    100000  /dev/ashmem/dalvik-allocspace zygote / non moving space live-bitmap 0 (deleted)
+    f2b1e000-f2b1ffff r-x         0      2000  /system/lib/libmetricslogger.so (BuildId: 74ba94fa4bc893861845ec30f7e94943)
+    f2b20000-f2b20fff r--      1000      1000  /system/lib/libmetricslogger.so
+    f2b21000-f2b21fff rw-      2000      1000  /system/lib/libmetricslogger.so
+    f2b43000-f2b56fff r-x         0     14000  /system/lib/liblz4.so (BuildId: 70787fb867fabfc82bcdda0e9336f464)
+    f2b57000-f2b57fff ---         0      1000
+    f2b58000-f2b58fff r--     14000      1000  /system/lib/liblz4.so
+    f2b59000-f2b59fff rw-     15000      1000  /system/lib/liblz4.so
+    f2b89000-f3220fff r-x         0    698000  /system/lib/libart.so (BuildId: 32e6d60f34c4a0c6e25392e7d9c3f7e7) (load bias 0xc000)
+    f3221000-f3229fff r--    697000      9000  /system/lib/libart.so (load bias 0xc000)
+    f322a000-f322bfff rw-    6a0000      2000  /system/lib/libart.so (load bias 0xc000)
+    f322c000-f322efff rw-         0      3000
+    f325c000-f325ffff r-x         0      4000  /system/lib/libtombstoned_client.so (BuildId: 5a7d4d034eb1d8c10eac878a9faedfd6)
+    f3260000-f3260fff r--      3000      1000  /system/lib/libtombstoned_client.so
+    f3261000-f3261fff rw-      4000      1000  /system/lib/libtombstoned_client.so
+    f3280000-f33fffff rw-         0    180000
+    f3417000-f3467fff r--         0     51000  /system/fonts/Roboto-BlackItalic.ttf
+    f3468000-f346afff r-x         0      3000  /system/lib/libaudiomanager.so (BuildId: 5e82a31b68101638cf4dd364ca0686f7)
+    f346b000-f346bfff r--      2000      1000  /system/lib/libaudiomanager.so
+    f346c000-f346cfff rw-      3000      1000  /system/lib/libaudiomanager.so
+    f3483000-f34b9fff r-x         0     37000  /system/lib/libm.so (BuildId: 31732bfc989d34944871ee485e1a5de9)
+    f34ba000-f34bafff ---         0      1000
+    f34bb000-f34bbfff r--     37000      1000  /system/lib/libm.so
+    f34bc000-f34bcfff rw-     38000      1000  /system/lib/libm.so
+    f34cf000-f34f3fff r-x         0     25000  /system/lib/libminikin.so (BuildId: 04fdee9fa7f524f93345d4365a2c2019)
+    f34f4000-f34f4fff r--     24000      1000  /system/lib/libminikin.so
+    f34f5000-f34f5fff rw-     25000      1000  /system/lib/libminikin.so
+    f3501000-f353cfff r-x         0     3c000  /system/lib/libdexfile.so (BuildId: 28722e17bc6308f00dc577034470d61b)
+    f353d000-f353dfff ---         0      1000
+    f353e000-f353efff r--     3c000      1000  /system/lib/libdexfile.so
+    f353f000-f353ffff rw-     3d000      1000  /system/lib/libdexfile.so
+    f356b000-f356cfff r-x         0      2000  /system/lib/libsync.so (BuildId: 43dbc843443d876435fd47f9ca2225cf)
+    f356d000-f356dfff r--      1000      1000  /system/lib/libsync.so
+    f356e000-f356efff rw-      2000      1000  /system/lib/libsync.so
+    f358b000-f35b3fff r-x         0     29000  /system/lib/libvulkan.so (BuildId: bfa2d06577b6ab3b9b880aa79ec7f280)
+    f35b4000-f35b4fff ---         0      1000
+    f35b5000-f35b5fff r--     29000      1000  /system/lib/libvulkan.so
+    f35b6000-f35b6fff rw-     2a000      1000  /system/lib/libvulkan.so
+    f35c1000-f35c6fff rw-         0      6000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f35e5000-f35e6fff r-x         0      2000  /system/lib/libmemtrack.so (BuildId: a3dde084d5711a72ca72b9502f15551d)
+    f35e7000-f35e7fff r--      1000      1000  /system/lib/libmemtrack.so
+    f35e8000-f35e8fff rw-      2000      1000  /system/lib/libmemtrack.so
+    f360d000-f361afff r-x         0      e000  /system/lib/libhidlbase.so (BuildId: bdee97aa7b8b3441d448608b2a23da5f)
+    f361b000-f361bfff ---         0      1000
+    f361c000-f361cfff r--      e000      1000  /system/lib/libhidlbase.so
+    f361d000-f361dfff rw-      f000      1000  /system/lib/libhidlbase.so
+    f3641000-f365ffff r-x         0     1f000  /system/lib/libdrmframework.so (BuildId: 518f8a90d0b0ee3a9f737dff81648214) (load bias 0x1000)
+    f3660000-f3662fff r--     1e000      3000  /system/lib/libdrmframework.so (load bias 0x1000)
+    f3663000-f3663fff rw-     21000      1000  /system/lib/libdrmframework.so (load bias 0x1000)
+    f3669000-f36b9fff r--         0     51000  /system/fonts/Roboto-MediumItalic.ttf
+    f36ba000-f3930fff r-x         0    277000  /system/lib/libicui18n.so (BuildId: adcd190d2d778837a7106f3fa2d5c1af) (load bias 0x6000)
+    f3931000-f393bfff r--    276000      b000  /system/lib/libicui18n.so (load bias 0x6000)
+    f393c000-f393cfff rw-    281000      1000  /system/lib/libicui18n.so (load bias 0x6000)
+    f3940000-f397bfff r-x         0     3c000  /system/lib/libwilhelm.so (BuildId: de7397c2c6f68f933edb827d5691d922) (load bias 0x1000)
+    f397c000-f397efff r--     3b000      3000  /system/lib/libwilhelm.so (load bias 0x1000)
+    f397f000-f397ffff rw-     3e000      1000  /system/lib/libwilhelm.so (load bias 0x1000)
+    f3987000-f39aafff r-x         0     24000  /system/lib/libEGL.so (BuildId: 89e4c659b78709df42d7852c3c369211) (load bias 0x2000)
+    f39ab000-f39abfff ---         0      1000
+    f39ac000-f39adfff r--     24000      2000  /system/lib/libEGL.so (load bias 0x2000)
+    f39ae000-f39aefff rw-     26000      1000  /system/lib/libEGL.so (load bias 0x2000)
+    f39af000-f39b1fff rw-         0      3000
+    f39e7000-f39e7fff r-x         0      1000  /system/lib/libhidlallocatorutils.so (BuildId: ce7bce227851de7bc95847ab0f210092)
+    f39e8000-f39e8fff r--         0      1000  /system/lib/libhidlallocatorutils.so (BuildId: ce7bce227851de7bc95847ab0f210092)
+    f39e9000-f39e9fff rw-      1000      1000  /system/lib/libhidlallocatorutils.so
+    f3a0b000-f3a21fff r-x         0     17000  /system/lib/libGLESv2.so (BuildId: b5626f0d3aa82f7c71a809b6d0b62dd3)
+    f3a22000-f3a22fff r--     16000      1000  /system/lib/libGLESv2.so
+    f3a23000-f3a23fff rw-     17000      1000  /system/lib/libGLESv2.so
+    f3a58000-f3a71fff r-x         0     1a000  /system/lib/android.hardware.configstore@1.1.so (BuildId: 455cf64870316fafa6001f8b70eb3efa)
+    f3a72000-f3a73fff r--     19000      2000  /system/lib/android.hardware.configstore@1.1.so
+    f3a74000-f3a74fff rw-     1b000      1000  /system/lib/android.hardware.configstore@1.1.so
+    f3a82000-f3a8cfff r-x         0      b000  /system/lib/libmediautils.so (BuildId: ddbf6ce2892399ef336bd4193706009d)
+    f3a8d000-f3a8dfff ---         0      1000
+    f3a8e000-f3a8efff r--      b000      1000  /system/lib/libmediautils.so
+    f3a8f000-f3a8ffff rw-      c000      1000  /system/lib/libmediautils.so
+    f3acf000-f3ad8fff r-x         0      a000  /system/lib/libziparchive.so (BuildId: 51c14e5e639284b59ed0edf09e3a1bf4)
+    f3ad9000-f3ad9fff ---         0      1000
+    f3ada000-f3adafff r--      a000      1000  /system/lib/libziparchive.so
+    f3adb000-f3adbfff rw-      b000      1000  /system/lib/libziparchive.so
+    f3b18000-f3b1bfff r-x         0      4000  /system/lib/libusbhost.so (BuildId: f5770b922cffc29e5abc66f647ae93ac)
+    f3b1c000-f3b1cfff r--      3000      1000  /system/lib/libusbhost.so
+    f3b1d000-f3b1dfff rw-      4000      1000  /system/lib/libusbhost.so
+    f3b1f000-f3b69fff r--         0     4b000  /system/fonts/Roboto-Black.ttf
+    f3b6a000-f3b71fff r-x         0      8000  /system/lib/libcamera_metadata.so (BuildId: 573069a7cea3f4542949580d1e3c5e39)
+    f3b72000-f3b72fff r--      7000      1000  /system/lib/libcamera_metadata.so
+    f3b73000-f3b73fff rw-      8000      1000  /system/lib/libcamera_metadata.so
+    f3b76000-f3b95fff r--         0     20000  /dev/__properties__/u:object_r:vendor_default_prop:s0
+    f3b96000-f3b99fff r-x         0      4000  /system/lib/libdebuggerd_client.so (BuildId: bd67206dd3ee37408dcfe0328b8cfe61)
+    f3b9a000-f3b9afff r--      3000      1000  /system/lib/libdebuggerd_client.so
+    f3b9b000-f3b9bfff rw-      4000      1000  /system/lib/libdebuggerd_client.so
+    f3b9f000-f3ba4fff rw-         0      6000  /system/etc/event-log-tags
+    f3ba5000-f3ba5fff ---         0      1000
+    f3ba6000-f3ba9fff rw-         0      4000
+    f3baa000-f3baafff ---         0      1000
+    f3bab000-f3badfff rw-         0      3000
+    f3bae000-f3baefff ---         0      1000
+    f3baf000-f3bb3fff rw-         0      5000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f3bb4000-f3bb8fff rw-         0      5000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f3bb9000-f3bdcfff r--         0     24000  /system/usr/hyphen-data/hyph-nn.hyb
+    f3bdd000-f3be1fff r-x         0      5000  /system/lib/libprocessgroup.so (BuildId: 2e3cdc8d5c5d7ba5ffcf34d6ddadd440)
+    f3be2000-f3be2fff ---         0      1000
+    f3be3000-f3be3fff r--      5000      1000  /system/lib/libprocessgroup.so
+    f3be4000-f3be4fff rw-      6000      1000  /system/lib/libprocessgroup.so
+    f3be9000-f3bedfff rw-         0      5000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f3bee000-f3beefff ---         0      1000
+    f3bef000-f3bf2fff rw-         0      4000
+    f3bf3000-f3c16fff r--         0     24000  /system/usr/hyphen-data/hyph-nb.hyb
+    f3c17000-f3c17fff r-x         0      1000  /system/lib/android.hardware.graphics.common@1.0.so (BuildId: e080a018c2a9f9e3e667d01d382b17cd)
+    f3c18000-f3c18fff r--         0      1000  /system/lib/android.hardware.graphics.common@1.0.so (BuildId: e080a018c2a9f9e3e667d01d382b17cd)
+    f3c19000-f3c19fff rw-      1000      1000  /system/lib/android.hardware.graphics.common@1.0.so
+    f3c1a000-f3c1afff ---         0      1000
+    f3c1b000-f3c1dfff rw-         0      3000
+    f3c1e000-f3c1efff ---         0      1000
+    f3c1f000-f3c1ffff ---         0      1000
+    f3c20000-f3c23fff rw-         0      4000
+    f3c24000-f3c41fff r--         0     1e000  /system/usr/hyphen-data/hyph-de-ch-1901.hyb
+    f3c42000-f3c46fff r-x         0      5000  /system/lib/libstagefright_omx_utils.so (BuildId: fda31e11518046c0b37d2252668be6b5)
+    f3c47000-f3c47fff r--      4000      1000  /system/lib/libstagefright_omx_utils.so
+    f3c48000-f3c48fff rw-      5000      1000  /system/lib/libstagefright_omx_utils.so
+    f3c4b000-f3c4bfff ---         0      1000
+    f3c4c000-f3c4efff rw-         0      3000
+    f3c4f000-f3c4ffff ---         0      1000
+    f3c50000-f3c6dfff r--         0     1e000  /system/usr/hyphen-data/hyph-de-1996.hyb
+    f3c6e000-f3c8bfff r--         0     1e000  /system/usr/hyphen-data/hyph-de-1901.hyb
+    f3c8c000-f3c94fff r-x         0      9000  /system/lib/libGLESv1_CM.so (BuildId: 04f97ab62b78759ac0aa1ff74f55d261)
+    f3c95000-f3c95fff r--      8000      1000  /system/lib/libGLESv1_CM.so
+    f3c96000-f3c96fff rw-      9000      1000  /system/lib/libGLESv1_CM.so
+    f3c9a000-f3ceafff r--         0     51000  /system/fonts/Roboto-Italic.ttf
+    f3ceb000-f3cf0fff r-x         0      6000  /system/lib/libheif.so (BuildId: 36bafc5930b0268a78e8c419cbb6dadf)
+    f3cf1000-f3cf1fff ---         0      1000
+    f3cf2000-f3cf2fff r--      6000      1000  /system/lib/libheif.so
+    f3cf3000-f3cf3fff rw-      7000      1000  /system/lib/libheif.so
+    f3cf6000-f3cf6fff ---         0      1000
+    f3cf7000-f3cfafff rw-         0      4000
+    f3cfb000-f3cfbfff ---         0      1000
+    f3cfc000-f3cfefff rw-         0      3000
+    f3cff000-f3cfffff ---         0      1000
+    f3d00000-f3d00fff ---         0      1000
+    f3d01000-f3d04fff rw-         0      4000
+    f3d05000-f3d16fff r-x         0     12000  /system/lib/libaudioutils.so (BuildId: 0074bfd0fd873120ebb721a02b135183)
+    f3d17000-f3d17fff ---         0      1000
+    f3d18000-f3d18fff r--     12000      1000  /system/lib/libaudioutils.so
+    f3d19000-f3d19fff rw-     13000      1000  /system/lib/libaudioutils.so
+    f3d1a000-f3d1dfff rw-         0      4000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f3d1f000-f3d2dfff r--         0      f000  /system/usr/hyphen-data/hyph-en-us.hyb
+    f3d2e000-f3d39fff r--         0      c000  /system/usr/hyphen-data/hyph-en-gb.hyb
+    f3d3a000-f3d59fff r--         0     20000  /dev/__properties__/u:object_r:log_prop:s0
+    f3d5a000-f3d6efff r-x         0     15000  /system/lib/libmedia_helper.so (BuildId: 51a4f1436eb5d9376d8863a8bceb2943)
+    f3d6f000-f3d70fff r--     14000      2000  /system/lib/libmedia_helper.so
+    f3d71000-f3d71fff rw-     16000      1000  /system/lib/libmedia_helper.so
+    f3d72000-f3d72fff ---         0      1000
+    f3d73000-f3d75fff rw-         0      3000
+    f3d76000-f3d76fff ---         0      1000
+    f3d77000-f3d83fff r--         0      d000  /system/usr/hyphen-data/hyph-cu.hyb
+    f3d84000-f3d90fff rw-         0      d000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f3d91000-f3da5fff r-x         0     15000  /system/lib/libselinux.so (BuildId: 547f6fca0c45096ad2bac5645fe6d132)
+    f3da6000-f3da6fff r--     14000      1000  /system/lib/libselinux.so
+    f3da7000-f3da7fff rw-     15000      1000  /system/lib/libselinux.so
+    f3da8000-f3da8fff ---         0      1000
+    f3da9000-f3dacfff rw-         0      4000
+    f3dad000-f3db6fff rw-         0      a000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f3db8000-f3dc0fff r--         0      9000  /system/usr/hyphen-data/hyph-ga.hyb
+    f3dc1000-f3f7ffff r-x         0    1bf000  /system/lib/libstagefright.so (BuildId: 7a2f3e7b14ef831242a566e79c9c53c6) (load bias 0x1c000)
+    f3f80000-f3f80fff ---         0      1000
+    f3f81000-f3f8afff r--    1bf000      a000  /system/lib/libstagefright.so (load bias 0x1c000)
+    f3f8b000-f3fbffff rw-    1c9000     35000  /system/lib/libstagefright.so (load bias 0x1c000)
+    f3fc0000-f3fc5fff rw-         0      6000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f3fc6000-f4034fff r-x         0     6f000  /system/lib/libaudioclient.so (BuildId: 7a4b636a2405f82b3ad52f5c7743c3a8) (load bias 0x6000)
+    f4035000-f403cfff r--     6e000      8000  /system/lib/libaudioclient.so (load bias 0x6000)
+    f403d000-f403dfff rw-     76000      1000  /system/lib/libaudioclient.so (load bias 0x6000)
+    f403e000-f403efff ---         0      1000
+    f403f000-f4041fff rw-         0      3000
+    f4042000-f4042fff ---         0      1000
+    f4043000-f4046fff rw-         0      4000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f4047000-f404afff rw-         0      4000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f404b000-f4061fff r-x         0     17000  /system/lib/android.hardware.graphics.mapper@2.1.so (BuildId: 4ac5415ec6b7aeeacef90b6e521b6663)
+    f4062000-f4063fff r--     16000      2000  /system/lib/android.hardware.graphics.mapper@2.1.so
+    f4064000-f4064fff rw-     18000      1000  /system/lib/android.hardware.graphics.mapper@2.1.so
+    f4066000-f406bfff rw-         0      6000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f406c000-f4072fff rw-         0      7000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f4074000-f4079fff r--         0      6000  /system/usr/hyphen-data/hyph-et.hyb
+    f407a000-f4080fff rw-         0      7000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f4081000-f40befff r-x         0     3e000  /system/lib/libprotobuf-cpp-lite.so (BuildId: 246e3535af7f8cbcc68128225b37d1b6)
+    f40bf000-f40bffff ---         0      1000
+    f40c0000-f40c0fff r--     3e000      1000  /system/lib/libprotobuf-cpp-lite.so
+    f40c1000-f40c1fff rw-     3f000      1000  /system/lib/libprotobuf-cpp-lite.so
+    f40c2000-f4113fff r--         0     52000  /system/fonts/Roboto-LightItalic.ttf
+    f4114000-f4972fff r-x         0    85f000  /system/lib/libhwui.so (BuildId: f08875d5b3b690d45ff3aa06714f8153) (load bias 0x1f000)
+    f4973000-f4973fff ---         0      1000
+    f4974000-f498ffff r--    85f000     1c000  /system/lib/libhwui.so (load bias 0x1f000)
+    f4990000-f4990fff rw-    87b000      1000  /system/lib/libhwui.so (load bias 0x1f000)
+    f4991000-f4994fff rw-         0      4000
+    f4998000-f499bfff rw-         0      4000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f49a0000-f49aefff rw-         0      f000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f49af000-f49cffff r--         0     21000  /system/fonts/NotoSansAnatolianHieroglyphs-Regular.otf
+    f49d0000-f49ecfff r-x         0     1d000  /system/lib/android.hidl.memory@1.0.so (BuildId: 6045c2b5b29d1dda0cbc2f369f8cdcbf) (load bias 0x1000)
+    f49ed000-f49edfff ---         0      1000
+    f49ee000-f49effff r--     1d000      2000  /system/lib/android.hidl.memory@1.0.so (load bias 0x1000)
+    f49f0000-f49f0fff rw-     1f000      1000  /system/lib/android.hidl.memory@1.0.so (load bias 0x1000)
+    f49f2000-f4a0afff r--         0     19000  /system/fonts/NotoSansBhaiksuki-Regular.otf
+    f4a0b000-f4a0efff r-x         0      4000  /system/lib/libspeexresampler.so (BuildId: effd4b831a8b7768e1bd2b67940d6c0b)
+    f4a0f000-f4a0ffff r--      3000      1000  /system/lib/libspeexresampler.so
+    f4a10000-f4a10fff rw-      4000      1000  /system/lib/libspeexresampler.so
+    f4a13000-f4a1bfff r--         0      9000  /system/usr/hyphen-data/hyph-cy.hyb
+    f4a1c000-f4a6cfff r--         0     51000  /system/fonts/Roboto-ThinItalic.ttf
+    f4a6d000-f4a6ffff r-x         0      3000  /system/lib/libstdc++.so (BuildId: 9cc54beb99f050af431edd20088ffa25)
+    f4a70000-f4a70fff r--      2000      1000  /system/lib/libstdc++.so
+    f4a71000-f4a71fff rw-      3000      1000  /system/lib/libstdc++.so
+    f4a73000-f4a74fff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f4a75000-f4a79fff rw-         0      5000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f4a7b000-f4a7efff r--         0      4000  /system/usr/hyphen-data/hyph-es.hyb
+    f4a7f000-f4a89fff rw-         0      b000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f4a8a000-f4af0fff r-x         0     67000  /system/lib/android.hardware.media.omx@1.0.so (BuildId: 3f8e46c544d2a6be2a7d23a91e9b11c6) (load bias 0x3000)
+    f4af1000-f4af5fff r--     66000      5000  /system/lib/android.hardware.media.omx@1.0.so (load bias 0x3000)
+    f4af6000-f4af6fff rw-     6b000      1000  /system/lib/android.hardware.media.omx@1.0.so (load bias 0x3000)
+    f4af7000-f4af8fff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f4af9000-f4afffff rw-         0      7000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f4b00000-f4b38fff r-x         0     39000  /system/lib/android.hardware.cas@1.0.so (BuildId: 07e49759e776800e5851036e66b2db9f) (load bias 0x2000)
+    f4b39000-f4b39fff ---         0      1000
+    f4b3a000-f4b3cfff r--     39000      3000  /system/lib/android.hardware.cas@1.0.so (load bias 0x2000)
+    f4b3d000-f4b3dfff rw-     3c000      1000  /system/lib/android.hardware.cas@1.0.so (load bias 0x2000)
+    f4b3e000-f4b3efff r--         0      1000  /dev/ashmem/75a21620-aac8-4652-9219-64e8ea1bed44 (deleted)
+    f4b3f000-f4b40fff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f4b41000-f4b8afff r-x         0     4a000  /system/lib/libcamera_client.so (BuildId: 42b0039ea3ad8be1c06f0196daaadb3d) (load bias 0x4000)
+    f4b8b000-f4b90fff r--     49000      6000  /system/lib/libcamera_client.so (load bias 0x4000)
+    f4b91000-f4b91fff rw-     4f000      1000  /system/lib/libcamera_client.so (load bias 0x4000)
+    f4b92000-f4b97fff rw-         0      6000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f4b98000-f4b9cfff rw-         0      5000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f4b9d000-f4ba3fff r--         0      7000  /system/fonts/NotoSansSharada-Regular.otf
+    f4ba4000-f4bbffff r--         0     1c000  /system/fonts/NotoSansMongolian-Regular.ttf
+    f4bc0000-f4bd7fff r-x         0     18000  /system/lib/libz.so (BuildId: 17a9d953b859c00792fb0bc386b5d17b)
+    f4bd8000-f4bd8fff r--     17000      1000  /system/lib/libz.so
+    f4bd9000-f4bd9fff rw-     18000      1000  /system/lib/libz.so
+    f4bda000-f4bdafff rw-         0      1000
+    f4bdb000-f4bdcfff r--         0      2000  /system/usr/hyphen-data/hyph-sl.hyb
+    f4bdd000-f4bdffff r--         0      3000  /system/fonts/NotoSansPauCinHau-Regular.otf
+    f4be0000-f4bf0fff r--         0     11000  /system/fonts/NotoSansNewa-Regular.otf
+    f4bf1000-f4c0ffff r--         0     1f000  /system/fonts/NotoSansYi-Regular.ttf
+    f4c10000-f4ca8fff r-x         0     99000  /system/lib/libft2.so (BuildId: c103eda895910acf07b99aa9c25f71fb) (load bias 0x1000)
+    f4ca9000-f4ca9fff ---         0      1000
+    f4caa000-f4cacfff r--     99000      3000  /system/lib/libft2.so (load bias 0x1000)
+    f4cad000-f4cadfff rw-     9c000      1000  /system/lib/libft2.so (load bias 0x1000)
+    f4cae000-f4caffff r--         0      2000  /system/usr/hyphen-data/hyph-mn-cyrl.hyb
+    f4cb0000-f4cb2fff r--         0      3000  /system/fonts/NotoSansPalmyrene-Regular.otf
+    f4cb3000-f4cc2fff r--         0     10000  /system/fonts/NotoSansMarchen-Regular.otf
+    f4cc3000-f4daefff r-x         0     ec000  /system/lib/libc.so (BuildId: a0e4c28cd0a1f3b7c93140a825240d10)
+    f4daf000-f4db2fff r--     eb000      4000  /system/lib/libc.so
+    f4db3000-f4db4fff rw-     ef000      2000  /system/lib/libc.so
+    f4db5000-f4db5fff rw-         0      1000
+    f4db6000-f4db6fff r--         0      1000
+    f4db7000-f4dbdfff rw-         0      7000
+    f4dbe000-f4dc1fff r--         0      4000  /system/fonts/NotoSansPahawhHmong-Regular.otf
+    f4dc2000-f4dc4fff r--         0      3000  /system/fonts/NotoSansOldPermic-Regular.otf
+    f4dc5000-f4dcafff r--         0      6000  /system/fonts/NotoSansMiao-Regular.otf
+    f4dcb000-f4debfff r--         0     21000  /system/fonts/NotoSansBamum-Regular.ttf
+    f4dec000-f4df9fff r-x         0      e000  /system/lib/libmediametrics.so (BuildId: 2baaaf0088a841028750672653e622d7)
+    f4dfa000-f4dfafff ---         0      1000
+    f4dfb000-f4dfbfff r--      e000      1000  /system/lib/libmediametrics.so
+    f4dfc000-f4dfcfff rw-      f000      1000  /system/lib/libmediametrics.so
+    f4dfd000-f4dfefff r--         0      2000  /system/usr/hyphen-data/hyph-fr.hyb
+    f4dff000-f4e03fff r--         0      5000  /system/fonts/NotoSansMeroitic-Regular.otf
+    f4e04000-f4e0cfff r--         0      9000  /system/fonts/NotoSansLinearA-Regular.otf
+    f4e0d000-f4e1cfff r--         0     10000  /system/fonts/NotoSansVai-Regular.ttf
+    f4e1d000-f4e21fff r-x         0      5000  /system/lib/libstagefright_codecbase.so (BuildId: b2c689a42e0ebdbad68427e66bc0564f)
+    f4e22000-f4e22fff r--      4000      1000  /system/lib/libstagefright_codecbase.so
+    f4e23000-f4e23fff rw-      5000      1000  /system/lib/libstagefright_codecbase.so
+    f4e24000-f4e25fff r--         0      2000  /system/usr/hyphen-data/hyph-da.hyb
+    f4e26000-f4e2cfff r--         0      7000  /system/fonts/NotoSansPhagsPa-Regular.ttf
+    f4e2d000-f4e39fff r--         0      d000  /system/fonts/NotoSansSyriacWestern-Regular.ttf
+    f4e3a000-f4e5bfff r--         0     22000  /system/fonts/NotoSerifMyanmar-Bold.otf
+    f4e5c000-f4e67fff r-x         0      c000  /system/lib/libsoundtrigger.so (BuildId: 246efd17b0cbb3a464094bd43c894a79) (load bias 0x1000)
+    f4e68000-f4e68fff ---         0      1000
+    f4e69000-f4e6afff r--      c000      2000  /system/lib/libsoundtrigger.so (load bias 0x1000)
+    f4e6b000-f4e6bfff rw-      e000      1000  /system/lib/libsoundtrigger.so (load bias 0x1000)
+    f4e6c000-f4e84fff r--         0     19000  /system/fonts/NotoSansLepcha-Regular.ttf
+    f4e85000-f4f14fff r-x         0     90000  /system/lib/libmedia.so (BuildId: 245ba97cf3a04e8ef221c4b45b6ad6d8) (load bias 0xe000)
+    f4f15000-f4f15fff ---         0      1000
+    f4f16000-f4f22fff r--     90000      d000  /system/lib/libmedia.so (load bias 0xe000)
+    f4f23000-f4f2ffff rw-     9d000      d000  /system/lib/libmedia.so (load bias 0xe000)
+    f4f30000-f4f30fff rw-         0      1000
+    f4f31000-f4f39fff r--         0      9000  /system/fonts/NotoSansSymbols-Regular-Subsetted2.ttf
+    f4f3a000-f4f5bfff r--         0     22000  /system/fonts/NotoSerifMyanmar-Regular.otf
+    f4f5c000-f4fb2fff r-x         0     57000  /system/lib/libandroidfw.so (BuildId: 591472afcd1d68bc440761c586ff2c12)
+    f4fb3000-f4fb4fff r--     56000      2000  /system/lib/libandroidfw.so
+    f4fb5000-f4fb5fff rw-     58000      1000  /system/lib/libandroidfw.so
+    f4fb6000-f4fb6fff rw-         0      1000
+    f4fb7000-f4fd0fff r--         0     1a000  /system/fonts/NotoSansMyanmarUI-Bold.ttf
+    f4fd1000-f4febfff r--         0     1b000  /system/fonts/NotoSansMyanmar-Bold.ttf
+    f4fec000-f4feefff r-x         0      3000  /system/lib/libETC1.so (BuildId: bd5252b02c54d3a7633ebdcee92bafbb)
+    f4fef000-f4feffff r--      2000      1000  /system/lib/libETC1.so
+    f4ff0000-f4ff0fff rw-      3000      1000  /system/lib/libETC1.so
+    f4ff1000-f4ff2fff r--         0      2000  /system/usr/hyphen-data/hyph-be.hyb
+    f4ff3000-f500dfff r--         0     1b000  /system/fonts/NotoSansMyanmar-Regular.ttf
+    f500e000-f500ffff r-x         0      2000  /system/lib/libion.so (BuildId: 268e868cb484f1e0a26612bca366d721)
+    f5010000-f5010fff r--      1000      1000  /system/lib/libion.so
+    f5011000-f5011fff rw-      2000      1000  /system/lib/libion.so
+    f5012000-f5013fff r--         0      2000  /system/fonts/NotoSansSoraSompeng-Regular.otf
+    f5014000-f5015fff r--         0      2000  /system/fonts/NotoSansOldNorthArabian-Regular.otf
+    f5016000-f5060fff r--         0     4b000  /system/fonts/Roboto-Medium.ttf
+    f5061000-f50eafff r-x         0     8a000  /system/lib/libvintf.so (BuildId: f4091162613a9fa1ac8bbd73a324aa7d) (load bias 0x1000)
+    f50eb000-f50edfff r--     89000      3000  /system/lib/libvintf.so (load bias 0x1000)
+    f50ee000-f50eefff rw-     8c000      1000  /system/lib/libvintf.so (load bias 0x1000)
+    f50ef000-f50effff rw-         0      1000
+    f50f0000-f50f0fff r--         0      1000
+    f50f1000-f50f2fff r--         0      2000  /system/fonts/NotoSansNabataean-Regular.otf
+    f50f3000-f5101fff r--         0      f000  /system/fonts/NotoSansLinearB-Regular.ttf
+    f5102000-f5127fff r-x         0     26000  /system/lib/liblzma.so (BuildId: f674d27a23f3d8e6b8faea10482779b7)
+    f5128000-f5128fff r--     25000      1000  /system/lib/liblzma.so
+    f5129000-f5129fff rw-     26000      1000  /system/lib/liblzma.so
+    f512a000-f512ffff rw-         0      6000
+    f5130000-f513bfff r--         0      c000  /system/fonts/NotoSansTaiTham-Regular.ttf
+    f513c000-f515ffff r--         0     24000  /system/fonts/NotoSansKhmer-VF.ttf
+    f5160000-f516efff r-x         0      f000  /system/lib/libmediaextractor.so (BuildId: c6187ffefb5a87d65b5f73a4b0e6c2c9)
+    f516f000-f516ffff r--      e000      1000  /system/lib/libmediaextractor.so
+    f5170000-f5170fff rw-      f000      1000  /system/lib/libmediaextractor.so
+    f5171000-f518afff r--         0     1a000  /system/fonts/NotoSansMyanmarUI-Regular.ttf
+    f518b000-f519ffff r--         0     15000  /system/fonts/NotoSansSinhalaUI-Bold.otf
+    f51a0000-f51a1fff r-x         0      2000  /system/lib/libdl.so (BuildId: d1ecdabe0306dbaf3dea29fa7539c7f1)
+    f51a2000-f51a2fff r--      1000      1000  /system/lib/libdl.so
+    f51a3000-f51a3fff r--         0      1000
+    f51a4000-f51a8fff r--         0      5000  /system/fonts/NotoSansManichaean-Regular.otf
+    f51a9000-f51bdfff r--         0     15000  /system/fonts/NotoSansSinhalaUI-Regular.otf
+    f51be000-f51d2fff r--         0     15000  /system/fonts/NotoSerifSinhala-Bold.otf
+    f51d3000-f5237fff r-x         0     65000  /system/lib/libpdx_default_transport.so (BuildId: 202b863651fee8606582943e6ff08611)
+    f5238000-f5238fff ---         0      1000
+    f5239000-f5239fff r--     65000      1000  /system/lib/libpdx_default_transport.so
+    f523a000-f523afff rw-     66000      1000  /system/lib/libpdx_default_transport.so
+    f523b000-f523bfff rw-         0      1000
+    f523c000-f523dfff r--         0      2000  /system/fonts/NotoSansMultani-Regular.otf
+    f523e000-f523ffff r--         0      2000  /system/fonts/NotoSansMro-Regular.otf
+    f5240000-f5242fff r--         0      3000  /system/fonts/NotoSansTaiLe-Regular.ttf
+    f5243000-f5286fff r-x         0     44000  /system/lib/libmedia_omx.so (BuildId: 09d52d615c17d133842f6c9c695e89d8) (load bias 0x6000)
+    f5287000-f5287fff ---         0      1000
+    f5288000-f528efff r--     44000      7000  /system/lib/libmedia_omx.so (load bias 0x6000)
+    f528f000-f5293fff rw-     4b000      5000  /system/lib/libmedia_omx.so (load bias 0x6000)
+    f5294000-f5295fff r--         0      2000  /system/fonts/NotoSansHatran-Regular.otf
+    f5296000-f5299fff r--         0      4000  /system/fonts/NotoSansTifinagh-Regular.ttf
+    f529a000-f529dfff r--         0      4000  /system/fonts/NotoSansTaiViet-Regular.ttf
+    f529e000-f52c3fff r--         0     26000  /system/fonts/NotoSansSinhala-Bold.ttf
+    f52c4000-f52c4fff r-x         0      1000  /system/lib/android.hardware.media@1.0.so (BuildId: fbcf3263ae95b6b7b4c8ab556d9f9324)
+    f52c5000-f52c5fff r--         0      1000  /system/lib/android.hardware.media@1.0.so (BuildId: fbcf3263ae95b6b7b4c8ab556d9f9324)
+    f52c6000-f52c6fff rw-      1000      1000  /system/lib/android.hardware.media@1.0.so
+    f52c7000-f52c8fff r--         0      2000  /system/fonts/NotoSansBassaVah-Regular.otf
+    f52c9000-f5313fff r--         0     4b000  /system/fonts/Roboto-Regular.ttf
+    f5314000-f5316fff r-x         0      3000  /system/lib/libstagefright_http_support.so (BuildId: f110a5ebe2379a53f663ebcb032853ea)
+    f5317000-f5317fff r--      2000      1000  /system/lib/libstagefright_http_support.so
+    f5318000-f5318fff rw-      3000      1000  /system/lib/libstagefright_http_support.so
+    f5319000-f531afff r--         0      2000  /system/fonts/NotoSansUgaritic-Regular.ttf
+    f531b000-f5342fff r--         0     28000  /system/fonts/NotoSansSinhala-Regular.ttf
+    f5343000-f534dfff r-x         0      b000  /system/lib/libbpf.so (BuildId: 60033cdb81d820992cedf767c8208185)
+    f534e000-f534efff r--      a000      1000  /system/lib/libbpf.so
+    f534f000-f534ffff rw-      b000      1000  /system/lib/libbpf.so
+    f5350000-f535cfff r--         0      d000  /system/fonts/NotoSansSyriacEastern-Regular.ttf
+    f535d000-f536ffff r--         0     13000  /system/fonts/NotoSerifSinhala-Regular.otf
+    f5370000-f5383fff r--         0     14000  /system/fonts/NotoSansOriyaUI-Bold.ttf
+    f5384000-f53b6fff r-x         0     33000  /system/lib/android.hardware.graphics.bufferqueue@1.0.so (BuildId: b2a12dc014c3834bd7ef77f517c3ad82) (load bias 0x1000)
+    f53b7000-f53b7fff ---         0      1000
+    f53b8000-f53b9fff r--     33000      2000  /system/lib/android.hardware.graphics.bufferqueue@1.0.so (load bias 0x1000)
+    f53ba000-f53bafff rw-     35000      1000  /system/lib/android.hardware.graphics.bufferqueue@1.0.so (load bias 0x1000)
+    f53bb000-f53bbfff r--         0      1000
+    f53bc000-f53bdfff r--         0      2000  /system/fonts/NotoSansTagbanwa-Regular.ttf
+    f53be000-f53ccfff r--         0      f000  /system/fonts/NotoSansKaithi-Regular.ttf
+    f53cd000-f53e0fff r--         0     14000  /system/fonts/NotoSansOriyaUI-Regular.ttf
+    f53e1000-f5436fff r-x         0     56000  /system/lib/libsonivox.so (BuildId: 47a1a42006bc8386b3680803db05b56a)
+    f5437000-f5437fff ---         0      1000
+    f5438000-f5438fff r--     56000      1000  /system/lib/libsonivox.so
+    f5439000-f5439fff rw-     57000      1000  /system/lib/libsonivox.so
+    f543a000-f543efff rw-         0      5000
+    f543f000-f544afff r--         0      c000  /system/fonts/NotoSansSyriacEstrangela-Regular.ttf
+    f544b000-f545dfff r-x         0     13000  /system/lib/android.hidl.allocator@1.0.so (BuildId: c6dcb44df843b1936c03ff20a4dbb08c)
+    f545e000-f545efff ---         0      1000
+    f545f000-f545ffff r--     13000      1000  /system/lib/android.hidl.allocator@1.0.so
+    f5460000-f5460fff rw-     14000      1000  /system/lib/android.hidl.allocator@1.0.so
+    f5461000-f5462fff r--         0      2000  /system/fonts/NotoSansTagalog-Regular.ttf
+    f5463000-f5466fff r--         0      4000  /system/fonts/NotoSansSylotiNagri-Regular.ttf
+    f5467000-f546bfff r--         0      5000  /system/fonts/NotoSansSaurashtra-Regular.ttf
+    f546c000-f5480fff r--         0     15000  /system/fonts/NotoSansOriya-Bold.ttf
+    f5481000-f5658fff r-x         0    1d8000  /system/lib/libandroid_runtime.so (BuildId: 731876e4c6b18c896bfcc6a7ac9b68ee) (load bias 0x11000)
+    f5659000-f5659fff ---         0      1000
+    f565a000-f5669fff r--    1d8000     10000  /system/lib/libandroid_runtime.so (load bias 0x11000)
+    f566a000-f566afff rw-    1e8000      1000  /system/lib/libandroid_runtime.so (load bias 0x11000)
+    f566b000-f566cfff rw-         0      2000
+    f566d000-f566dfff r--         0      1000  /system/usr/hyphen-data/hyph-und-ethi.hyb
+    f566e000-f5682fff r--         0     15000  /system/fonts/NotoSansOriya-Regular.ttf
+    f5683000-f5699fff r--         0     17000  /system/fonts/NotoSerifKannada-Bold.ttf
+    f569a000-f56b5fff r--         0     1c000  /system/fonts/NotoSansTeluguUI-Bold.ttf
+    f56b6000-f573dfff r-x         0     88000  /system/lib/libjpeg.so (BuildId: 55e38c3a8310cef98b9f3b80f06fb57d)
+    f573e000-f573efff r--     87000      1000  /system/lib/libjpeg.so
+    f573f000-f573ffff rw-     88000      1000  /system/lib/libjpeg.so
+    f5740000-f5742fff r--         0      3000  /system/fonts/NotoSansSundanese-Regular.ttf
+    f5743000-f576afff r-x         0     28000  /system/lib/libmemunreachable.so (BuildId: 6b36f841b266d36afe275e48f616572f)
+    f576b000-f576bfff ---         0      1000
+    f576c000-f576cfff r--     28000      1000  /system/lib/libmemunreachable.so
+    f576d000-f576dfff rw-     29000      1000  /system/lib/libmemunreachable.so
+    f576e000-f576efff r--         0      1000  /system/usr/hyphen-data/hyph-tk.hyb
+    f576f000-f5771fff r--         0      3000  /system/fonts/NotoSansSamaritan-Regular.ttf
+    f5772000-f5776fff r--         0      5000  /system/fonts/NotoSansNKo-Regular.ttf
+    f5777000-f5792fff r--         0     1c000  /system/fonts/NotoSansTeluguUI-Regular.ttf
+    f5793000-f57b0fff r-x         0     1e000  /system/lib/android.hardware.configstore@1.0.so (BuildId: e8c4ab5faf9ba8d3f687a9357fb0766a)
+    f57b1000-f57b2fff r--     1d000      2000  /system/lib/android.hardware.configstore@1.0.so
+    f57b3000-f57b3fff rw-     1f000      1000  /system/lib/android.hardware.configstore@1.0.so
+    f57b4000-f57b6fff r--         0      3000  /system/fonts/NotoSansRunic-Regular.ttf
+    f57b7000-f57c5fff r--         0      f000  /system/fonts/NotoSansCherokee-Regular.ttf
+    f57c6000-f57fbfff r-x         0     36000  /system/lib/libpng.so (BuildId: 9647e356c7dd286511a487a6455a6e2f)
+    f57fc000-f57fcfff r--     35000      1000  /system/lib/libpng.so
+    f57fd000-f57fdfff rw-     36000      1000  /system/lib/libpng.so
+    f57fe000-f5801fff r--         0      4000  /system/fonts/NotoSansOldPersian-Regular.ttf
+    f5802000-f5818fff r--         0     17000  /system/fonts/NotoSerifKannada-Regular.ttf
+    f5819000-f581afff r-x         0      2000  /system/lib/libhardware_legacy.so (BuildId: 97e0fd778769f5b8ab86b2dc79d0dbfb)
+    f581b000-f581bfff r--      1000      1000  /system/lib/libhardware_legacy.so
+    f581c000-f581cfff rw-      2000      1000  /system/lib/libhardware_legacy.so
+    f581d000-f581efff r--         0      2000  /system/fonts/NotoSansShavian-Regular.ttf
+    f581f000-f5828fff r--         0      a000  /system/fonts/NotoSansJavanese-Regular.ttf
+    f5829000-f584dfff r--         0     25000  /system/fonts/NotoSerifTelugu-Bold.ttf
+    f584e000-f584efff r-x         0      1000  /system/lib/libvndksupport.so (BuildId: bd2ec069943d038639bc8a33c8ef89c8)
+    f584f000-f584ffff r--         0      1000  /system/lib/libvndksupport.so (BuildId: bd2ec069943d038639bc8a33c8ef89c8)
+    f5850000-f5850fff rw-      1000      1000  /system/lib/libvndksupport.so
+    f5851000-f5853fff r--         0      3000  /system/fonts/NotoSansOsage-Regular.ttf
+    f5854000-f589efff r--         0     4b000  /system/fonts/Roboto-Light.ttf
+    f589f000-f58bafff r-x         0     1c000  /system/lib/libutils.so (BuildId: 1f3edeed46ee7b73b59c900fa26616bd)
+    f58bb000-f58bbfff r--     1b000      1000  /system/lib/libutils.so
+    f58bc000-f58bcfff rw-     1c000      1000  /system/lib/libutils.so
+    f58bd000-f58bdfff r--         0      1000  /system/usr/hyphen-data/hyph-te.hyb
+    f58be000-f58d1fff r--         0     14000  /system/fonts/NotoSansKannadaUI-Bold.ttf
+    f58d2000-f58f6fff r--         0     25000  /system/fonts/NotoSerifTelugu-Regular.ttf
+    f58f7000-f58f8fff r-x         0      2000  /system/lib/android.hardware.configstore-utils.so (BuildId: 0e953d73c34ebcd0f169f0159fd7dae8)
+    f58f9000-f58f9fff r--      1000      1000  /system/lib/android.hardware.configstore-utils.so
+    f58fa000-f58fafff rw-      2000      1000  /system/lib/android.hardware.configstore-utils.so
+    f58fb000-f58fcfff r--         0      2000  /system/fonts/NotoSansRejang-Regular.ttf
+    f58fd000-f5902fff r--         0      6000  /system/fonts/NotoSansKharoshthi-Regular.ttf
+    f5903000-f590bfff r--         0      9000  /system/fonts/NotoSansChakma-Regular.ttf
+    f590c000-f5a3afff r-x         0    12f000  /system/lib/libsqlite.so (BuildId: cc1959edfe1cda80d0d9aa16f3768b88) (load bias 0x1000)
+    f5a3b000-f5a3cfff r--    12e000      2000  /system/lib/libsqlite.so (load bias 0x1000)
+    f5a3d000-f5a3dfff rw-    130000      1000  /system/lib/libsqlite.so (load bias 0x1000)
+    f5a3e000-f5a51fff r--         0     14000  /system/fonts/NotoSansKannadaUI-Regular.ttf
+    f5a52000-f5a73fff r-x         0     22000  /system/lib/libpcre2.so (BuildId: c9baca324df2113b4a020b368e0fd19b)
+    f5a74000-f5a74fff r--     21000      1000  /system/lib/libpcre2.so
+    f5a75000-f5a75fff rw-     22000      1000  /system/lib/libpcre2.so
+    f5a76000-f5a76fff r--         0      1000
+    f5a77000-f5a7afff r--         0      4000  /system/fonts/NotoSansNewTaiLue-Regular.ttf
+    f5a7b000-f5a8efff r--         0     14000  /system/fonts/NotoSansKannada-Bold.ttf
+    f5a8f000-f5fabfff r-x         0    51d000  /system/lib/libpdfium.so (BuildId: 2d7d2d8813fe51a490102bae7ca36a56) (load bias 0x7000)
+    f5fac000-f5facfff ---         0      1000
+    f5fad000-f5fb8fff r--    51d000      c000  /system/lib/libpdfium.so (load bias 0x7000)
+    f5fb9000-f5fbbfff rw-    529000      3000  /system/lib/libpdfium.so (load bias 0x7000)
+    f5fbc000-f5fbefff rw-         0      3000
+    f5fbf000-f5fc4fff r--         0      6000  /system/fonts/NotoSansCoptic-Regular.ttf
+    f5fc5000-f5fd0fff r--         0      c000  /system/fonts/NotoSansCanadianAboriginal-Regular.ttf
+    f5fd1000-f5febfff r--         0     1b000  /system/fonts/NotoSansTelugu-Bold.ttf
+    f5fec000-f5fedfff r-x         0      2000  /system/lib/android.hidl.token@1.0-utils.so (BuildId: a395faca894b2ccbe342c95ba7c1cb62)
+    f5fee000-f5feefff ---         0      1000
+    f5fef000-f5feffff r--      2000      1000  /system/lib/android.hidl.token@1.0-utils.so
+    f5ff0000-f5ff0fff rw-      3000      1000  /system/lib/android.hidl.token@1.0-utils.so
+    f5ff1000-f5ff2fff r--         0      2000  /system/fonts/NotoSansPhoenician-Regular.ttf
+    f5ff3000-f5ffffff r--         0      d000  /system/fonts/NotoSansAdlam-Regular.ttf
+    f6000000-f6024fff r-x         0     25000  /system/lib/libui.so (BuildId: 4eaea8dd38603e8f26f85e33181c8f31)
+    f6025000-f6025fff ---         0      1000
+    f6026000-f6026fff r--     25000      1000  /system/lib/libui.so
+    f6027000-f6027fff rw-     26000      1000  /system/lib/libui.so
+    f6028000-f6029fff r--         0      2000  /system/fonts/NotoSansOsmanya-Regular.ttf
+    f602a000-f6031fff r--         0      8000  /system/fonts/NotoSansBalinese-Regular.ttf
+    f6032000-f604dfff r--         0     1c000  /system/fonts/NotoSansTelugu-Regular.ttf
+    f604e000-f61eafff r-x         0    19d000  /system/lib/libicuuc.so (BuildId: b080e10812d3c046dad921adcce994f7) (load bias 0x8000)
+    f61eb000-f61f6fff r--    19c000      c000  /system/lib/libicuuc.so (load bias 0x8000)
+    f61f7000-f61f7fff rw-    1a8000      1000  /system/lib/libicuuc.so (load bias 0x8000)
+    f61f8000-f61f8fff rw-         0      1000
+    f61f9000-f61f9fff r--         0      1000  /system/usr/hyphen-data/hyph-ta.hyb
+    f61fa000-f6201fff r--         0      8000  /system/fonts/NotoSansLaoUI-Bold.ttf
+    f6202000-f6252fff r-x         0     51000  /system/lib/libunwindstack.so (BuildId: 6b8fef1799d1940c4b904ac048d69a41) (load bias 0x1000)
+    f6253000-f6253fff ---         0      1000
+    f6254000-f6257fff r--     51000      4000  /system/lib/libunwindstack.so (load bias 0x1000)
+    f6258000-f6258fff rw-     55000      1000  /system/lib/libunwindstack.so (load bias 0x1000)
+    f6259000-f6259fff r--         0      1000  /system/usr/hyphen-data/hyph-pt.hyb
+    f625a000-f629afff r--         0     41000  /system/fonts/NotoSerif-BoldItalic.ttf
+    f629b000-f62b3fff r-x         0     19000  /system/lib/libpiex.so (BuildId: ccfff77f42b36d935be92f26e4768645)
+    f62b4000-f62b4fff r--     18000      1000  /system/lib/libpiex.so
+    f62b5000-f62b5fff rw-     19000      1000  /system/lib/libpiex.so
+    f62b6000-f62bbfff r--         0      6000  /system/fonts/NotoSansBrahmi-Regular.ttf
+    f62bc000-f62d5fff r--         0     1a000  /system/fonts/NotoSansBengaliUI-Bold.ttf
+    f62d6000-f62f0fff r--         0     1b000  /system/fonts/NotoSansBengaliUI-Regular.ttf
+    f62f1000-f62f3fff r-x         0      3000  /system/lib/libnetd_client.so (BuildId: 8a44c3cf923990c2211945e491efb4d2)
+    f62f4000-f62f4fff r--      2000      1000  /system/lib/libnetd_client.so
+    f62f5000-f62f5fff rw-      3000      1000  /system/lib/libnetd_client.so
+    f62f6000-f62f7fff r--         0      2000  /system/fonts/NotoSansOldTurkic-Regular.ttf
+    f62f8000-f6314fff r--         0     1d000  /system/fonts/NotoSerifBengali-Bold.ttf
+    f6315000-f6327fff r-x         0     13000  /system/lib/android.hidl.token@1.0.so (BuildId: 99bcf51004300adc526152ae04e09216)
+    f6328000-f6328fff ---         0      1000
+    f6329000-f6329fff r--     13000      1000  /system/lib/android.hidl.token@1.0.so
+    f632a000-f632afff rw-     14000      1000  /system/lib/android.hidl.token@1.0.so
+    f632b000-f632efff r--         0      4000  /system/fonts/NotoSansMeeteiMayek-Regular.ttf
+    f632f000-f6336fff r--         0      8000  /system/fonts/NotoSansLaoUI-Regular.ttf
+    f6337000-f6353fff r--         0     1d000  /system/fonts/NotoSerifBengali-Regular.ttf
+    f6354000-f6366fff r-x         0     13000  /system/lib/android.hardware.graphics.allocator@2.0.so (BuildId: 6ea53053d36097c19e206aed1b2160d5)
+    f6367000-f6367fff ---         0      1000
+    f6368000-f6368fff r--     13000      1000  /system/lib/android.hardware.graphics.allocator@2.0.so
+    f6369000-f6369fff rw-     14000      1000  /system/lib/android.hardware.graphics.allocator@2.0.so
+    f636a000-f636bfff r--         0      2000  /system/fonts/NotoSansOldSouthArabian-Regular.ttf
+    f636c000-f6373fff r--         0      8000  /system/fonts/NotoSerifLao-Bold.ttf
+    f6374000-f638cfff r--         0     19000  /system/fonts/NotoSansBengali-Bold.ttf
+    f638d000-f63a0fff r-x         0     14000  /system/lib/android.hardware.cas.native@1.0.so (BuildId: a324c5fb0007306301383e4c44751395)
+    f63a1000-f63a1fff ---         0      1000
+    f63a2000-f63a2fff r--     14000      1000  /system/lib/android.hardware.cas.native@1.0.so
+    f63a3000-f63a3fff rw-     15000      1000  /system/lib/android.hardware.cas.native@1.0.so
+    f63a4000-f63a4fff r--         0      1000  /system/usr/hyphen-data/hyph-pa.hyb
+    f63a5000-f63acfff r--         0      8000  /system/fonts/NotoSerifLao-Regular.ttf
+    f63ad000-f63e9fff r--         0     3d000  /system/fonts/NotoSerif-Italic.ttf
+    f63ea000-f63fafff r-x         0     11000  /system/lib/libimg_utils.so (BuildId: f0c298c20e749b8d3706fe2920a5867b)
+    f63fb000-f63fcfff r--     10000      2000  /system/lib/libimg_utils.so
+    f63fd000-f63fdfff rw-     12000      1000  /system/lib/libimg_utils.so
+    f63fe000-f6412fff r--         0     15000  /system/fonts/NotoSansKannada-Regular.ttf
+    f6413000-f642ffff r--         0     1d000  /system/fonts/NotoSansGujaratiUI-Regular.ttf
+    f6430000-f643bfff r-x         0      c000  /system/lib/libstagefright_xmlparser.so (BuildId: aa027091e497b36faddb11a85c7ebb56)
+    f643c000-f643cfff r--      b000      1000  /system/lib/libstagefright_xmlparser.so
+    f643d000-f643dfff rw-      c000      1000  /system/lib/libstagefright_xmlparser.so
+    f643e000-f643efff r--         0      1000  /system/usr/hyphen-data/hyph-or.hyb
+    f643f000-f6444fff r--         0      6000  /system/fonts/NotoSansCham-Bold.ttf
+    f6445000-f644cfff r--         0      8000  /system/fonts/NotoSansLao-Bold.ttf
+    f644d000-f6469fff r--         0     1d000  /system/fonts/NotoSansGujarati-Bold.ttf
+    f646a000-f647dfff r-x         0     14000  /system/lib/libstatslog.so (BuildId: e227265244a26e3ca87380bdbc4d8f85)
+    f647e000-f647efff r--     13000      1000  /system/lib/libstatslog.so
+    f647f000-f647ffff rw-     14000      1000  /system/lib/libstatslog.so
+    f6480000-f6498fff r--         0     19000  /system/fonts/NotoSansBengali-Regular.ttf
+    f6499000-f64b6fff r--         0     1e000  /system/fonts/NotoSansGujarati-Regular.ttf
+    f64b7000-f6536fff r-x         0     80000  /system/lib/libhidl-gen-utils.so (BuildId: cdf8c75e85e231a61e4ebdb1c53f7d16)
+    f6537000-f6537fff ---         0      1000
+    f6538000-f6538fff r--     80000      1000  /system/lib/libhidl-gen-utils.so
+    f6539000-f6539fff rw-     81000      1000  /system/lib/libhidl-gen-utils.so
+    f653a000-f653bfff r--         0      2000  /system/fonts/NotoSansOldItalic-Regular.ttf
+    f653c000-f6543fff r--         0      8000  /system/fonts/NotoSansLao-Regular.ttf
+    f6544000-f665bfff r-x         0    118000  /system/lib/libcrypto.so (BuildId: b59138815b821fbef21ce0cfa0609385)
+    f665c000-f665cfff ---         0      1000
+    f665d000-f6666fff r--    118000      a000  /system/lib/libcrypto.so
+    f6667000-f6667fff rw-    122000      1000  /system/lib/libcrypto.so
+    f6668000-f6668fff r--         0      1000  /system/usr/hyphen-data/hyph-mr.hyb
+    f6669000-f666afff r--         0      2000  /system/fonts/NotoSansOlChiki-Regular.ttf
+    f666b000-f6673fff r--         0      9000  /system/fonts/NotoSansKhmerUI-Bold.ttf
+    f6674000-f6681fff r--         0      e000  /system/fonts/NotoSansMalayalamUI-Bold.ttf
+    f6682000-f669ffff r--         0     1e000  /system/fonts/NotoSansDevanagariUI-Bold.ttf
+    f66a0000-f66a3fff r-x         0      4000  /system/lib/libnativewindow.so (BuildId: bceffc8c447d576ab9c512d9115f03f1)
+    f66a4000-f66a4fff r--      3000      1000  /system/lib/libnativewindow.so
+    f66a5000-f66a5fff rw-      4000      1000  /system/lib/libnativewindow.so
+    f66a6000-f66a6fff r--         0      1000  /system/usr/hyphen-data/hyph-ml.hyb
+    f66a7000-f66aafff r--         0      4000  /system/fonts/NotoSansMandaic-Regular.ttf
+    f66ab000-f66b8fff r--         0      e000  /system/fonts/NotoSansMalayalamUI-Regular.ttf
+    f66b9000-f66d7fff r--         0     1f000  /system/fonts/NotoSansDevanagariUI-Regular.ttf
+    f66d8000-f66d8fff r-x         0      1000  /system/lib/libhardware.so (BuildId: 5f1695968b168a1d0f3768ef7e96984b)
+    f66d9000-f66d9fff ---         0      1000
+    f66da000-f66dafff r--      1000      1000  /system/lib/libhardware.so
+    f66db000-f66dbfff rw-      2000      1000  /system/lib/libhardware.so
+    f66dc000-f66e7fff r--         0      c000  /system/fonts/NotoSerifKhmer-Bold.otf
+    f66e8000-f6708fff r--         0     21000  /system/fonts/NotoSansDevanagari-Bold.ttf
+    f6709000-f6768fff r-x         0     60000  /system/lib/libhidltransport.so (BuildId: 3419a605d52206af07e6912b51664f07) (load bias 0x2000)
+    f6769000-f6769fff ---         0      1000
+    f676a000-f676dfff r--     60000      4000  /system/lib/libhidltransport.so (load bias 0x2000)
+    f676e000-f676efff rw-     64000      1000  /system/lib/libhidltransport.so (load bias 0x2000)
+    f676f000-f677bfff r--         0      d000  /system/fonts/NotoSerifMalayalam-Bold.ttf
+    f677c000-f6788fff r--         0      d000  /system/fonts/NotoSerifMalayalam-Regular.ttf
+    f6789000-f6861fff r-x         0     d9000  /system/lib/libdng_sdk.so (BuildId: f4f19057c9e679cfb1ec5c216f33493f) (load bias 0x1000)
+    f6862000-f6865fff r--     d8000      4000  /system/lib/libdng_sdk.so (load bias 0x1000)
+    f6866000-f6866fff rw-     dc000      1000  /system/lib/libdng_sdk.so (load bias 0x1000)
+    f6867000-f6868fff r--         0      2000  /system/fonts/NotoSansOgham-Regular.ttf
+    f6869000-f68a5fff r--         0     3d000  /system/fonts/NotoSerif-Bold.ttf
+    f68a6000-f68a9fff r-x         0      4000  /system/lib/libhidlmemory.so (BuildId: 97459df74a72a8a85ed227ff1a458c77)
+    f68aa000-f68aafff ---         0      1000
+    f68ab000-f68abfff r--      4000      1000  /system/lib/libhidlmemory.so
+    f68ac000-f68acfff rw-      5000      1000  /system/lib/libhidlmemory.so
+    f68ad000-f68adfff r--         0      1000  /system/usr/hyphen-data/hyph-la.hyb
+    f68ae000-f68affff r--         0      2000  /system/fonts/NotoSansLydian-Regular.ttf
+    f68b0000-f68bdfff r--         0      e000  /system/fonts/NotoSansMalayalam-Bold.ttf
+    f68be000-f68dffff r--         0     22000  /system/fonts/NotoSansDevanagari-Regular.ttf
+    f68e0000-f68f9fff r-x         0     1a000  /system/lib/libbacktrace.so (BuildId: ba5759fb650adcd07d7e5bfe653fcf89)
+    f68fa000-f68fafff r--     19000      1000  /system/lib/libbacktrace.so
+    f68fb000-f68fbfff rw-     1a000      1000  /system/lib/libbacktrace.so
+    f68fc000-f68fcfff r--         0      1000  /system/usr/hyphen-data/hyph-kn.hyb
+    f68fd000-f6900fff r--         0      4000  /system/fonts/NotoSansGlagolitic-Regular.ttf
+    f6901000-f690efff r--         0      e000  /system/fonts/NotoSansMalayalam-Regular.ttf
+    f690f000-f6936fff r-x         0     28000  /system/lib/libhwbinder.so (BuildId: 62af88e8b97ddc3d5f82ba850f85cea2)
+    f6937000-f6937fff ---         0      1000
+    f6938000-f6938fff r--     28000      1000  /system/lib/libhwbinder.so
+    f6939000-f6939fff rw-     29000      1000  /system/lib/libhwbinder.so
+    f693a000-f693ffff r--         0      6000  /system/fonts/NotoSansCham-Regular.ttf
+    f6940000-f697dfff r-x         0     3e000  /system/lib/libRScpp.so (BuildId: b169e252ccf032365605939343021ba2)
+    f697e000-f697efff r--     3d000      1000  /system/lib/libRScpp.so
+    f697f000-f697ffff rw-     3e000      1000  /system/lib/libRScpp.so
+    f6980000-f6989fff r--         0      a000  /system/fonts/NotoSansKhmerUI-Regular.ttf
+    f698a000-f6a06fff r-x         0     7d000  /system/lib/libclang_rt.ubsan_standalone-i686-android.so
+    f6a07000-f6a07fff r--     7c000      1000  /system/lib/libclang_rt.ubsan_standalone-i686-android.so
+    f6a08000-f6a0afff rw-     7d000      3000  /system/lib/libclang_rt.ubsan_standalone-i686-android.so
+    f6a0b000-f6e76fff rw-         0    46c000
+    f6e77000-f6e92fff r--         0     1c000  /system/fonts/NotoSansGujaratiUI-Bold.ttf
+    f6e93000-f6e98fff r-x         0      6000  /system/lib/libnativehelper.so (BuildId: b99debdaf01a061edb50428f0ea55450)
+    f6e99000-f6e99fff r--      5000      1000  /system/lib/libnativehelper.so
+    f6e9a000-f6e9afff rw-      6000      1000  /system/lib/libnativehelper.so
+    f6e9b000-f6e9cfff r--         0      2000  /system/fonts/NotoSansLycian-Regular.ttf
+    f6e9d000-f6ea6fff r--         0      a000  /system/fonts/NotoSerifKhmer-Regular.otf
+    f6ea7000-f6ec6fff r--         0     20000  /system/fonts/NotoSerifEthiopic-Bold.otf
+    f6ec7000-f6ef0fff r-x         0     2a000  /system/lib/libinput.so (BuildId: cfadce67fc3317f1977c06430676f500) (load bias 0x2000)
+    f6ef1000-f6ef1fff ---         0      1000
+    f6ef2000-f6ef5fff r--     2a000      4000  /system/lib/libinput.so (load bias 0x2000)
+    f6ef6000-f6ef6fff rw-     2e000      1000  /system/lib/libinput.so (load bias 0x2000)
+    f6ef7000-f6efafff r--         0      4000  /system/fonts/NotoSansBatak-Regular.ttf
+    f6efb000-f6f03fff r--         0      9000  /system/fonts/NotoSansTamilUI-Bold.ttf
+    f6f04000-f6f27fff r--         0     24000  /system/fonts/NotoSansEthiopic-Bold.ttf
+    f6f28000-f6f3bfff r-x         0     14000  /system/lib/libtinyxml2.so (BuildId: ed87bb4bec7c58b50ac7aa24180c5ce5)
+    f6f3c000-f6f3cfff ---         0      1000
+    f6f3d000-f6f3dfff r--     14000      1000  /system/lib/libtinyxml2.so
+    f6f3e000-f6f3efff rw-     15000      1000  /system/lib/libtinyxml2.so
+    f6f3f000-f6f40fff r--         0      2000  /system/fonts/NotoSansLisu-Regular.ttf
+    f6f41000-f6f49fff r--         0      9000  /system/fonts/NotoSansTamilUI-Regular.ttf
+    f6f4a000-f6f52fff r--         0      9000  /system/fonts/NotoSerifTamil-Bold.ttf
+    f6f53000-f6f5bfff r-x         0      9000  /system/lib/libnetdutils.so (BuildId: 70fb97690cc807928e1e1c9b2d811d5f)
+    f6f5c000-f6f5cfff r--      8000      1000  /system/lib/libnetdutils.so
+    f6f5d000-f6f5dfff rw-      9000      1000  /system/lib/libnetdutils.so
+    f6f5e000-f6f66fff r--         0      9000  /system/fonts/NotoSerifTamil-Regular.ttf
+    f6f67000-f6fa3fff r--         0     3d000  /system/fonts/NotoSerif-Regular.ttf
+    f6fa4000-f6fa5fff r-x         0      2000  /system/lib/libgraphicsenv.so (BuildId: a2cdd58342d435d4864b252dfd5190ef)
+    f6fa6000-f6fa6fff r--      1000      1000  /system/lib/libgraphicsenv.so
+    f6fa7000-f6fa7fff rw-      2000      1000  /system/lib/libgraphicsenv.so
+    f6fa8000-f6fabfff r--         0      4000  /system/fonts/NotoSansAhom-Regular.otf
+    f6fac000-f6fcefff r--         0     23000  /system/fonts/NotoSansEthiopic-Regular.ttf
+    f6fcf000-f6fd4fff r-x         0      6000  /system/lib/libutilscallstack.so (BuildId: 490c834206b77c1ac4836dfd20cc86ca)
+    f6fd5000-f6fd5fff r--      5000      1000  /system/lib/libutilscallstack.so
+    f6fd6000-f6fd6fff rw-      6000      1000  /system/lib/libutilscallstack.so
+    f6fd7000-f6fdafff r--         0      4000  /system/fonts/NotoSansThaana-Bold.ttf
+    f6fdb000-f7026fff r--         0     4c000  /system/fonts/Roboto-Thin.ttf
+    f7027000-f7027fff r-x         0      1000  /system/lib/android.hardware.graphics.common@1.1.so (BuildId: 285868fc42c96645aa49065f7f9f22ee)
+    f7028000-f7028fff r--         0      1000  /system/lib/android.hardware.graphics.common@1.1.so (BuildId: 285868fc42c96645aa49065f7f9f22ee)
+    f7029000-f7029fff rw-      1000      1000  /system/lib/android.hardware.graphics.common@1.1.so
+    f702a000-f702afff r--         0      1000  /system/usr/hyphen-data/hyph-hy.hyb
+    f702b000-f7033fff r--         0      9000  /system/fonts/NotoSansTamil-Bold.ttf
+    f7034000-f703cfff r--         0      9000  /system/fonts/NotoSansTamil-Regular.ttf
+    f703d000-f7044fff r--         0      8000  /system/fonts/NotoSansGurmukhiUI-Bold.ttf
+    f7045000-f7062fff r--         0     1e000  /system/fonts/NotoNaskhArabicUI-Bold.ttf
+    f7063000-f7072fff r-x         0     10000  /system/lib/libbase.so (BuildId: f6b9d40c21c704fd3463a518c4254d62)
+    f7073000-f7073fff ---         0      1000
+    f7074000-f7074fff r--     10000      1000  /system/lib/libbase.so
+    f7075000-f7075fff rw-     11000      1000  /system/lib/libbase.so
+    f7076000-f7076fff r--         0      1000  /system/usr/hyphen-data/hyph-hr.hyb
+    f7077000-f707efff r--         0      8000  /system/fonts/NotoSansGurmukhiUI-Regular.ttf
+    f707f000-f7086fff r--         0      8000  /system/fonts/NotoSerifGurmukhi-Bold.otf
+    f7087000-f70a4fff r--         0     1e000  /system/fonts/NotoNaskhArabicUI-Regular.ttf
+    f70a5000-f70aafff r-x         0      6000  /system/lib/libnativeloader.so (BuildId: e354fb1c2ee39d008cc7ce73ef305fd0)
+    f70ab000-f70abfff ---         0      1000
+    f70ac000-f70acfff r--      6000      1000  /system/lib/libnativeloader.so
+    f70ad000-f70adfff rw-      7000      1000  /system/lib/libnativeloader.so
+    f70ae000-f70b0fff r--         0      3000  /system/fonts/NotoSansLimbu-Regular.ttf
+    f70b1000-f70b8fff r--         0      8000  /system/fonts/NotoSansGurmukhi-Bold.ttf
+    f70b9000-f70c8fff r--         0     10000  /system/fonts/NotoSerifGujarati-Bold.ttf
+    f70c9000-f70e5fff r--         0     1d000  /system/fonts/NotoNaskhArabic-Bold.ttf
+    f70e6000-f716efff r-x         0     89000  /system/lib/libbinder.so (BuildId: 5f713badebe88863acaf05d099dfba13) (load bias 0x5000)
+    f716f000-f7176fff r--     88000      8000  /system/lib/libbinder.so (load bias 0x5000)
+    f7177000-f7177fff rw-     90000      1000  /system/lib/libbinder.so (load bias 0x5000)
+    f7178000-f7193fff r--         0     1c000  /system/fonts/NotoSerifEthiopic-Regular.otf
+    f7194000-f71a4fff r-x         0     11000  /system/lib/android.hidl.memory.token@1.0.so (BuildId: d6f399b821e391fd4eb52330805a0938)
+    f71a5000-f71a5fff ---         0      1000
+    f71a6000-f71a6fff r--     11000      1000  /system/lib/android.hidl.memory.token@1.0.so
+    f71a7000-f71a7fff rw-     12000      1000  /system/lib/android.hidl.memory.token@1.0.so
+    f71a8000-f71a9fff r--         0      2000  /system/fonts/NotoSansKayahLi-Regular.ttf
+    f71aa000-f71b9fff r--         0     10000  /system/fonts/NotoSerifGujarati-Regular.ttf
+    f71ba000-f71d6fff r--         0     1d000  /system/fonts/NotoNaskhArabic-Regular.ttf
+    f71d7000-f7236fff r-x         0     60000  /system/lib/libharfbuzz_ng.so (BuildId: c24e877f70b9c4b2a2e2bab8ed6981d0)
+    f7237000-f7237fff r--     5f000      1000  /system/lib/libharfbuzz_ng.so
+    f7238000-f7238fff rw-     60000      1000  /system/lib/libharfbuzz_ng.so
+    f7239000-f723ffff r--         0      7000  /system/fonts/NotoSerifGurmukhi-Regular.otf
+    f7240000-f7253fff r--         0     14000  /system/fonts/NotoSerifDevanagari-Bold.ttf
+    f7254000-f7266fff r-x         0     13000  /system/lib/libsensor.so (BuildId: bc840aeb99eca5011410788b5f23a264)
+    f7267000-f7267fff ---         0      1000
+    f7268000-f7269fff r--     13000      2000  /system/lib/libsensor.so
+    f726a000-f726afff rw-     15000      1000  /system/lib/libsensor.so
+    f726b000-f726cfff r--         0      2000  /system/fonts/NotoSansInscriptionalParthian-Regular.ttf
+    f726d000-f7280fff r--         0     14000  /system/fonts/NotoSerifDevanagari-Regular.ttf
+    f7281000-f729dfff r--         0     1d000  /system/fonts/DancingScript-Bold.ttf
+    f729e000-f72b2fff r-x         0     15000  /system/lib/android.hardware.graphics.mapper@2.0.so (BuildId: 76517b6ebfcc2be410aef81044310a0e)
+    f72b3000-f72b3fff ---         0      1000
+    f72b4000-f72b4fff r--     15000      1000  /system/lib/android.hardware.graphics.mapper@2.0.so
+    f72b5000-f72b5fff rw-     16000      1000  /system/lib/android.hardware.graphics.mapper@2.0.so
+    f72b6000-f72b9fff r--         0      4000  /system/fonts/NotoSansThaana-Regular.ttf
+    f72ba000-f72c1fff r--         0      8000  /system/fonts/NotoSansGurmukhi-Regular.ttf
+    f72c2000-f72defff r--         0     1d000  /system/fonts/DancingScript-Regular.ttf
+    f72df000-f72eefff r-x         0     10000  /system/lib/libcutils.so (BuildId: 82632191a75611bfcc5d0fb48ad5ce2f)
+    f72ef000-f72effff ---         0      1000
+    f72f0000-f72f0fff r--     10000      1000  /system/lib/libcutils.so
+    f72f1000-f72f1fff rw-     11000      1000  /system/lib/libcutils.so
+    f72f2000-f72f3fff r--         0      2000  /system/fonts/NotoSansInscriptionalPahlavi-Regular.ttf
+    f72f4000-f72f9fff r--         0      6000  /system/fonts/NotoSerifGeorgian-Bold.ttf
+    f72fa000-f72fffff r--         0      6000  /system/fonts/NotoSerifGeorgian-Regular.ttf
+    f7300000-f731afff r--         0     1b000  /system/fonts/DroidSansMono.ttf
+    f731b000-f73eefff r-x         0     d4000  /system/lib/libc++.so (BuildId: f90fc4b59506ebf8f07ea16580c33a5c) (load bias 0x3000)
+    f73ef000-f73effff ---         0      1000
+    f73f0000-f73f4fff r--     d4000      5000  /system/lib/libc++.so (load bias 0x3000)
+    f73f5000-f73f5fff rw-     d9000      1000  /system/lib/libc++.so (load bias 0x3000)
+    f73f6000-f73f6fff rw-         0      1000
+    f73f7000-f73f8fff r--         0      2000  /system/fonts/NotoSansImperialAramaic-Regular.ttf
+    f73f9000-f73fdfff r--         0      5000  /system/fonts/NotoSansGeorgian-Bold.ttf
+    f73fe000-f7402fff r--         0      5000  /system/fonts/NotoSansGeorgian-Regular.ttf
+    f7403000-f7406fff r--         0      4000  /system/fonts/NotoSerifArmenian-Bold.ttf
+    f7407000-f740afff r--         0      4000  /system/fonts/NotoSerifArmenian-Regular.ttf
+    f740b000-f7430fff r-x         0     26000  /system/lib/libexpat.so (BuildId: ea4ce366e76530912499466c383db9ef)
+    f7431000-f7431fff ---         0      1000
+    f7432000-f7433fff r--     26000      2000  /system/lib/libexpat.so
+    f7434000-f7434fff rw-     28000      1000  /system/lib/libexpat.so
+    f7435000-f7439fff r--         0      5000  /system/fonts/NotoSansThaiUI-Bold.ttf
+    f743a000-f743ffff r--         0      6000  /system/fonts/NotoSansThaiUI-Regular.ttf
+    f7440000-f7444fff r--         0      5000  /system/fonts/NotoSerifThai-Bold.ttf
+    f7445000-f7449fff r--         0      5000  /system/fonts/NotoSerifThai-Regular.ttf
+    f744a000-f7467fff r-x         0     1e000  /system/lib/libbufferhubqueue.so (BuildId: 19248f818fd081bbaf3972ce6688cfa2)
+    f7468000-f7468fff r--     1d000      1000  /system/lib/libbufferhubqueue.so
+    f7469000-f7469fff rw-     1e000      1000  /system/lib/libbufferhubqueue.so
+    f746a000-f746bfff r--         0      2000  /system/fonts/NotoSansHanunoo-Regular.ttf
+    f746c000-f7470fff r--         0      5000  /system/fonts/NotoSansThai-Bold.ttf
+    f7471000-f7476fff r--         0      6000  /system/fonts/NotoSansThai-Regular.ttf
+    f7477000-f7496fff r--         0     20000  /dev/__properties__/u:object_r:persist_debug_prop:s0
+    f7497000-f74b3fff r--    1c2000     1d000  /system/framework/ext.jar
+    f74b4000-f74b7fff r-x         0      4000  /system/lib/libnativebridge.so (BuildId: 5c526231c7d52de70f5cb69566acb329)
+    f74b8000-f74b8fff r--      3000      1000  /system/lib/libnativebridge.so
+    f74b9000-f74b9fff rw-      4000      1000  /system/lib/libnativebridge.so
+    f74ba000-f74bdfff r--         0      4000  /system/fonts/NotoSansArmenian-Bold.ttf
+    f74be000-f74c2fff r--         0      5000  /system/fonts/NotoSerifHebrew-Bold.ttf
+    f74c3000-f74c7fff r--         0      5000  /system/fonts/NotoSerifHebrew-Regular.ttf
+    f74c8000-f74d8fff r-x         0     11000  /system/lib/android.hardware.memtrack@1.0.so (BuildId: 71b79294d7e06d5094624df12fe3fc5c)
+    f74d9000-f74d9fff ---         0      1000
+    f74da000-f74dafff r--     11000      1000  /system/lib/android.hardware.memtrack@1.0.so
+    f74db000-f74dbfff rw-     12000      1000  /system/lib/android.hardware.memtrack@1.0.so
+    f74dc000-f74ddfff r--         0      2000  /system/fonts/NotoSansGothic-Regular.ttf
+    f74de000-f74e2fff r--         0      5000  /system/fonts/NotoSansHebrew-Bold.ttf
+    f74e3000-f74f1fff r--         0      f000  /system/fonts/ComingSoon.ttf
+    f74f2000-f7511fff r--         0     20000  /dev/__properties__/u:object_r:radio_prop:s0
+    f7512000-f752cfff r-x         0     1b000  /system/lib/libunwind.so (BuildId: ae54e7ea297188cf2b98ab649d8bc732)
+    f752d000-f752dfff r--     1a000      1000  /system/lib/libunwind.so
+    f752e000-f752efff rw-     1b000      1000  /system/lib/libunwind.so
+    f752f000-f753dfff rw-         0      f000
+    f753e000-f7541fff r--         0      4000  /system/fonts/NotoSansArmenian-Regular.ttf
+    f7542000-f754bfff r--         0      a000  /system/fonts/CarroisGothicSC-Regular.ttf
+    f754c000-f7556fff r-x         0      b000  /system/lib/libappfuse.so (BuildId: affd28ae3b766702b895ea17adf90000)
+    f7557000-f7557fff r--      a000      1000  /system/lib/libappfuse.so
+    f7558000-f7558fff rw-      b000      1000  /system/lib/libappfuse.so
+    f7559000-f755bfff r--         0      3000  /system/fonts/NotoSansElbasan-Regular.otf
+    f755c000-f7560fff r--         0      5000  /system/fonts/NotoSansHebrew-Regular.ttf
+    f7561000-f7580fff rw-         0     20000  /dev/ashmem/dalvik-LinearAlloc (deleted)
+    f7581000-f7583fff r-x         0      3000  /system/lib/libpackagelistparser.so (BuildId: f8790bae0bae6da612be757a58f46021)
+    f7584000-f7584fff r--      2000      1000  /system/lib/libpackagelistparser.so
+    f7585000-f7585fff rw-      3000      1000  /system/lib/libpackagelistparser.so
+    f7586000-f7596fff r--         0     11000  /system/fonts/CutiveMono.ttf
+    f7597000-f759bfff rw-         0      5000  /dev/ashmem/dalvik-large object space allocation (deleted)
+    f759c000-f759dfff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f759e000-f759ffff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f75a0000-f75a0fff ---         0      1000
+    f75a1000-f75a4fff rw-         0      4000
+    f75a5000-f75a5fff ---         0      1000
+    f75a6000-f75a8fff rw-         0      3000
+    f75a9000-f75a9fff ---         0      1000
+    f75aa000-f75abfff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f75ac000-f75acfff ---         0      1000
+    f75ad000-f75b0fff rw-         0      4000
+    f75b1000-f75b1fff ---         0      1000
+    f75b2000-f75b4fff rw-         0      3000
+    f75b5000-f75b5fff ---         0      1000
+    f75b6000-f75b6fff ---         0      1000
+    f75b7000-f75bafff rw-         0      4000
+    f75bb000-f75bbfff ---         0      1000
+    f75bc000-f75befff rw-         0      3000
+    f75bf000-f75bffff ---         0      1000
+    f75c0000-f75f6fff r-x         0     37000  /system/lib/libstagefright_foundation.so (BuildId: 1ee4590078ca1d11b4d8b835b1c412e6) (load bias 0x2000)
+    f75f7000-f75f7fff ---         0      1000
+    f75f8000-f75f8fff r--     37000      1000  /system/lib/libstagefright_foundation.so (load bias 0x2000)
+    f75f9000-f75fdfff rw-     38000      5000  /system/lib/libstagefright_foundation.so (load bias 0x2000)
+    f75fe000-f75fefff ---         0      1000
+    f75ff000-f7602fff rw-         0      4000
+    f7603000-f7694fff r-x         0     92000  /system/lib/libgui.so (BuildId: 0e193d399c783a1b47c3e6e02bb85e37) (load bias 0x7000)
+    f7695000-f769efff r--     91000      a000  /system/lib/libgui.so (load bias 0x7000)
+    f769f000-f769ffff rw-     9b000      1000  /system/lib/libgui.so (load bias 0x7000)
+    f76a0000-f76a2fff r--         0      3000  /system/fonts/NotoSansDeseret-Regular.ttf
+    f76a3000-f76a3fff ---         0      1000
+    f76a4000-f76a6fff rw-         0      3000
+    f76a7000-f76a7fff ---         0      1000
+    f76a8000-f76abfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76ac000-f76affff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76b0000-f76b3fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76b4000-f76b7fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76b8000-f76bbfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76bc000-f76bffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76c0000-f76c3fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76c4000-f76c7fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76c8000-f76cbfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76cc000-f76cffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76d0000-f76d3fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76d4000-f76eafff r-x         0     17000  /system/lib/liblog.so (BuildId: b2311dd8f0ec86093e545f6b3c88f8b1)
+    f76eb000-f76ebfff r--     16000      1000  /system/lib/liblog.so
+    f76ec000-f76ecfff rw-     17000      1000  /system/lib/liblog.so
+    f76ed000-f76edfff r--         0      1000
+    f76ee000-f76f1fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76f2000-f76f5fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76f6000-f76f9fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76fa000-f76fdfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f76fe000-f7701fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7702000-f7705fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7706000-f7709fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f770a000-f770dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f770e000-f7711fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7712000-f7715fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7716000-f7719fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f771a000-f771dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f771e000-f7721fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7722000-f7725fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7726000-f7729fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f772a000-f772dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f772e000-f7730fff rw-         0      3000
+    f7731000-f7731fff r--         0      1000  /system/usr/hyphen-data/hyph-hi.hyb
+    f7732000-f7732fff r--         0      1000
+    f7733000-f7736fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7737000-f773afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f773b000-f773efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f773f000-f7742fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7743000-f7746fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7747000-f7747fff rw-         0      1000
+    f7748000-f7749fff r--         0      2000  /system/fonts/NotoSansCypriot-Regular.ttf
+    f774a000-f774dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f774e000-f7751fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7752000-f7755fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7756000-f7759fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f775a000-f775dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f775e000-f7761fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7762000-f7762fff r--         0      1000
+    f7763000-f7763fff r--         0      1000  /system/usr/hyphen-data/hyph-gu.hyb
+    f7764000-f7765fff r--         0      2000  /system/fonts/NotoSansCarian-Regular.ttf
+    f7766000-f7769fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f776a000-f776dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f776e000-f776efff r--         0      1000
+    f776f000-f7772fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7773000-f7776fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7777000-f777afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f777b000-f777bfff r--         0      1000
+    f777c000-f777cfff r--         0      1000  /system/usr/hyphen-data/hyph-eu.hyb
+    f777d000-f7780fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7781000-f7784fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7785000-f7788fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7789000-f778cfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f778d000-f7790fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7791000-f7794fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7795000-f7798fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7799000-f7799fff rw-         0      1000
+    f779a000-f779afff r--         0      1000  /system/usr/hyphen-data/hyph-bn.hyb
+    f779b000-f779cfff r--         0      2000  /system/fonts/NotoSansBuhid-Regular.ttf
+    f779d000-f77a0fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77a1000-f77a4fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77a5000-f77a8fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77a9000-f77acfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77ad000-f77b0fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77b1000-f77b1fff r--         0      1000
+    f77b2000-f77b5fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77b6000-f77b9fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77ba000-f77bdfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77be000-f77c1fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77c2000-f77c5fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77c6000-f77c6fff rw-         0      1000
+    f77c7000-f77c7fff rw-         0      1000
+    f77c8000-f77cbfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77cc000-f77cffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77d0000-f77d3fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77d4000-f77d4fff r--         0      1000
+    f77d5000-f77d5fff r--         0      1000  /system/usr/hyphen-data/hyph-bg.hyb
+    f77d6000-f77d9fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77da000-f77ddfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77de000-f77e1fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77e2000-f77e5fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77e6000-f77e9fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77ea000-f77eafff rw-         0      1000
+    f77eb000-f77ebfff r--         0      1000
+    f77ec000-f77edfff r--         0      2000  /system/fonts/NotoSansBuginese-Regular.ttf
+    f77ee000-f77f1fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77f2000-f77f5fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77f6000-f77f9fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77fa000-f77fdfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f77fe000-f7801fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7802000-f7805fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7806000-f7806fff r--         0      1000
+    f7807000-f7809fff r--         0      3000  /system/fonts/NotoSansAvestan-Regular.ttf
+    f780a000-f780dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f780e000-f7811fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7812000-f7815fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7816000-f7819fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f781a000-f781dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f781e000-f7821fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7822000-f7825fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7826000-f7829fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f782a000-f782dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f782e000-f7831fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7832000-f7835fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7836000-f7839fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f783a000-f783dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f783e000-f783efff r--         0      1000
+    f783f000-f783ffff r--         0      1000  /system/usr/hyphen-data/hyph-as.hyb
+    f7840000-f7843fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7844000-f7847fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7848000-f784bfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f784c000-f784ffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7850000-f7853fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7854000-f7857fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7858000-f7858fff rw-         0      1000
+    f7859000-f7859fff r--         0      1000
+    f785a000-f785afff r--         0      1000  /system/framework/android.test.base.jar
+    f785b000-f785efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f785f000-f7862fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7863000-f7866fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7867000-f786afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f786b000-f786efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f786f000-f7872fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7873000-f7876fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7877000-f787afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f787b000-f787efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f787f000-f7882fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7883000-f7886fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7887000-f7887fff r--         0      1000
+    f7888000-f7888fff r--         0      1000  /system/framework/framework-oahl-backward-compatibility.jar
+    f7889000-f7889fff r--         0      1000  /system/framework/android.hidl.manager-V1.0-java.jar
+    f788a000-f788afff r--         0      1000  /system/framework/android.hidl.base-V1.0-java.jar
+    f788b000-f788efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f788f000-f7892fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7893000-f7893fff rw-         0      1000
+    f7894000-f7894fff r--         0      1000  /system/framework/ims-common.jar
+    f7895000-f7898fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7899000-f789cfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f789d000-f78a0fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78a1000-f78a4fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78a5000-f78a6fff r--         0      2000
+    f78a7000-f78aafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78ab000-f78aefff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78af000-f78b2fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78b3000-f78b6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78b7000-f78bafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78bb000-f78befff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78bf000-f78c2fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78c3000-f78c6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78c7000-f78c7fff r--         0      1000
+    f78c8000-f78c8fff r--         0      1000  /system/framework/voip-common.jar
+    f78c9000-f78c9fff r--         0      1000  /system/framework/telephony-common.jar
+    f78ca000-f78cdfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78ce000-f78d1fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78d2000-f78d5fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78d6000-f78d9fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78da000-f78ddfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78de000-f78e1fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78e2000-f78e5fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78e6000-f78e9fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78ea000-f78edfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78ee000-f78f1fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78f2000-f78f5fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78f6000-f78f9fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78fa000-f78fdfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f78fe000-f7901fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7902000-f7905fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7906000-f7909fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f790a000-f790dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f790e000-f7911fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7912000-f7915fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7916000-f7919fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f791a000-f791dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f791e000-f7921fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7922000-f7925fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7926000-f7929fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f792a000-f792dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f792e000-f7931fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7932000-f7932fff r--         0      1000
+    f7933000-f7933fff r--         0      1000  /system/framework/framework.jar
+    f7934000-f7937fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7938000-f7938fff rw-         0      1000
+    f7939000-f7939fff r--      4000      1000  /system/framework/apache-xml.jar
+    f793a000-f793bfff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f793c000-f793ffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7940000-f7943fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7944000-f7947fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7948000-f794bfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f794c000-f794ffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7950000-f7950fff r--         0      1000
+    f7951000-f7951fff r--         0      1000  /system/framework/bouncycastle.jar
+    f7952000-f7955fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7956000-f7956fff rw-         0      1000
+    f7957000-f7957fff rw-         0      1000
+    f7958000-f795bfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f795c000-f795ffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7960000-f7963fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7964000-f7967fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7968000-f796bfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f796c000-f796ffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7970000-f7973fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7974000-f7977fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7978000-f797bfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f797c000-f797ffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7980000-f7983fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7984000-f7984fff r--         0      1000
+    f7985000-f7986fff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f7987000-f798afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f798b000-f798efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f798f000-f798ffff rw-         0      1000
+    f7990000-f7990fff r--         0      1000  /system/framework/okhttp.jar
+    f7991000-f7992fff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f7993000-f7996fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7997000-f799afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f799b000-f799efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f799f000-f79a2fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79a3000-f79a6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79a7000-f79aafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79ab000-f79aefff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79af000-f79b2fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79b3000-f79b6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79b7000-f79bafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79bb000-f79befff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79bf000-f79c2fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79c3000-f79c6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79c7000-f79cafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79cb000-f79cefff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79cf000-f79d2fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79d3000-f79d6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79d7000-f79dafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79db000-f79defff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79df000-f79dffff rw-         0      1000
+    f79e0000-f79e0fff r--         0      1000  /system/framework/conscrypt.jar
+    f79e1000-f79e1fff r--         0      1000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/base.apk
+    f79e2000-f79e2fff rw-         0      1000  /dev/ashmem/dalvik-mod union bitmap (deleted)
+    f79e3000-f79e6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79e7000-f79eafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79eb000-f79eefff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79ef000-f79f2fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79f3000-f79f5fff r--         0      3000
+    f79f6000-f79f6fff r--      4000      1000  /system/framework/core-libart.jar
+    f79f7000-f79fafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79fb000-f79fefff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f79ff000-f7a02fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a03000-f7a06fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a07000-f7a0afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a0b000-f7a0efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a0f000-f7a12fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a13000-f7a16fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a17000-f7a1afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a1b000-f7a1efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a1f000-f7a22fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a23000-f7a26fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a27000-f7a2afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a2b000-f7a2efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a2f000-f7a32fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a33000-f7a36fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a37000-f7a3afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a3b000-f7a3efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a3f000-f7a42fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a43000-f7a46fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a47000-f7a4afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a4b000-f7a4efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a4f000-f7a52fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a53000-f7a56fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a57000-f7a57fff rw-         0      1000
+    f7a58000-f7a58fff r--     1e000      1000  /system/framework/core-oj.jar
+    f7a59000-f7a59fff r--         0      1000
+    f7a5a000-f7a5dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a5e000-f7a61fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a62000-f7a65fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a66000-f7a69fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a6a000-f7a6dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a6e000-f7a71fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a72000-f7a75fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a76000-f7a79fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a7a000-f7a7dfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a7e000-f7a81fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a82000-f7a85fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a86000-f7a89fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a8a000-f7a8afff r--         0      1000
+    f7a8b000-f7a8efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a8f000-f7a92fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a93000-f7a96fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a97000-f7a9afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a9b000-f7a9efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7a9f000-f7aa2fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7aa3000-f7aa6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7aa7000-f7aaafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7aab000-f7aaefff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7aaf000-f7aeefff rw-         0     40000  /dev/ashmem/dalvik-mark stack (deleted)
+    f7aef000-f7aeffff r-x         0      1000  /system/lib/libsigchain.so (BuildId: aeab89adc81a41ad8de06295df1813ad)
+    f7af0000-f7af0fff r--         0      1000  /system/lib/libsigchain.so (BuildId: aeab89adc81a41ad8de06295df1813ad)
+    f7af1000-f7af1fff rw-      1000      1000  /system/lib/libsigchain.so
+    f7af2000-f7af2fff r--         0      1000
+    f7af3000-f7af6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7af7000-f7afafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7afb000-f7b1afff rw-         0     20000  /dev/ashmem/dalvik-large marked objects (deleted)
+    f7b1b000-f7b1bfff r--         0      1000
+    f7b1c000-f7b1cfff rw-         0      1000
+    f7b1d000-f7b20fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7b21000-f7b24fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7b25000-f7b28fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7b29000-f7b2cfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7b2d000-f7b4cfff rw-         0     20000  /dev/ashmem/dalvik-large live objects (deleted)
+    f7b4d000-f7b6cfff r--         0     20000  /dev/__properties__/u:object_r:fingerprint_prop:s0
+    f7b6d000-f7b8cfff r--         0     20000  /dev/__properties__/u:object_r:debug_prop:s0
+    f7b8d000-f7b8dfff r--         0      1000
+    f7b8e000-f7b8efff rw-         0      1000
+    f7b8f000-f7b92fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7b93000-f7b96fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7b97000-f7b9afff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7b9b000-f7b9efff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7b9f000-f7ba2fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7ba3000-f7ba6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7ba7000-f7bc6fff r--         0     20000  /dev/__properties__/u:object_r:system_prop:s0
+    f7bc7000-f7be6fff r--         0     20000  /dev/__properties__/u:object_r:vold_prop:s0
+    f7be7000-f7be7fff rw-         0      1000
+    f7be8000-f7be8fff r--         0      1000
+    f7be9000-f7becfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7bed000-f7bf0fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7bf1000-f7c10fff r--         0     20000  /dev/__properties__/u:object_r:config_prop:s0
+    f7c11000-f7c30fff r--         0     20000  /dev/__properties__/u:object_r:dalvik_prop:s0
+    f7c31000-f7c50fff r--         0     20000  /dev/__properties__/u:object_r:log_tag_prop:s0
+    f7c51000-f7c51fff r--         0      1000
+    f7c52000-f7c53fff rw-         0      2000
+    f7c54000-f7c57fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7c58000-f7c5bfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7c5c000-f7c5ffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7c60000-f7c63fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7c64000-f7c67fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7c68000-f7c6bfff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7c6c000-f7c6ffff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7c70000-f7c8ffff r--         0     20000  /dev/__properties__/u:object_r:logd_prop:s0
+    f7c90000-f7caffff r--         0     20000  /proc/version
+    f7cb0000-f7cb0fff rw-         0      1000
+    f7cb1000-f7cb2fff r--         0      2000
+    f7cb3000-f7cb6fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7cb7000-f7cbafff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7cbb000-f7cbbfff r--         0      1000
+    f7cbc000-f7cbdfff rw-         0      2000  /dev/ashmem/dalvik-indirect ref table (deleted)
+    f7cbe000-f7cc1fff rw-         0      4000  /dev/ashmem/dalvik-thread local mark stack (deleted)
+    f7cc2000-f7cc2fff r--      5000      1000  /data/dalvik-cache/x86/system@framework@boot-android.test.base.art
+    f7cc3000-f7cc3fff rw-         0      1000
+    f7cc4000-f7cd4fff r--    863000     11000  /data/dalvik-cache/x86/system@framework@boot-framework.art
+    f7cd5000-f7cd5fff rw-         0      1000
+    f7cd6000-f7cd6fff r--      2000      1000  /data/dalvik-cache/x86/system@framework@boot-framework-oahl-backward-compatibility.art
+    f7cd7000-f7cd7fff r--      6000      1000  /data/dalvik-cache/x86/system@framework@boot-android.hidl.manager-V1.0-java.art
+    f7cd8000-f7cd8fff r--      3000      1000  /data/dalvik-cache/x86/system@framework@boot-android.hidl.base-V1.0-java.art
+    f7cd9000-f7cd9fff r--     17000      1000  /data/dalvik-cache/x86/system@framework@boot-ims-common.art
+    f7cda000-f7cdafff r--      d000      1000  /data/dalvik-cache/x86/system@framework@boot-voip-common.art
+    f7cdb000-f7cdcfff r--     f4000      2000  /data/dalvik-cache/x86/system@framework@boot-telephony-common.art
+    f7cdd000-f7cddfff r--         0      1000
+    f7cde000-f7cdefff r--     46000      1000  /data/dalvik-cache/x86/system@framework@boot-ext.art
+    f7cdf000-f7cdffff r--     5c000      1000  /data/dalvik-cache/x86/system@framework@boot-apache-xml.art
+    f7ce0000-f7ce0fff r--     5d000      1000  /data/dalvik-cache/x86/system@framework@boot-bouncycastle.art
+    f7ce1000-f7ce1fff r--     30000      1000  /data/dalvik-cache/x86/system@framework@boot-okhttp.art
+    f7ce2000-f7ce4fff r--    109000      3000  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+    f7ce5000-f7ce5fff r--         0      1000
+    f7ce6000-f7ce6fff r--     34000      1000  /data/dalvik-cache/x86/system@framework@boot-conscrypt.art
+    f7ce7000-f7cecfff rw-         0      6000  /system/etc/event-log-tags
+    f7ced000-f7d0cfff r--         0     20000  /dev/__properties__/u:object_r:default_prop:s0
+    f7d0d000-f7d0dfff rw-         0      1000
+    f7d0e000-f7d12fff r--    23b000      5000  /data/dalvik-cache/x86/system@framework@boot.art
+    f7d13000-f7d13fff r--         0      1000
+    f7d14000-f7d17fff rw-         0      4000
+    f7d18000-f7d37fff r--         0     20000  /dev/__properties__/properties_serial
+    f7d38000-f7d3afff r--         0      3000  /dev/__properties__/property_info
+    f7d3b000-f7d3cfff r--         0      2000
+    f7d3d000-f7d3dfff r--         0      1000
+    f7d3e000-f7d3efff r--         0      1000
+    f7d3f000-f7d40fff r--         0      2000
+    f7d41000-f7d41fff r--         0      1000
+    f7d42000-f7d42fff r--         0      1000
+    f7d43000-f7d43fff rw-         0      1000
+    f7d44000-f7d63fff r--         0     20000  /dev/__properties__/u:object_r:default_prop:s0
+    f7d64000-f7d64fff rw-         0      1000
+    f7d65000-f7d65fff r--         0      1000
+    f7d66000-f7d66fff rw-         0      1000
+    f7d67000-f7d67fff rw-         0      1000
+    f7d68000-f7d68fff r--         0      1000
+    f7d69000-f7d88fff r--         0     20000  /dev/__properties__/u:object_r:debug_prop:s0
+    f7d89000-f7d89fff ---         0      1000
+    f7d8a000-f7d8afff rw-         0      1000
+    f7d8b000-f7d8bfff ---         0      1000
+    f7d8c000-f7dabfff r--         0     20000  /dev/__properties__/properties_serial
+    f7dac000-f7dacfff rw-         0      1000
+    f7dad000-f7daffff r--         0      3000  /dev/__properties__/property_info
+    f7db0000-f7db0fff r--         0      1000
+    f7db1000-f7db1fff r--    5a6000      1000  /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/base.apk
+    f7db2000-f7db2fff rw-         0      1000
+    f7db3000-f7db3fff rw-         0      1000
+    f7db4000-f7db4fff rw-         0      1000
+    f7db5000-f7db5fff r--         0      1000
+    f7db6000-f7db6fff ---         0      1000
+    f7db7000-f7dbafff rw-         0      4000
+    f7dbb000-f7dbbfff rw-         0      1000
+    f7dbc000-f7dbcfff ---         0      1000
+    f7dbd000-f7dbffff rw-         0      3000
+    f7dc0000-f7dc0fff ---         0      1000
+    f7dc1000-f7dc3fff r--         0      3000  [vvar]
+    f7dc4000-f7dc5fff r-x         0      2000  [vdso] (BuildId: 3aa2f25052a3a16d02dafd4483360109406655a5)
+    f7dc6000-f7f07fff r-x         0    142000  /system/bin/linker (BuildId: 6f3f6cab36353c6bf4e0d874db4e0762)
+    f7f08000-f7f0dfff r--    141000      6000  /system/bin/linker
+    f7f0e000-f7f0efff rw-    147000      1000  /system/bin/linker
+    f7f0f000-f7f10fff rw-         0      2000
+    f7f11000-f7f11fff r--         0      1000
+    f7f12000-f7f17fff rw-         0      6000
+    ff775000-ff775fff ---         0      1000
+    ff776000-fff74fff rw-         0    7ff000  [stack]
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18148, name: box.gamepad.ps3  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffffc  ebx 0000001c  ecx fff726d8  edx 00000010
+    edi 00000000  esi ffffffff
+    ebp 00000008  esp fff72600  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 00078f9b  /system/lib/libc.so (__epoll_pwait+43)
+    #02 pc 000329cd  /system/lib/libc.so (epoll_wait+45)
+    #03 pc 00013567  /system/lib/libutils.so (android::Looper::pollInner(int)+183)
+    #04 pc 0001340b  /system/lib/libutils.so (android::Looper::pollOnce(int, int*, int*, void**)+43)
+    #05 pc 000e4b2b  /system/lib/libandroid_runtime.so (android::android_os_MessageQueue_nativePollOnce(_JNIEnv*, _jobject*, long long, int)+59)
+    #06 pc 003deb28  /system/framework/x86/boot-framework.oat (offset 0x3cb000) (android.media.MediaExtractor.seekTo [DEDUPED]+136)
+    #07 pc 00a770a8  /system/framework/x86/boot-framework.oat (offset 0x3cb000) (android.os.MessageQueue.next+232)
+    #08 pc 00a74809  /system/framework/x86/boot-framework.oat (offset 0x3cb000) (android.os.Looper.loop+521)
+    #09 pc 00864abd  /system/framework/x86/boot-framework.oat (offset 0x3cb000) (android.app.ActivityThread.main+653)
+    #10 pc 005f10d2  /system/lib/libart.so
+    #11 pc 000a315f  /system/lib/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+239)
+    #12 pc 004d36d9  /system/lib/libart.so
+    #13 pc 004d53be  /system/lib/libart.so (art::InvokeMethod(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jobject*, _jobject*, unsigned int)+1422)
+    #14 pc 00449b13  /system/lib/libart.so
+    #15 pc 0011d778  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.Class.getDeclaredMethodInternal [DEDUPED]+168)
+    #16 pc 00ba8aa9  /system/framework/x86/boot-framework.oat (offset 0x3cb000) (com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run+137)
+    #17 pc 00bafefc  /system/framework/x86/boot-framework.oat (offset 0x3cb000) (com.android.internal.os.ZygoteInit.main+3100)
+    #18 pc 005f10d2  /system/lib/libart.so
+    #19 pc 000a315f  /system/lib/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+239)
+    #20 pc 004d36d9  /system/lib/libart.so
+    #21 pc 004d335d  /system/lib/libart.so (art::InvokeWithVarArgs(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, char*)+429)
+    #22 pc 003a7bdd  /system/lib/libart.so
+    #23 pc 00070a8e  /system/lib/libandroid_runtime.so (_JNIEnv::CallStaticVoidMethod(_jclass*, _jmethodID*, ...)+62)
+    #24 pc 00073f78  /system/lib/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+744)
+    #25 pc 00001bb2  /system/bin/app_process32 (main+1506)
+    #26 pc 000c3cd4  /system/lib/libc.so (__libc_init+100)
+
+stack:
+         fff725c0  ec8e8780  <anonymous:ec880000>
+         fff725c4  00000000
+         fff725c8  e6eba3bb  /system/framework/framework-res.apk
+         fff725cc  f58b40a4  /system/lib/libutils.so (_ZNK7android6VectorINS_6Looper8ResponseEE10do_destroyEPvj+20)
+         fff725d0  0000002a
+         fff725d4  f58bbe90  /system/lib/libutils.so
+         fff725d8  fff725f8  [stack]
+         fff725dc  f58a9761  /system/lib/libutils.so (_ZN7android12SharedBuffer7deallocEPKS0_+33)
+         fff725e0  ec8e8780  <anonymous:ec880000>
+         fff725e4  f58bbe90  /system/lib/libutils.so
+         fff725e8  fff72618  [stack]
+         fff725ec  ec8e8780  <anonymous:ec880000>
+         fff725f0  f332638c  <anonymous:f3280000>
+         fff725f4  f58bbe90  /system/lib/libutils.so
+         fff725f8  fff72638  [stack]
+         fff725fc  f58b0568  /system/lib/libutils.so (_ZN7android10VectorImpl7_shrinkEjj+600)
+    #00  fff72600  00000008
+         ........  ........
+    #01  fff72610  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  fff72630  0000001c
+         ........  ........
+    #03  fff72670  0000001c
+         ........  ........
+    #04  fff727c0  f3326340  <anonymous:f3280000>
+         ........  ........
+    #05  fff72800  f3326340  <anonymous:f3280000>
+         ........  ........
+    #06  fff72850  f3319380  <anonymous:f3280000>
+         ........  ........
+    #07  fff728a0  71845150  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         ........  ........
+    #08  fff72930  7176eed0  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         ........  ........
+    #09  fff72a20  7182ffdc  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         ........  ........
+    #10  fff72a60  00000000
+         ........  ........
+    #11  fff72a80  7182ffdc  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         ........  ........
+    #12  fff72b20  7182ffdc  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         ........  ........
+    #13  fff72be0  fff72c90  [stack]
+         ........  ........
+    #14  fff72d10  fff72d38  [stack]
+         ........  ........
+    #15  fff72d70  f3319380  <anonymous:f3280000>
+         ........  ........
+    #16  fff72dc0  71754ad8  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         ........  ........
+    #17  fff72df0  7183fbdc  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         ........  ........
+    #18  fff72e90  00000000
+         ........  ........
+    #19  fff72eb0  7183fbdc  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         ........  ........
+    #20  fff72f50  7183fbdc  /data/dalvik-cache/x86/system@framework@boot-framework.art
+         ........  ........
+    #21  fff73010  fff73050  [stack]
+         ........  ........
+    #22  fff730d0  fff73118  [stack]
+         ........  ........
+    #23  fff73170  f3319380  <anonymous:f3280000>
+         ........  ........
+    #24  fff731b0  f3319380  <anonymous:f3280000>
+         ........  ........
+    #25  fff73260  fff732d8  [stack]
+         ........  ........
+    #26  fff74340  00000006
+         fff74344  fff743d4  [stack]
+         fff74348  fff743f0  [stack]
+         fff7434c  f4d86c87  /system/lib/libc.so (__libc_init+23)
+         fff74350  00000000
+         fff74354  00000000
+         fff74358  00000006
+         fff7435c  00000000
+         fff74360  00000000
+         fff74364  00000000
+         fff74368  00000000
+         fff7436c  00000000
+         fff74370  00000000
+         fff74374  56562ef8  /system/bin/app_process32
+         fff74378  fff743b8  [stack]
+         fff7437c  5655e58b  /system/bin/app_process32
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18153, name: Jit thread pool  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffe00  ebx f33724c0  ecx 00000000  edx 00000001
+    edi 00000000  esi 00000000
+    ebp 00000000  esp f015c778  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 0001ff48  /system/lib/libc.so (syscall+40)
+    #02 pc 000abc5e  /system/lib/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+110)
+    #03 pc 000abbe3  /system/lib/libart.so (art::ConditionVariable::Wait(art::Thread*)+35)
+    #04 pc 00530455  /system/lib/libart.so (art::ThreadPool::GetTask(art::Thread*)+261)
+    #05 pc 0052f825  /system/lib/libart.so (art::ThreadPoolWorker::Run()+117)
+    #06 pc 0052f24b  /system/lib/libart.so (art::ThreadPoolWorker::Callback(void*)+139)
+    #07 pc 00091de5  /system/lib/libc.so
+    #08 pc 0002539b  /system/lib/libc.so
+
+stack:
+         f015c738  00000001
+         f015c73c  00000001
+         f015c740  00000000
+         f015c744  00000000
+         f015c748  00000000
+         f015c74c  f2c278d1  /system/lib/libart.so (_ZN3art5Mutex15ExclusiveUnlockEPNS_6ThreadE+17)
+         f015c750  ecf0a080  <anonymous:ecd80000>
+         f015c754  f4db9dbc  <anonymous:f4db7000>
+         f015c758  f72f1040  /system/lib/libcutils.so
+         f015c75c  f72f10a0  /system/lib/libcutils.so
+         f015c760  f3178c73  /system/lib/libart.so
+         f015c764  005b0000
+         f015c768  f4db9dbc  <anonymous:f4db7000>
+         f015c76c  f308c5b1  /system/lib/libart.so
+         f015c770  f3178d37  /system/lib/libart.so
+         f015c774  f3178d1a  /system/lib/libart.so
+    #00  f015c778  00000000
+         ........  ........
+    #01  f015c788  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  f015c7a0  000000f0
+         ........  ........
+    #03  f015c820  f33724b8  <anonymous:f3280000>
+         ........  ........
+    #04  f015c850  f33724b8  <anonymous:f3280000>
+         ........  ........
+    #05  f015c890  f3372480  <anonymous:f3280000>
+         ........  ........
+    #06  f015c8c0  f3352e60  <anonymous:f3280000>
+         ........  ........
+    #07  f015c910  f3352e60  <anonymous:f3280000>
+         ........  ........
+    #08  f015c930  f015c970  /dev/ashmem/dalvik-Jit thread pool worker thread 0 (deleted)
+         f015c934  00000000
+         f015c938  00000000
+         f015c93c  00000000
+         f015c940  00000000
+         f015c944  00000000
+         f015c948  00000000
+         f015c94c  fff70270  [stack]
+         f015c950  f015c978  /dev/ashmem/dalvik-Jit thread pool worker thread 0 (deleted)
+         f015c954  003d0f00
+         f015c958  fff70228  [stack]
+         f015c95c  f4ce2d67  /system/lib/libc.so
+         f015c960  f4d54db0  /system/lib/libc.so
+         f015c964  f015c970  /dev/ashmem/dalvik-Jit thread pool worker thread 0 (deleted)
+         f015c968  00000000
+         f015c96c  00000000
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18154, name: Signal Catcher  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffffc  ebx f005b800  ecx 00000000  edx 00000000
+    edi 00000204  esi 00000008
+    ebp f005b828  esp f005b7b8  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 000795e1  /system/lib/libc.so (__rt_sigtimedwait+33)
+    #02 pc 00030839  /system/lib/libc.so (sigwait+73)
+    #03 pc 004fb799  /system/lib/libart.so (art::SignalCatcher::WaitForSignal(art::Thread*, art::SignalSet&)+265)
+    #04 pc 004f9eb0  /system/lib/libart.so (art::SignalCatcher::Run(void*)+320)
+    #05 pc 00091de5  /system/lib/libc.so
+    #06 pc 0002539b  /system/lib/libc.so
+
+stack:
+         f005b778  f005b7e8  <anonymous:eff60000>
+         f005b77c  00000009
+         f005b780  00000000
+         f005b784  f322985c  /system/lib/libart.so
+         f005b788  f005b7e8  <anonymous:eff60000>
+         f005b78c  f3093467  /system/lib/libart.so (_ZN3art6Thread17NotifyThreadGroupERNS_33ScopedObjectAccessAlreadyRunnableEP8_jobject+279)
+         f005b790  f3319700  <anonymous:f3280000>
+         f005b794  00000009
+         f005b798  00000000
+         f005b79c  f3093361  /system/lib/libart.so (_ZN3art6Thread17NotifyThreadGroupERNS_33ScopedObjectAccessAlreadyRunnableEP8_jobject+17)
+         f005b7a0  f3179792  /system/lib/libart.so
+         f005b7a4  f3319700  <anonymous:f3280000>
+         f005b7a8  f3319700  <anonymous:f3280000>
+         f005b7ac  f3319700  <anonymous:f3280000>
+         f005b7b0  00000009
+         f005b7b4  f4db9dbc  <anonymous:f4db7000>
+    #00  f005b7b8  f005b828  <anonymous:eff60000>
+         ........  ........
+    #01  f005b7c8  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  f005b7e0  f005b800  <anonymous:eff60000>
+         ........  ........
+    #03  f005b830  f005b8e0  <anonymous:eff60000>
+         ........  ........
+    #04  f005b8a0  ecec84a0  <anonymous:ecd80000>
+         ........  ........
+    #05  f005b910  ecec84a0  <anonymous:ecd80000>
+         ........  ........
+    #06  f005b930  f005b970  <anonymous:eff60000>
+         f005b934  00000000
+         f005b938  00000000
+         f005b93c  00000000
+         f005b940  00000000
+         f005b944  00000000
+         f005b948  00000000
+         f005b94c  fff703f0  [stack]
+         f005b950  f005b978  <anonymous:eff60000>
+         f005b954  003d0f00
+         f005b958  fff703a8  [stack]
+         f005b95c  f4ce2d67  /system/lib/libc.so
+         f005b960  f4d54db0  /system/lib/libc.so
+         f005b964  f005b970  <anonymous:eff60000>
+         f005b968  00000000
+         f005b96c  00000000
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18155, name: ReferenceQueueD  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffe00  ebx f32a1028  ecx 00000000  edx 00000000
+    edi 00000000  esi 00000000
+    ebp 00000000  esp eff5d338  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 0001ff48  /system/lib/libc.so (syscall+40)
+    #02 pc 000abc5e  /system/lib/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+110)
+    #03 pc 000abbe3  /system/lib/libart.so (art::ConditionVariable::Wait(art::Thread*)+35)
+    #04 pc 004100c6  /system/lib/libart.so (art::Monitor::Wait(art::Thread*, long long, int, bool, art::ThreadState)+630)
+    #05 pc 004120f5  /system/lib/libart.so (art::Monitor::Wait(art::Thread*, art::mirror::Object*, long long, int, bool, art::ThreadState)+453)
+    #06 pc 00431442  /system/lib/libart.so
+    #07 pc 001142a8  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.Object.notify [DEDUPED]+104)
+    #08 pc 00187e2d  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (java.lang.Daemons$ReferenceQueueDaemon.runInternal+125)
+    #09 pc 0011421e  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (java.lang.Daemons$Daemon.run+78)
+    #10 pc 00269e7a  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.Thread.run+74)
+    #11 pc 005f0f02  /system/lib/libart.so
+    #12 pc 000a314e  /system/lib/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+222)
+    #13 pc 004d36d9  /system/lib/libart.so
+    #14 pc 004d4987  /system/lib/libart.so (art::InvokeVirtualOrInterfaceWithJValues(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, jvalue*)+471)
+    #15 pc 0050991c  /system/lib/libart.so (art::Thread::CreateCallback(void*)+1484)
+    #16 pc 00091de5  /system/lib/libc.so
+    #17 pc 0002539b  /system/lib/libc.so
+
+stack:
+         eff5d2f8  00000001
+         eff5d2fc  00000001
+         eff5d300  00000000
+         eff5d304  00000000
+         eff5d308  00000000
+         eff5d30c  f2c278d1  /system/lib/libart.so (_ZN3art5Mutex15ExclusiveUnlockEPNS_6ThreadE+17)
+         eff5d310  00000000
+         eff5d314  00000000
+         eff5d318  00000000
+         eff5d31c  ecf05000  <anonymous:ecd80000>
+         eff5d320  f3178c73  /system/lib/libart.so
+         eff5d324  f322985c  /system/lib/libart.so
+         eff5d328  eff5d4b8  <anonymous:efe5a000>
+         eff5d32c  f2f87c59  /system/lib/libart.so (_ZN3art7Monitor4LockILNS_10LockReasonE1EEEvPNS_6ThreadE+89)
+         eff5d330  f3178d37  /system/lib/libart.so
+         eff5d334  f3178d1a  /system/lib/libart.so
+    #00  eff5d338  00000000
+         ........  ........
+    #01  eff5d348  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  eff5d360  000000f0
+         ........  ........
+    #03  eff5d3e0  f32a1020  <anonymous:f3280000>
+         ........  ........
+    #04  eff5d410  f32a1020  <anonymous:f3280000>
+         ........  ........
+    #05  eff5d4a0  ecf05000  <anonymous:ecd80000>
+         ........  ........
+    #06  eff5d520  f335d800  <anonymous:f3280000>
+         ........  ........
+    #07  eff5d570  ecf0a000  <anonymous:ecd80000>
+         ........  ........
+    #08  eff5d5b0  70f6b960  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+         ........  ........
+    #09  eff5d5e0  70f844d4  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+         ........  ........
+    #10  eff5d600  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #11  eff5d620  00000000
+         ........  ........
+    #12  eff5d640  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #13  eff5d6e0  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #14  eff5d7a0  eff5d7e0  <anonymous:efe5a000>
+         ........  ........
+    #15  eff5d860  eff5d8b0  <anonymous:efe5a000>
+         ........  ........
+    #16  eff5d910  f335d800  <anonymous:f3280000>
+         ........  ........
+    #17  eff5d930  eff5d970  <anonymous:efe5a000>
+         eff5d934  00000000
+         eff5d938  00000000
+         eff5d93c  00000000
+         eff5d940  00000000
+         eff5d944  00000000
+         eff5d948  00000000
+         eff5d94c  fff72a30  [stack]
+         eff5d950  eff5d978  <anonymous:efe5a000>
+         eff5d954  003d0f00
+         eff5d958  fff729e8  [stack]
+         eff5d95c  f4ce2d67  /system/lib/libc.so
+         eff5d960  f4d54db0  /system/lib/libc.so
+         eff5d964  eff5d970  <anonymous:efe5a000>
+         eff5d968  00000000
+         eff5d96c  00000000
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18156, name: FinalizerDaemon  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffe00  ebx f3289948  ecx 00000000  edx 00000000
+    edi 00000000  esi 00000000
+    ebp 00000000  esp efe57298  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 0001ff48  /system/lib/libc.so (syscall+40)
+    #02 pc 000abc5e  /system/lib/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+110)
+    #03 pc 000abbe3  /system/lib/libart.so (art::ConditionVariable::Wait(art::Thread*)+35)
+    #04 pc 004100c6  /system/lib/libart.so (art::Monitor::Wait(art::Thread*, long long, int, bool, art::ThreadState)+630)
+    #05 pc 004120f5  /system/lib/libart.so (art::Monitor::Wait(art::Thread*, art::mirror::Object*, long long, int, bool, art::ThreadState)+453)
+    #06 pc 004314b5  /system/lib/libart.so
+    #07 pc 00114398  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.Object.wait [DEDUPED]+136)
+    #08 pc 00193267  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.ref.ReferenceQueue.remove+455)
+    #09 pc 00193073  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.ref.ReferenceQueue.remove+51)
+    #10 pc 00187297  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (java.lang.Daemons$FinalizerDaemon.runInternal+359)
+    #11 pc 0011421e  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (java.lang.Daemons$Daemon.run+78)
+    #12 pc 00269e7a  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.Thread.run+74)
+    #13 pc 005f0f02  /system/lib/libart.so
+    #14 pc 000a314e  /system/lib/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+222)
+    #15 pc 004d36d9  /system/lib/libart.so
+    #16 pc 004d4987  /system/lib/libart.so (art::InvokeVirtualOrInterfaceWithJValues(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, jvalue*)+471)
+    #17 pc 0050991c  /system/lib/libart.so (art::Thread::CreateCallback(void*)+1484)
+    #18 pc 00091de5  /system/lib/libc.so
+    #19 pc 0002539b  /system/lib/libc.so
+
+stack:
+         efe57258  00000001
+         efe5725c  00000001
+         efe57260  00000000
+         efe57264  00000000
+         efe57268  00000000
+         efe5726c  f2c278d1  /system/lib/libart.so (_ZN3art5Mutex15ExclusiveUnlockEPNS_6ThreadE+17)
+         efe57270  00000000
+         efe57274  00000000
+         efe57278  e6eba3bb  /system/framework/framework-res.apk
+         efe5727c  f2c272d1  /system/lib/libart.so (_ZN3art5Mutex13ExclusiveLockEPNS_6ThreadE+17)
+         efe57280  f3178c73  /system/lib/libart.so
+         efe57284  00000001
+         efe57288  f4db9dbc  <anonymous:f4db7000>
+         efe5728c  f328b500  <anonymous:f3280000>
+         efe57290  f3178d37  /system/lib/libart.so
+         efe57294  f3178d1a  /system/lib/libart.so
+    #00  efe57298  00000000
+         ........  ........
+    #01  efe572a8  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  efe572c0  000000f0
+         ........  ........
+    #03  efe57340  f3289940  <anonymous:f3280000>
+         ........  ........
+    #04  efe57370  f3289940  <anonymous:f3280000>
+         ........  ........
+    #05  efe57400  f328b500  <anonymous:f3280000>
+         ........  ........
+    #06  efe57480  f335de00  <anonymous:f3280000>
+         ........  ........
+    #07  efe574d0  f3319e00  <anonymous:f3280000>
+         ........  ........
+    #08  efe57520  70dfea60  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #09  efe57570  70dfea44  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #10  efe57590  70f77cfc  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+         ........  ........
+    #11  efe575e0  70f844d4  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+         ........  ........
+    #12  efe57600  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #13  efe57620  00000000
+         ........  ........
+    #14  efe57640  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #15  efe576e0  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #16  efe577a0  efe577e0  <anonymous:efd54000>
+         ........  ........
+    #17  efe57860  efe578b0  <anonymous:efd54000>
+         ........  ........
+    #18  efe57910  f335de00  <anonymous:f3280000>
+         ........  ........
+    #19  efe57930  efe57970  <anonymous:efd54000>
+         efe57934  00000000
+         efe57938  00000000
+         efe5793c  00000000
+         efe57940  00000000
+         efe57944  00000000
+         efe57948  00000000
+         efe5794c  fff72a30  [stack]
+         efe57950  efe57978  <anonymous:efd54000>
+         efe57954  003d0f00
+         efe57958  fff729e8  [stack]
+         efe5795c  f4ce2d67  /system/lib/libc.so
+         efe57960  f4d54db0  /system/lib/libc.so
+         efe57964  efe57970  <anonymous:efd54000>
+         efe57968  00000000
+         efe5796c  00000000
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18157, name: FinalizerWatchd  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffe00  ebx f32a1d18  ecx 00000000  edx 00000000
+    edi 00000000  esi 00000000
+    ebp 00000000  esp efd51338  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 0001ff48  /system/lib/libc.so (syscall+40)
+    #02 pc 000abc5e  /system/lib/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+110)
+    #03 pc 000abbe3  /system/lib/libart.so (art::ConditionVariable::Wait(art::Thread*)+35)
+    #04 pc 004100c6  /system/lib/libart.so (art::Monitor::Wait(art::Thread*, long long, int, bool, art::ThreadState)+630)
+    #05 pc 004120f5  /system/lib/libart.so (art::Monitor::Wait(art::Thread*, art::mirror::Object*, long long, int, bool, art::ThreadState)+453)
+    #06 pc 00431442  /system/lib/libart.so
+    #07 pc 001142a8  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.Object.notify [DEDUPED]+104)
+    #08 pc 00187764  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (java.lang.Daemons$FinalizerWatchdogDaemon.sleepUntilNeeded+68)
+    #09 pc 00187b1a  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (java.lang.Daemons$FinalizerWatchdogDaemon.runInternal+74)
+    #10 pc 0011421e  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (java.lang.Daemons$Daemon.run+78)
+    #11 pc 00269e7a  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.Thread.run+74)
+    #12 pc 005f0f02  /system/lib/libart.so
+    #13 pc 000a314e  /system/lib/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+222)
+    #14 pc 004d36d9  /system/lib/libart.so
+    #15 pc 004d4987  /system/lib/libart.so (art::InvokeVirtualOrInterfaceWithJValues(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, jvalue*)+471)
+    #16 pc 0050991c  /system/lib/libart.so (art::Thread::CreateCallback(void*)+1484)
+    #17 pc 00091de5  /system/lib/libc.so
+    #18 pc 0002539b  /system/lib/libc.so
+
+stack:
+         efd512f8  00000001
+         efd512fc  00000001
+         efd51300  00000000
+         efd51304  00000000
+         efd51308  00000000
+         efd5130c  f2c278d1  /system/lib/libart.so (_ZN3art5Mutex15ExclusiveUnlockEPNS_6ThreadE+17)
+         efd51310  00000000
+         efd51314  00000000
+         efd51318  00000000
+         efd5131c  f328b440  <anonymous:f3280000>
+         efd51320  f3178c73  /system/lib/libart.so
+         efd51324  f322985c  /system/lib/libart.so
+         efd51328  efd514b8  <anonymous:efc4e000>
+         efd5132c  f2f87c59  /system/lib/libart.so (_ZN3art7Monitor4LockILNS_10LockReasonE1EEEvPNS_6ThreadE+89)
+         efd51330  f3178d37  /system/lib/libart.so
+         efd51334  f3178d1a  /system/lib/libart.so
+    #00  efd51338  00000000
+         ........  ........
+    #01  efd51348  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  efd51360  000000f0
+         ........  ........
+    #03  efd513e0  f32a1d10  <anonymous:f3280000>
+         ........  ........
+    #04  efd51410  f32a1d10  <anonymous:f3280000>
+         ........  ........
+    #05  efd514a0  f328b440  <anonymous:f3280000>
+         ........  ........
+    #06  efd51520  f3360800  <anonymous:f3280000>
+         ........  ........
+    #07  efd51570  f3319b00  <anonymous:f3280000>
+         ........  ........
+    #08  efd515b0  70f77e8c  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+         ........  ........
+    #09  efd515c0  70f77ee0  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+         ........  ........
+    #10  efd515e0  70f844d4  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+         ........  ........
+    #11  efd51600  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #12  efd51620  00000000
+         ........  ........
+    #13  efd51640  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #14  efd516e0  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #15  efd517a0  efd517e0  <anonymous:efc4e000>
+         ........  ........
+    #16  efd51860  efd518b0  <anonymous:efc4e000>
+         ........  ........
+    #17  efd51910  f3360800  <anonymous:f3280000>
+         ........  ........
+    #18  efd51930  efd51970  <anonymous:efc4e000>
+         efd51934  00000000
+         efd51938  00000000
+         efd5193c  00000000
+         efd51940  00000000
+         efd51944  00000000
+         efd51948  00000000
+         efd5194c  fff72a30  [stack]
+         efd51950  efd51978  <anonymous:efc4e000>
+         efd51954  003d0f00
+         efd51958  fff729e8  [stack]
+         efd5195c  f4ce2d67  /system/lib/libc.so
+         efd51960  f4d54db0  /system/lib/libc.so
+         efd51964  efd51970  <anonymous:efc4e000>
+         efd51968  00000000
+         efd5196c  00000000
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18158, name: HeapTaskDaemon  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffe00  ebx f328a9f8  ecx 00000000  edx 00000019
+    edi 00000000  esi 00000000
+    ebp 00000000  esp efc4b3c8  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 0001ff48  /system/lib/libc.so (syscall+40)
+    #02 pc 000abc5e  /system/lib/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+110)
+    #03 pc 000abbe3  /system/lib/libart.so (art::ConditionVariable::Wait(art::Thread*)+35)
+    #04 pc 0023a832  /system/lib/libart.so (art::gc::TaskProcessor::GetTask(art::Thread*)+402)
+    #05 pc 0023b212  /system/lib/libart.so (art::gc::TaskProcessor::RunAllTasks(art::Thread*)+98)
+    #06 pc 00424a57  /system/lib/libart.so
+    #07 pc 0007c1b8  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (dalvik.system.VMRuntime.clampGrowthLimit [DEDUPED]+104)
+    #08 pc 00187d64  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (java.lang.Daemons$HeapTaskDaemon.runInternal+196)
+    #09 pc 0011421e  /system/framework/x86/boot-core-libart.oat (offset 0x7a000) (java.lang.Daemons$Daemon.run+78)
+    #10 pc 00269e7a  /system/framework/x86/boot.oat (offset 0x114000) (java.lang.Thread.run+74)
+    #11 pc 005f0f02  /system/lib/libart.so
+    #12 pc 000a314e  /system/lib/libart.so (art::ArtMethod::Invoke(art::Thread*, unsigned int*, unsigned int, art::JValue*, char const*)+222)
+    #13 pc 004d36d9  /system/lib/libart.so
+    #14 pc 004d4987  /system/lib/libart.so (art::InvokeVirtualOrInterfaceWithJValues(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, jvalue*)+471)
+    #15 pc 0050991c  /system/lib/libart.so (art::Thread::CreateCallback(void*)+1484)
+    #16 pc 00091de5  /system/lib/libc.so
+    #17 pc 0002539b  /system/lib/libc.so
+
+stack:
+         efc4b388  00000001
+         efc4b38c  00000001
+         efc4b390  00000000
+         efc4b394  00000000
+         efc4b398  00000000
+         efc4b39c  f2c278d1  /system/lib/libart.so (_ZN3art5Mutex15ExclusiveUnlockEPNS_6ThreadE+17)
+         efc4b3a0  00000000
+         efc4b3a4  00000000
+         efc4b3a8  00000000
+         efc4b3ac  f4d56174  /system/lib/libc.so (pthread_mutex_unlock+20)
+         efc4b3b0  f3178c73  /system/lib/libart.so
+         efc4b3b4  00000000
+         efc4b3b8  00000000
+         efc4b3bc  00000000
+         efc4b3c0  f3178d37  /system/lib/libart.so
+         efc4b3c4  f3178d1a  /system/lib/libart.so
+    #00  efc4b3c8  00000000
+         ........  ........
+    #01  efc4b3d8  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  efc4b3f0  000000f0
+         ........  ........
+    #03  efc4b470  f328a9f0  <anonymous:f3280000>
+         ........  ........
+    #04  efc4b4a0  f328a9f0  <anonymous:f3280000>
+         ........  ........
+    #05  efc4b510  f328a9c0  <anonymous:f3280000>
+         ........  ........
+    #06  efc4b550  f328a9c0  <anonymous:f3280000>
+         ........  ........
+    #07  efc4b580  f32b1e80  <anonymous:f3280000>
+         ........  ........
+    #08  efc4b5c0  70f72420  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+         ........  ........
+    #09  efc4b5e0  70f844d4  /data/dalvik-cache/x86/system@framework@boot-core-libart.art
+         ........  ........
+    #10  efc4b600  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #11  efc4b620  00000000
+         ........  ........
+    #12  efc4b640  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #13  efc4b6e0  70e4c5a0  /data/dalvik-cache/x86/system@framework@boot.art
+         ........  ........
+    #14  efc4b7a0  efc4b7e0  <anonymous:efb48000>
+         ........  ........
+    #15  efc4b860  efc4b8b0  <anonymous:efb48000>
+         ........  ........
+    #16  efc4b910  f3360e00  <anonymous:f3280000>
+         ........  ........
+    #17  efc4b930  efc4b970  <anonymous:efb48000>
+         efc4b934  00000000
+         efc4b938  00000000
+         efc4b93c  00000000
+         efc4b940  00000000
+         efc4b944  00000000
+         efc4b948  00000000
+         efc4b94c  fff72a30  [stack]
+         efc4b950  efc4b978  <anonymous:efb48000>
+         efc4b954  003d0f00
+         efc4b958  fff729e8  [stack]
+         efc4b95c  f4ce2d67  /system/lib/libc.so
+         efc4b960  f4d54db0  /system/lib/libc.so
+         efc4b964  efc4b970  <anonymous:efb48000>
+         efc4b968  00000000
+         efc4b96c  00000000
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18159, name: Binder:18148_1  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffe00  ebx 00000009  ecx c0306201  edx efa47708
+    edi fffffff7  esi f4db9dbc
+    ebp efa476d8  esp efa4768c  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 0007921c  /system/lib/libc.so (__ioctl+28)
+    #02 pc 0002b3dc  /system/lib/libc.so (ioctl+60)
+    #03 pc 00045247  /system/lib/libbinder.so (android::IPCThreadState::talkWithDriver(bool)+391)
+    #04 pc 0004545a  /system/lib/libbinder.so (android::IPCThreadState::getAndExecuteCommand()+42)
+    #05 pc 00045d58  /system/lib/libbinder.so (android::IPCThreadState::joinThreadPool(bool)+72)
+    #06 pc 00070f69  /system/lib/libbinder.so (android::PoolThread::threadLoop()+41)
+    #07 pc 0000e616  /system/lib/libutils.so (android::Thread::_threadLoop(void*)+326)
+    #08 pc 000742fb  /system/lib/libandroid_runtime.so (android::AndroidRuntime::javaThreadShell(void*)+171)
+    #09 pc 0000df76  /system/lib/libutils.so (thread_data_t::trampoline(thread_data_t const*)+246)
+    #10 pc 00091de5  /system/lib/libc.so
+    #11 pc 0002539b  /system/lib/libc.so
+
+stack:
+         efa4764c  f7126b49  /system/lib/libbinder.so (_ZN7android14IPCThreadState14executeCommandEi+1385)
+         efa47650  efa476b8  <anonymous:ef94c000>
+         efa47654  ecf1a000  <anonymous:ecd80000>
+         efa47658  ecf1a000  <anonymous:ecd80000>
+         efa4765c  f71265f4  /system/lib/libbinder.so (_ZN7android14IPCThreadState14executeCommandEi+20)
+         efa47660  ecf1a02c  <anonymous:ecd80000>
+         efa47664  f4db9dbc  <anonymous:f4db7000>
+         efa47668  00000000
+         efa4766c  00000000
+         efa47670  000046e4
+         efa47674  00002760
+         efa47678  00000000
+         efa4767c  00000000
+         efa47680  00000000
+         efa47684  00000000
+         efa47688  00000000
+    #00  efa4768c  efa476d8  <anonymous:ef94c000>
+         ........  ........
+    #01  efa4769c  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  efa476b0  00000009
+         ........  ........
+    #03  efa476e0  00000009
+         ........  ........
+    #04  efa47760  ecf1a000  <anonymous:ecd80000>
+         ........  ........
+    #05  efa477b0  ecf1a000  <anonymous:ecd80000>
+         ........  ........
+    #06  efa477f0  ecf1a000  <anonymous:ecd80000>
+         ........  ........
+    #07  efa47810  f33676c0  <anonymous:f3280000>
+         ........  ........
+    #08  efa47870  f33676c0  <anonymous:f3280000>
+         ........  ........
+    #09  efa478d0  f32a1fa0  <anonymous:f3280000>
+         ........  ........
+    #10  efa47910  ece17130  <anonymous:ecd80000>
+         ........  ........
+    #11  efa47930  efa47970  <anonymous:ef94c000>
+         efa47934  00000000
+         efa47938  00000000
+         efa4793c  00000000
+         efa47940  00000000
+         efa47944  00000000
+         efa47948  00000000
+         efa4794c  fff72a00  [stack]
+         efa47950  efa47978  <anonymous:ef94c000>
+         efa47954  003d0f00
+         efa47958  fff729b8  [stack]
+         efa4795c  f4ce2d67  /system/lib/libc.so
+         efa47960  f4d54db0  /system/lib/libc.so
+         efa47964  efa47970  <anonymous:ef94c000>
+         efa47968  00000000
+         efa4796c  00000000
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18160, name: Binder:18148_2  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffe00  ebx 00000009  ecx c0306201  edx ed209708
+    edi fffffff7  esi f4db9dbc
+    ebp ed2096d8  esp ed20968c  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 0007921c  /system/lib/libc.so (__ioctl+28)
+    #02 pc 0002b3dc  /system/lib/libc.so (ioctl+60)
+    #03 pc 00045247  /system/lib/libbinder.so (android::IPCThreadState::talkWithDriver(bool)+391)
+    #04 pc 0004545a  /system/lib/libbinder.so (android::IPCThreadState::getAndExecuteCommand()+42)
+    #05 pc 00045d58  /system/lib/libbinder.so (android::IPCThreadState::joinThreadPool(bool)+72)
+    #06 pc 00070f69  /system/lib/libbinder.so (android::PoolThread::threadLoop()+41)
+    #07 pc 0000e616  /system/lib/libutils.so (android::Thread::_threadLoop(void*)+326)
+    #08 pc 000742fb  /system/lib/libandroid_runtime.so (android::AndroidRuntime::javaThreadShell(void*)+171)
+    #09 pc 0000df76  /system/lib/libutils.so (thread_data_t::trampoline(thread_data_t const*)+246)
+    #10 pc 00091de5  /system/lib/libc.so
+    #11 pc 0002539b  /system/lib/libc.so
+
+stack:
+         ed20964c  f4db9dbc  <anonymous:f4db7000>
+         ed209650  ed2096b8  <anonymous:ed10e000>
+         ed209654  f3372640  <anonymous:f3280000>
+         ed209658  f3372640  <anonymous:f3280000>
+         ed20965c  f71265f4  /system/lib/libbinder.so (_ZN7android14IPCThreadState14executeCommandEi+20)
+         ed209660  f337266c  <anonymous:f3280000>
+         ed209664  f58bbe90  /system/lib/libutils.so
+         ed209668  ed2096a8  <anonymous:ed10e000>
+         ed20966c  00000000
+         ed209670  f3325d90  <anonymous:f3280000>
+         ed209674  00000010
+         ed209678  e6eba3bb  /system/framework/framework-res.apk
+         ed20967c  f58b0324  /system/lib/libutils.so (_ZN7android10VectorImpl7_shrinkEjj+20)
+         ed209680  00000000
+         ed209684  00000000
+         ed209688  00000000
+    #00  ed20968c  ed2096d8  <anonymous:ed10e000>
+         ........  ........
+    #01  ed20969c  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  ed2096b0  00000009
+         ........  ........
+    #03  ed2096e0  00000009
+         ........  ........
+    #04  ed209760  f3372640  <anonymous:f3280000>
+         ........  ........
+    #05  ed2097b0  f3372640  <anonymous:f3280000>
+         ........  ........
+    #06  ed2097f0  f3372640  <anonymous:f3280000>
+         ........  ........
+    #07  ed209810  ecf0b150  <anonymous:ecd80000>
+         ........  ........
+    #08  ed209870  ecf0b150  <anonymous:ecd80000>
+         ........  ........
+    #09  ed2098d0  ecf03110  <anonymous:ecd80000>
+         ........  ........
+    #10  ed209910  ecf03130  <anonymous:ecd80000>
+         ........  ........
+    #11  ed209930  ed209970  <anonymous:ed10e000>
+         ed209934  00000000
+         ed209938  00000000
+         ed20993c  00000000
+         ed209940  00000000
+         ed209944  00000000
+         ed209948  00000000
+         ed20994c  efa474b0  <anonymous:ef94c000>
+         ed209950  ed209978  <anonymous:ed10e000>
+         ed209954  003d0f00
+         ed209958  efa47468  <anonymous:ef94c000>
+         ed20995c  f4ce2d67  /system/lib/libc.so
+         ed209960  f4d54db0  /system/lib/libc.so
+         ed209964  ed209970  <anonymous:ed10e000>
+         ed209968  00000000
+         ed20996c  00000000
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 18148, tid: 18162, name: Binder:18148_3  >>> com.nkentseu.sandbox.gamepad.ps3 <<<
+    eax fffffe00  ebx 00000009  ecx c0306201  edx ed10b708
+    edi fffffff7  esi f4db9dbc
+    ebp ed10b6d8  esp ed10b68c  eip f7dc4c29
+
+backtrace:
+    #00 pc 00000c29  [vdso:f7dc4000] (__kernel_vsyscall+9)
+    #01 pc 0007921c  /system/lib/libc.so (__ioctl+28)
+    #02 pc 0002b3dc  /system/lib/libc.so (ioctl+60)
+    #03 pc 00045247  /system/lib/libbinder.so (android::IPCThreadState::talkWithDriver(bool)+391)
+    #04 pc 0004545a  /system/lib/libbinder.so (android::IPCThreadState::getAndExecuteCommand()+42)
+    #05 pc 00045d58  /system/lib/libbinder.so (android::IPCThreadState::joinThreadPool(bool)+72)
+    #06 pc 00070f69  /system/lib/libbinder.so (android::PoolThread::threadLoop()+41)
+    #07 pc 0000e616  /system/lib/libutils.so (android::Thread::_threadLoop(void*)+326)
+    #08 pc 000742fb  /system/lib/libandroid_runtime.so (android::AndroidRuntime::javaThreadShell(void*)+171)
+    #09 pc 0000df76  /system/lib/libutils.so (thread_data_t::trampoline(thread_data_t const*)+246)
+    #10 pc 00091de5  /system/lib/libc.so
+    #11 pc 0002539b  /system/lib/libc.so
+
+stack:
+         ed10b64c  f4db9dbc  <anonymous:f4db7000>
+         ed10b650  80000000
+         ed10b654  f338da80  <anonymous:f3280000>
+         ed10b658  eced5600  <anonymous:ecd80000>
+         ed10b65c  f71265f4  /system/lib/libbinder.so (_ZN7android14IPCThreadState14executeCommandEi+20)
+         ed10b660  0000000c
+         ed10b664  ed10b688  <anonymous:ed010000>
+         ed10b668  ed10b6d8  <anonymous:ed010000>
+         ed10b66c  00000000
+         ed10b670  ec8e8080  <anonymous:ec880000>
+         ed10b674  ec8e8084  <anonymous:ec880000>
+         ed10b678  e6eba3bb  /system/framework/framework-res.apk
+         ed10b67c  f58b0324  /system/lib/libutils.so (_ZN7android10VectorImpl7_shrinkEjj+20)
+         ed10b680  f4dbcc30  <anonymous:f4db7000>
+         ed10b684  f4db9dbc  <anonymous:f4db7000>
+         ed10b688  00000001
+    #00  ed10b68c  ed10b6d8  <anonymous:ed010000>
+         ........  ........
+    #01  ed10b69c  f7dc4c20  [vdso] (__kernel_vsyscall)
+         ........  ........
+    #02  ed10b6b0  00000009
+         ........  ........
+    #03  ed10b6e0  00000009
+         ........  ........
+    #04  ed10b760  ecf1a380  <anonymous:ecd80000>
+         ........  ........
+    #05  ed10b7b0  ecf1a380  <anonymous:ecd80000>
+         ........  ........
+    #06  ed10b7f0  ecf1a380  <anonymous:ecd80000>
+         ........  ........
+    #07  ed10b810  ecf0b180  <anonymous:ecd80000>
+         ........  ........
+    #08  ed10b870  ecf0b180  <anonymous:ecd80000>
+         ........  ........
+    #09  ed10b8d0  ecf03130  <anonymous:ecd80000>
+         ........  ........
+    #10  ed10b910  ecf03150  <anonymous:ecd80000>
+         ........  ........
+    #11  ed10b930  ed10b970  <anonymous:ed010000>
+         ed10b934  00000000
+         ed10b938  00000000
+         ed10b93c  00000000
+         ed10b940  00000000
+         ed10b944  00000000
+         ed10b948  00000000
+         ed10b94c  efa474b0  <anonymous:ef94c000>
+         ed10b950  ed10b978  <anonymous:ed010000>
+         ed10b954  003d0f00
+         ed10b958  efa47468  <anonymous:ef94c000>
+         ed10b95c  f4ce2d67  /system/lib/libc.so
+         ed10b960  f4d54db0  /system/lib/libc.so
+         ed10b964  ed10b970  <anonymous:ed010000>
+         ed10b968  00000000
+         ed10b96c  00000000
+
+open files:
+    fd 0: /dev/null
+    fd 1: /dev/null
+    fd 2: /dev/null
+    fd 3: /proc/version
+    fd 4: /proc/version
+    fd 5: socket:[3668212]
+    fd 6: /sys/kernel/debug/tracing/trace_marker
+    fd 7: /dev/null
+    fd 8: /dev/null
+    fd 9: /dev/binder
+    fd 10: /dev/null
+    fd 11: anon_inode:[eventfd]
+    fd 12: /system/framework/core-oj.jar
+    fd 13: /system/framework/core-libart.jar
+    fd 14: /system/framework/conscrypt.jar
+    fd 15: /system/framework/okhttp.jar
+    fd 16: /system/framework/bouncycastle.jar
+    fd 17: /system/framework/apache-xml.jar
+    fd 18: /system/framework/ext.jar
+    fd 19: /system/framework/framework.jar
+    fd 20: /system/framework/telephony-common.jar
+    fd 21: /system/framework/voip-common.jar
+    fd 22: /system/framework/ims-common.jar
+    fd 23: /system/framework/android.hidl.base-V1.0-java.jar
+    fd 24: /system/framework/android.hidl.manager-V1.0-java.jar
+    fd 25: /system/framework/framework-oahl-backward-compatibility.jar
+    fd 26: /system/framework/android.test.base.jar
+    fd 27: /system/framework/framework-res.apk
+    fd 28: anon_inode:[eventpoll]
+    fd 29: /data/app/com.nkentseu.sandbox.gamepad.ps3-9auY2_ve0B7keO9g58fz_A==/base.apk
+    fd 30: /dev/ashmem
+    fd 31: pipe:[3669066]
+    fd 32: pipe:[3669066]
+    fd 33: pipe:[3669067]
+    fd 34: pipe:[3669067]
+    fd 35: anon_inode:[eventfd]
+    fd 36: anon_inode:[eventpoll]
+    fd 37: pipe:[3668250]
+    fd 38: socket:[3668245]
+    fd 39: socket:[3668247]
+    fd 40: socket:[3669069]
+    fd 41: pipe:[3668250]
+    fd 43: socket:[3669077]

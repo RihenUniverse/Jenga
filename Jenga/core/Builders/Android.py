@@ -478,10 +478,18 @@ class AndroidBuilder(Builder):
             else:
                 args.append(f"-l{lib}")
 
-        # Lien automatique de la STL C++ si nécessaire
-        if hasattr(project, 'cppDialect') and project.cppDialect:
-            if 'c++_shared' not in project.links:
-                args.append("-lc++_shared")
+        # Lien automatique de la STL C++ si nécessaire.
+        # androidStl = "c++_static" → -nostdlib++ + -lc++_static + -lc++abi
+        #                              (runtime embarqué dans le .so, libc++_shared.so non nécessaire)
+        # androidStl = "c++_shared" → laisse le driver NDK auto-lier libc++_shared.so
+        #                              (libc++_shared.so doit être bundlé dans l'APK)
+        # androidStl = ""           → auto : c++_shared si C++ détecté (comportement NDK par défaut)
+        if 'c++_shared' not in project.links and 'c++_static' not in project.links:
+            stl_pref = getattr(project, 'androidStl', '')
+            if stl_pref == 'c++_static':
+                # -nostdlib++ empêche le driver NDK d'auto-ajouter libc++_shared.so
+                args.extend(["-nostdlib++", "-lc++_static", "-lc++abi"])
+            # else: c++_shared or auto → NDK driver auto-adds libc++_shared (bundled in APK)
 
         # -----------------------------------------------------------------------
         # Exécution du linker
@@ -953,6 +961,12 @@ class AndroidBuilder(Builder):
 
         return 0
 
+    def BuildProject(self, project: Project) -> bool:
+        # TEST_SUITE projects cannot run on Android — skip compilation and linking entirely.
+        if project.kind == ProjectKind.TEST_SUITE:
+            return True
+        return super().BuildProject(project)
+
     def Build(self, targetProject: Optional[str] = None) -> int:
         if self._ShouldUseNdkMk():
             return self._BuildUsingNdkMk(targetProject)
@@ -974,8 +988,8 @@ class AndroidBuilder(Builder):
                 if exe_path.exists():
                     Reporter.Success(f"Executable generated: {exe_path}")
                 else:
-                    Reporter.Error(f"Executable not built: {proj.name}")
-                    return 1
+                    # No Android source files for this console app — skip gracefully
+                    Reporter.Info(f"Skipping {proj.name}: no Android executable produced (no source files for Android)")
                 continue
 
             # Pour les applications graphiques : détecter si fat APK (multi-ABI) ou single APK
@@ -1157,29 +1171,36 @@ class AndroidBuilder(Builder):
                     Reporter.Error(f"Failed to build for {abi}")
                     return False
 
-                # Include NDK's C++ STL library (libc++_shared.so) for this ABI
-                host_tag = {
-                    "win32": "windows-x86_64",
-                    "linux": "linux-x86_64",
-                    "darwin": "darwin-x86_64"
-                }.get(sys.platform, "linux-x86_64")
+                # Bundle libc++_shared.so sauf si androidStl="c++_static" (runtime embarqué).
+                stl_pref = getattr(project, 'androidStl', '')
+                is_cpp = bool(getattr(project, 'cppdialect', '') or getattr(project, 'language', '') == 'C++')
+                uses_shared_stl = is_cpp and stl_pref != 'c++_static' and not any(
+                    'c++_static' in (getattr(p, 'links', []) or [])
+                    for p in [project]
+                )
+                if uses_shared_stl:
+                    host_tag = {
+                        "win32": "windows-x86_64",
+                        "linux": "linux-x86_64",
+                        "darwin": "darwin-x86_64"
+                    }.get(sys.platform, "linux-x86_64")
 
-                # Map ABI to NDK lib directory name
-                abi_to_lib_dir = {
-                    "armeabi-v7a": "arm-linux-androideabi",
-                    "arm64-v8a": "aarch64-linux-android",
-                    "x86": "i686-linux-android",
-                    "x86_64": "x86_64-linux-android"
-                }
+                    abi_to_lib_dir = {
+                        "armeabi-v7a": "arm-linux-androideabi",
+                        "arm64-v8a": "aarch64-linux-android",
+                        "x86": "i686-linux-android",
+                        "x86_64": "x86_64-linux-android"
+                    }
 
-                lib_dir = abi_to_lib_dir.get(abi)
-                if lib_dir:
-                    stl_lib = self.ndk_path / "toolchains" / "llvm" / "prebuilt" / host_tag / "sysroot" / "usr" / "lib" / lib_dir / "libc++_shared.so"
-                    if not stl_lib.exists():
-                        # Try alternate location (older NDKs)
-                        stl_lib = self.ndk_path / "sources" / "cxx-stl" / "llvm-libc++" / "libs" / abi / "libc++_shared.so"
-                    if stl_lib.exists():
-                        native_libs.append(str(stl_lib))
+                    lib_dir = abi_to_lib_dir.get(abi)
+                    if lib_dir:
+                        stl_lib = self.ndk_path / "toolchains" / "llvm" / "prebuilt" / host_tag / "sysroot" / "usr" / "lib" / lib_dir / "libc++_shared.so"
+                        if not stl_lib.exists():
+                            stl_lib = self.ndk_path / "sources" / "cxx-stl" / "llvm-libc++" / "libs" / abi / "libc++_shared.so"
+                        if stl_lib.exists():
+                            native_libs.append(str(stl_lib))
+                        else:
+                            Reporter.Warning(f"libc++_shared.so not found for {abi} — APK may crash at runtime")
 
                 if not native_libs:
                     Reporter.Warning(f"No native libraries found for {abi}")

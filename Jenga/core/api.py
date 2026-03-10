@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any, Union, Tuple
 from pathlib import Path
 from enum import Enum
+import copy
 import os
 import sys
 import re
@@ -284,6 +285,7 @@ class Project:
     androidPermissions: List[str] = field(default_factory=list)
     androidNativeActivity: bool = True
     androidAllowRotation: bool = True
+    androidStl: str = ""  # "c++_static" | "c++_shared" | "" (auto)
     androidScreenOrientation: str = ""
     ndkVersion: str = ""
     androidSign: bool = False
@@ -697,9 +699,11 @@ class test:
         self._subname = subname
         self._testProject = None
         self._parent = None
+        self._capturedFilter = None  # filter active when the test block was opened
 
     def __enter__(self) -> Project:
         global _currentWorkspace, _currentProject
+        self._capturedFilter = _currentFilter  # capture before any project switch
 
         if _currentWorkspace is None:
             raise RuntimeError("test context must be inside a workspace")
@@ -740,11 +744,26 @@ class test:
         # Location: same as parent
         self._testProject.location = self._parent.location if self._parent.location else "."
 
-        # Dependencies: parent + Unitest
-        self._testProject.dependsOn = [self._parent.name, "__Unitest__"]
+        # Dependencies: parent + Unitest + all of parent's deps (needed for dep_link_map path resolution)
+        self._testProject.dependsOn = (
+            [self._parent.name, "__Unitest__"]
+            + [d for d in self._parent.dependsOn if d not in ("__Unitest__", self._parent.name)]
+        )
 
-        # Copy include dirs from parent
+        # Copy include dirs, defines, libDirs from parent
         self._testProject.includeDirs = list(self._parent.includeDirs)
+        self._testProject.defines     = list(self._parent.defines)
+        self._testProject.libDirs     = list(self._parent.libDirs)
+
+        # Copy all per-filter settings from parent (toolchain, links, defines, etc.)
+        self._testProject._filteredLinks        = copy.deepcopy(self._parent._filteredLinks)
+        self._testProject._filteredDefines      = copy.deepcopy(self._parent._filteredDefines)
+        self._testProject._filteredLibDirs      = copy.deepcopy(self._parent._filteredLibDirs)
+        self._testProject._filteredIncludeDirs  = copy.deepcopy(self._parent._filteredIncludeDirs)
+        self._testProject._filteredDependsOn    = copy.deepcopy(self._parent._filteredDependsOn)
+        self._testProject._filteredToolchain    = copy.deepcopy(self._parent._filteredToolchain)
+        self._testProject._filteredOptimize     = copy.deepcopy(self._parent._filteredOptimize)
+        self._testProject._filteredSymbols      = copy.deepcopy(self._parent._filteredSymbols)
 
         # Add Unitest include/lib using variables (resolved by backend)
         if _currentWorkspace.unitestConfig.isPrecompiled():
@@ -754,6 +773,16 @@ class test:
         else:
             # Compile mode: include Unitest headers from source tree.
             self._testProject.includeDirs.append("%{Jenga.Unitest.Source}/src")
+
+        # Inherit links from parent: [Unitest.Lib already added above] + parent lib + parent deps + parent global links
+        _inherited = []
+        _existing  = set(self._testProject.links)
+        for lib in ([self._parent.name]
+                    + [d for d in self._parent.dependsOn if d != "__Unitest__"]
+                    + list(self._parent.links)):
+            if lib not in _existing and lib not in _inherited:
+                _inherited.append(lib)
+        self._testProject.links.extend(_inherited)
 
         # Set output directories
         self._testProject.targetDir = "%{wks.location}/Build/Tests/%{cfg.buildcfg}-%{cfg.system}"
@@ -768,7 +797,8 @@ class test:
     def __exit__(self, exc_type, exc_val, exc_tb):
         global _currentProject
 
-        # Auto‑include test files if testfiles() was called inside the test context
+        # Auto‑include test files if testfiles() was called inside the test context without a filter.
+        # (Filter-guarded testfiles were already routed to _filteredFiles by testfiles().)
         if self._testProject.testFiles:
             self._testProject.files.extend(self._testProject.testFiles)
 
@@ -776,14 +806,28 @@ class test:
         if self._testProject.testMainFile:
             self._testProject.excludeMainFiles.append(self._testProject.testMainFile)
 
-        # Inject test main template if not provided and in precompiled mode
+        # Determine whether any test files were registered (filtered or not).
+        _has_any_test_files = (
+            bool(self._testProject.testFiles)
+            or bool(getattr(self._testProject, "_filteredFiles", {}))
+        )
+
+        # Inject test main template only when test files actually exist.
         wks = _currentWorkspace
-        if wks and wks.unitestConfig:
+        if _has_any_test_files and wks and wks.unitestConfig:
             if not self._testProject.testMainTemplate:
                 self._testProject.testMainTemplate = "%{Jenga.Unitest.AutoMainTemplate}"
 
-        if self._testProject.testMainTemplate:
-            self._testProject.files.append(self._testProject.testMainTemplate)
+        # Add the template under the same filter that guarded testfiles(), if any.
+        if _has_any_test_files and self._testProject.testMainTemplate:
+            if self._capturedFilter:
+                _AppendFilteredValues(
+                    self._testProject._filteredFiles,
+                    self._capturedFilter,
+                    [self._testProject.testMainTemplate],
+                )
+            else:
+                self._testProject.files.append(self._testProject.testMainTemplate)
 
         _currentProject = None
         return False
@@ -1538,6 +1582,11 @@ def androidpermissions(perms: List[str]) -> None:
             _currentProject.androidPermissions = []
         _currentProject.androidPermissions.extend(perms)
 
+def androidstl(stl: str = "c++_static") -> None:
+    """Set the Android C++ STL type: 'c++_static' (default) or 'c++_shared'."""
+    if _currentProject:
+        _currentProject.androidStl = stl
+
 def androidnativeactivity(enable: bool = True) -> None:
     if _currentProject:
         _currentProject.androidNativeActivity = enable
@@ -1846,7 +1895,11 @@ def testoptions(opts: List[str]) -> None:
 
 def testfiles(patterns: List[str]) -> None:
     if _currentProject and _currentProject.isTest:
-        _currentProject.testFiles.extend(patterns)
+        if _currentFilter:
+            # Respect the enclosing filter so test files are only compiled on matching platforms.
+            _AppendFilteredValues(_currentProject._filteredFiles, _currentFilter, patterns)
+        else:
+            _currentProject.testFiles.extend(patterns)
 
 def testmainfile(mainfile: str) -> None:
     if _currentProject and _currentProject.isTest:
@@ -3332,7 +3385,7 @@ __all__ = [
     'androidminsdk', 'androidtargetsdk', 'androidcompilesdk',
     'androidabis', 'androidproguard', 'androidproguardrules',
     'androidassets', 'androidpermissions', 'androidnativeactivity',
-    'androidallowrotation', 'androidscreenorientation',
+    'androidstl', 'androidallowrotation', 'androidscreenorientation',
     'androidjavafiles', 'androidjavalibs',
     'ndkversion', 'androidsign', 'androidkeystore', 'androidkeystorepass', 'androidkeyalias',
     'emscriptenshellfile', 'emscriptenfullscreenshell', 'emscriptencanvasid', 'emscripteninitialmemory',

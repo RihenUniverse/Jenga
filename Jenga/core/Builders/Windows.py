@@ -395,13 +395,22 @@ class WindowsBuilder(Builder):
             args.extend(objectFiles)
             for libdir in project.libDirs:
                 args.append(f"-L{self.ResolveProjectPath(project, libdir)}")
+            if project.links:
+                # GNU-like linkers on Windows (clang-mingw) are one-pass and
+                # order-sensitive for static archives. Group archives to allow
+                # symbol resolution across mutually-dependent libraries.
+                args.append("-Wl,--start-group")
             for lib in project.links:
                 if Path(lib).is_absolute() or ('/' in lib or '\\' in lib):
                     args.append(lib)
                 else:
                     args.append(f"-l{lib}")
+            if project.links:
+                args.append("-Wl,--end-group")
             args.extend(self.toolchain.ldflags)
             args.extend(project.ldflags)
+        if self.verbose and project.kind != ProjectKind.STATIC_LIB:
+            Colored.PrintInfo(f"[Link:Clang:{project.name}] {' '.join(str(a) for a in args)}")
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
         return result.returnCode == 0
@@ -443,6 +452,8 @@ class WindowsBuilder(Builder):
             else:
                 args.append(f"-l{lib}")
         args.extend(project.ldflags)
+        if self.verbose:
+            Colored.PrintInfo(f"[Link:MinGW:{project.name}] {' '.join(str(a) for a in args)}")
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
         return result.returnCode == 0
