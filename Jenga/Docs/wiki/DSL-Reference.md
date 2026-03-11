@@ -57,6 +57,7 @@ with workspace("GameWorkspace"):
 
 ## Fonctions DSL utiles (projets)
 
+- workspace: `configurations`, `targetoses`, `targetarchs`, `startproject`, `disableunittestcompilation`, `disableunittestexecution`
 - type de projet: `consoleapp`, `windowedapp`, `staticlib`, `sharedlib`, `testsuite`
 - sources: `files`, `excludefiles`, `excludemainfiles`
 - includes/libs: `includedirs`, `libdirs`, `links`, `dependson`, `dependfiles`

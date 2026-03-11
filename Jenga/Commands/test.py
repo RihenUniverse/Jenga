@@ -80,6 +80,20 @@ class TestCommand:
                 Colored.PrintError("Failed to load workspace.")
                 return 1
 
+        if bool(getattr(workspace, "disableUnitTestExecution", False)):
+            Colored.PrintError(
+                "Unit-test execution is disabled by workspace policy "
+                "(disableunittestexecution)."
+            )
+            return 1
+
+        if (not parsed.no_build) and bool(getattr(workspace, "disableUnitTestCompilation", False)):
+            Colored.PrintError(
+                "Unit-test compilation is disabled by workspace policy "
+                "(disableunittestcompilation). Use --no-build to run existing binaries."
+            )
+            return 1
+
         # Collecter les projets de test
         test_projects = []
         for name, proj in workspace.projects.items():

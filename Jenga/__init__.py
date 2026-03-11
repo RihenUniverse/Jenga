@@ -20,7 +20,7 @@ from .Core.Api import (
     # Context managers
     workspace, project, toolchain, filter, unitest, test, include, batchinclude, addtools,
     # User functions (lowercase DSL)
-    configurations, platforms, targetoses, targetarchs, targetos, targetarch, platform, architecture, startproject, newoption,
+    configurations, platforms, targetoses, targetarchs, targetos, targetarch, platform, architecture, startproject, disableunittestcompilation, disableunittestexecution, dutc, dute, newoption,
     consoleapp, windowedapp, staticlib, sharedlib, testsuite, kind,
     language, cppdialect, cdialect,
     location, files, excludefiles, removefiles, excludemainfiles, removemainfiles,
@@ -77,7 +77,7 @@ __all__ = [
     'TargetOS', 'TargetArch', 'TargetEnv', 'CompilerFamily',
     'workspace', 'project', 'toolchain', 'filter', 'unitest', 'test',
     'include', 'batchinclude', 'addtools',
-    'configurations', 'platforms', 'targetoses', 'targetarchs', 'targetos', 'targetarch', 'platform', 'architecture', 'startproject', 'newoption',
+    'configurations', 'platforms', 'targetoses', 'targetarchs', 'targetos', 'targetarch', 'platform', 'architecture', 'startproject', 'disableunittestcompilation', 'disableunittestexecution', 'dutc', 'dute', 'newoption',
     'consoleapp', 'windowedapp', 'staticlib', 'sharedlib', 'testsuite', 'kind',
     'language', 'cppdialect', 'cdialect',
     'location', 'files', 'excludefiles', 'removefiles', 'excludemainfiles', 'removemainfiles',

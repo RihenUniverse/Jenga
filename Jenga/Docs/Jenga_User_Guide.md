@@ -994,6 +994,20 @@ Set startup project for run command.
 startproject("MainApp")
 ```
 
+#### disableunittestcompilation(enable=True)
+Disable compilation of unit-test projects (`testsuite`, `isTest`, `__Unitest__`) for this workspace.
+
+```python
+disableunittestcompilation(True)
+```
+
+#### disableunittestexecution(enable=True)
+Disable unit-test execution for this workspace (`jenga test`, and `jenga run` on test projects).
+
+```python
+disableunittestexecution(True)
+```
+
 ### Project Kind Functions
 
 #### consoleapp()

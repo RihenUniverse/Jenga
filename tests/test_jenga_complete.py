@@ -243,6 +243,56 @@ class TestFilterMatches:
         assert b._FilterMatches("windows") is True
 
 
+class TestUnitTestCompilationPolicy:
+    def _make_policy_builder(self):
+        b = _make_builder(TargetOS.WINDOWS, TargetArch.X86_64)
+        wks = b.workspace
+        wks.disableUnitTestCompilation = True
+
+        app = Project(name="App")
+        app.kind = ProjectKind.CONSOLE_APP
+        app.dependsOn = []
+
+        tests = Project(name="AppTests")
+        tests.kind = ProjectKind.TEST_SUITE
+        tests.isTest = True
+
+        internal_unitest = Project(name="__Unitest__")
+        internal_unitest.kind = ProjectKind.STATIC_LIB
+
+        wks.projects = {
+            "App": app,
+            "AppTests": tests,
+            "__Unitest__": internal_unitest,
+        }
+        return b
+
+    def test_policy_skips_test_projects_when_building_all(self):
+        b = self._make_policy_builder()
+        order = b._ApplyUnitTestCompilationPolicy(
+            ["App", "__Unitest__", "AppTests"],
+            targetProject=None
+        )
+        assert order == ["App"]
+
+    def test_policy_blocks_explicit_test_target(self):
+        b = self._make_policy_builder()
+        order = b._ApplyUnitTestCompilationPolicy(
+            ["__Unitest__", "AppTests"],
+            targetProject="AppTests"
+        )
+        assert order is None
+
+    def test_policy_blocks_non_test_project_depending_on_test(self):
+        b = self._make_policy_builder()
+        b.workspace.projects["App"].dependsOn = ["AppTests"]
+        order = b._ApplyUnitTestCompilationPolicy(
+            ["AppTests", "App"],
+            targetProject="App"
+        )
+        assert order is None
+
+
 # ===========================================================================
 # 3. Variable Expander
 # ===========================================================================
@@ -732,11 +782,23 @@ class TestApiDSLFunctions:
             targetoses([TargetOS.WINDOWS, TargetOS.LINUX])
             targetarchs([TargetArch.X86_64])
             startproject("Main")
+            disableunittestcompilation(True)
+            disableunittestexecution(True)
             newoption(trigger="asan", description="Enable AddressSanitizer")
 
             assert wks.configurations == ["Debug", "Release", "Profile"]
             assert TargetOS.WINDOWS in wks.targetOses
             assert wks.startProject == "Main"
+            assert wks.disableUnitTestCompilation is True
+            assert wks.disableUnitTestExecution is True
+
+    def test_workspace_unittest_shortcuts(self):
+        _reset()
+        with workspace("ShortcutsTest") as wks:
+            dutc(True)
+            dute(True)
+            assert wks.disableUnitTestCompilation is True
+            assert wks.disableUnitTestExecution is True
 
     def test_all_project_kinds(self):
         _reset()

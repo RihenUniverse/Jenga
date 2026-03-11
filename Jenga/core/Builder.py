@@ -1856,6 +1856,56 @@ class Builder(abc.ABC):
         files.sort()
         return files
 
+    def _IsUnitTestProject(self, projectName: str, project: Optional[Project]) -> bool:
+        if project is None:
+            return False
+        if projectName == "__Unitest__" or project.name == "__Unitest__":
+            return True
+        return bool(project.isTest or project.kind == ProjectKind.TEST_SUITE)
+
+    def _ApplyUnitTestCompilationPolicy(self,
+                                        order: List[str],
+                                        targetProject: Optional[str]) -> Optional[List[str]]:
+        if not bool(getattr(self.workspace, "disableUnitTestCompilation", False)):
+            return order
+
+        blocked = []
+        for proj_name in order:
+            proj = self.workspace.projects.get(proj_name)
+            if self._IsUnitTestProject(proj_name, proj):
+                blocked.append(proj_name)
+
+        if not blocked:
+            return order
+
+        blocked_set = set(blocked)
+        if targetProject and targetProject in blocked_set:
+            Reporter.Error(
+                f"Unit-test compilation is disabled by workspace policy. "
+                f"Blocked target: '{targetProject}'."
+            )
+            return None
+
+        for proj_name in order:
+            if proj_name in blocked_set:
+                continue
+            proj = self.workspace.projects.get(proj_name)
+            if not proj:
+                continue
+            blocked_deps = [dep for dep in proj.dependsOn if dep in blocked_set]
+            if blocked_deps:
+                Reporter.Error(
+                    f"Project '{proj_name}' depends on blocked unit-test project(s): "
+                    f"{', '.join(blocked_deps)}."
+                )
+                return None
+
+        Reporter.Info(
+            "Skipping unit-test compilation due to workspace policy: "
+            + ", ".join(blocked)
+        )
+        return [proj_name for proj_name in order if proj_name not in blocked_set]
+
     def Build(self, targetProject: Optional[str] = None) -> int:
         from ..Utils.Reporter import BuildCoordinator
 
@@ -1869,6 +1919,12 @@ class Builder(abc.ABC):
         except RuntimeError as e:
             Reporter.Error(f"Dependency resolution failed: {e}")
             return 1
+        order = self._ApplyUnitTestCompilationPolicy(order, targetProject)
+        if order is None:
+            return 1
+        if not order:
+            Reporter.Info("No projects to build after applying workspace policy.")
+            return 0
 
         # Prepare build order information for header
         build_order_info = []

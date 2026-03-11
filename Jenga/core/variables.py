@@ -92,6 +92,8 @@ class VariableExpander:
             'platforms': lambda w: ','.join(getattr(w, 'platforms', [])),
             'startproject': 'startProject',
             'defaulttoolchain': 'defaultToolchain',
+            'disableunittestcompilation': 'disableUnitTestCompilation',
+            'disableunittestexecution': 'disableUnitTestExecution',
         }
         if key in mapping:
             attr = mapping[key]

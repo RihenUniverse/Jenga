@@ -98,6 +98,25 @@ class RunCommand:
             return 1
 
         project = workspace.projects[project_name]
+        is_test_project = bool(
+            project.isTest
+            or project.kind == Api.ProjectKind.TEST_SUITE
+            or project.name == "__Unitest__"
+        )
+
+        if is_test_project and bool(getattr(workspace, "disableUnitTestExecution", False)):
+            Colored.PrintError(
+                "Unit-test execution is disabled by workspace policy "
+                "(disableunittestexecution)."
+            )
+            return 1
+
+        if parsed.build and is_test_project and bool(getattr(workspace, "disableUnitTestCompilation", False)):
+            Colored.PrintError(
+                "Unit-test compilation is disabled by workspace policy "
+                "(disableunittestcompilation)."
+            )
+            return 1
 
         # Build si demandé explicitement (par défaut : skip build)
         if parsed.build:

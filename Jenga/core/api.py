@@ -414,6 +414,8 @@ class Workspace:
 
     # Unitest configuration (optional)
     unitestConfig: Optional[UnitestConfig] = None
+    disableUnitTestCompilation: bool = False
+    disableUnitTestExecution: bool = False
 
     # Android SDK/NDK paths
     androidSdkPath: str = ""
@@ -1100,6 +1102,24 @@ def architecture(architem: Union[str, TargetArch]) -> None:
 def startproject(name: str) -> None:
     if _currentWorkspace:
         _currentWorkspace.startProject = name
+
+def disableunittestcompilation(enable: bool = True) -> None:
+    """Disable compilation of unit-test projects at workspace scope."""
+    if _currentWorkspace:
+        _currentWorkspace.disableUnitTestCompilation = bool(enable)
+
+def disableunittestexecution(enable: bool = True) -> None:
+    """Disable execution of unit tests at workspace scope."""
+    if _currentWorkspace:
+        _currentWorkspace.disableUnitTestExecution = bool(enable)
+
+def dutc(enable: bool = True) -> None:
+    """Shortcut for disableunittestcompilation()."""
+    disableunittestcompilation(enable)
+
+def dute(enable: bool = True) -> None:
+    """Shortcut for disableunittestexecution()."""
+    disableunittestexecution(enable)
 
 
 def newoption(option: Optional[Union[Dict[str, Any], str]] = None, **kwargs) -> None:
@@ -3369,7 +3389,7 @@ __all__ = [
     # Context managers
     'workspace', 'project', 'toolchain', 'filter', 'unitest', 'test', 'include', 'batchinclude', 'addtools',
     # User functions (lowercase)
-    'configurations', 'platforms', 'targetoses', 'targetarchs', 'targetos', 'targetarch', 'platform', 'architecture', 'startproject', 'newoption',
+    'configurations', 'platforms', 'targetoses', 'targetarchs', 'targetos', 'targetarch', 'platform', 'architecture', 'startproject', 'disableunittestcompilation', 'disableunittestexecution', 'dutc', 'dute', 'newoption',
     'consoleapp', 'windowedapp', 'staticlib', 'sharedlib', 'testsuite', 'kind',
     'language', 'cppdialect', 'cdialect',
     'location', 'files', 'excludefiles', 'removefiles', 'excludemainfiles', 'removemainfiles',
