@@ -1217,6 +1217,18 @@ def kind(k: Union[str, ProjectKind]) -> None:
         if k == ProjectKind.TEST_SUITE and not _currentFilter:
             _currentProject.isTest = True
 
+def kindexport(k: Union[str, ProjectKind], ke: str) -> None:
+    """Generic kind export setter (alternative to specific functions)."""
+    if _currentProject:
+        kind(k)
+
+        name = "" if len(ke) == 0 or ke == "" else f"{ke.upper()}"
+
+        if k == ProjectKind.STATIC_LIB:
+            defines([f"{name}_STATIC_LIB"])
+        elif k == ProjectKind.SHARED_LIB:
+            defines([f"{name}_BUILD_SHARED_LIB"])
+
 # --- Language and dialect ---
 def language(lang: Union[str, Language]) -> None:
     if _currentProject:

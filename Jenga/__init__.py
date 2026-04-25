@@ -21,7 +21,7 @@ from .Core.Api import (
     workspace, project, toolchain, filter, unitest, test, include, batchinclude, addtools,
     # User functions (lowercase DSL)
     configurations, platforms, targetoses, targetarchs, targetos, targetarch, platform, architecture, startproject, disableunittestcompilation, disableunittestexecution, dutc, dute, newoption,
-    consoleapp, windowedapp, staticlib, sharedlib, testsuite, kind,
+    consoleapp, windowedapp, staticlib, sharedlib, testsuite, kind, kindexport,
     language, cppdialect, cdialect,
     location, files, excludefiles, removefiles, excludemainfiles, removemainfiles,
     includedirs, externalincludedirs, sysincludedirs, removeincludedirs,
@@ -78,7 +78,7 @@ __all__ = [
     'workspace', 'project', 'toolchain', 'filter', 'unitest', 'test',
     'include', 'batchinclude', 'addtools',
     'configurations', 'platforms', 'targetoses', 'targetarchs', 'targetos', 'targetarch', 'platform', 'architecture', 'startproject', 'disableunittestcompilation', 'disableunittestexecution', 'dutc', 'dute', 'newoption',
-    'consoleapp', 'windowedapp', 'staticlib', 'sharedlib', 'testsuite', 'kind',
+    'consoleapp', 'windowedapp', 'staticlib', 'sharedlib', 'testsuite', 'kind', 'kindexport',
     'language', 'cppdialect', 'cdialect',
     'location', 'files', 'excludefiles', 'removefiles', 'excludemainfiles', 'removemainfiles',
     'includedirs', 'externalincludedirs', 'sysincludedirs', 'removeincludedirs',

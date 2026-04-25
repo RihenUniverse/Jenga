@@ -1,113 +1,203 @@
 #!/usr/bin/env bash
 # =============================================================================
-# cri.sh — Jenga Dev + Distribution Build Script (Linux / macOS)
+# cri.sh — Jenga Dev + Distribution Build Script
 #
 # Mode dev (par défaut) :
-#   ./cri.sh            → nettoie, réinstalle en mode éditable, build dist/
+#   ./cri.sh          → nettoie, réinstalle en mode éditable, build dist/
 #
 # Avec tests :
-#   ./cri.sh --tests    → identique + lance la suite pytest
+#   ./cri.sh --tests  → identique + lance la suite pytest
 # =============================================================================
 
-set -e
-cd "$(dirname "${BASH_SOURCE[0]}")"
+set -euo pipefail
 
+# --- Forcer UTF-8 ---
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
+export LANG="${LANG:-en_US.UTF-8}"
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+
+# --- Aller dans le répertoire du script ---
+cd "$(dirname "$(realpath "$0")")"
+
+# =============================================================================
+# Couleurs (désactivées si pas de terminal)
+# =============================================================================
+if [ -t 1 ]; then
+    C_RESET="\033[0m"
+    C_OK="\033[0;32m"
+    C_WARN="\033[0;33m"
+    C_ERR="\033[0;31m"
+    C_INFO="\033[0;36m"
+else
+    C_RESET="" C_OK="" C_WARN="" C_ERR="" C_INFO=""
+fi
+
+ok()   { echo -e "${C_OK}[OK]${C_RESET} $*"; }
+warn() { echo -e "${C_WARN}[AVERTISSEMENT]${C_RESET} $*"; }
+err()  { echo -e "${C_ERR}[ERREUR]${C_RESET} $*" >&2; }
+info() { echo -e "${C_INFO}$*${C_RESET}"; }
+
+# =============================================================================
+# Arguments
+# =============================================================================
 RUN_TESTS=0
 for arg in "$@"; do
     case "$arg" in
         --tests|-t) RUN_TESTS=1 ;;
+        *)
+            err "Argument inconnu : $arg"
+            echo "Usage: $0 [--tests|-t]"
+            exit 1
+            ;;
     esac
 done
 
-# --- Détection Python ----------------------------------------------------------
-if command -v python3 &>/dev/null; then
-    PY=python3
-elif command -v python &>/dev/null; then
-    PY=python
-else
-    echo "[ERREUR] Python introuvable dans le PATH." >&2
+# =============================================================================
+# Détection Python
+# =============================================================================
+PY=""
+for candidate in python3 python py; do
+    if command -v "$candidate" &>/dev/null; then
+        PY="$candidate"
+        break
+    fi
+done
+
+if [ -z "$PY" ]; then
+    err "Python introuvable dans le PATH."
     exit 1
 fi
 
-echo
+# Vérification version minimale (Python >= 3.8)
+PY_VER=$("$PY" -c "import sys; print(sys.version_info >= (3,8))" 2>/dev/null || echo "False")
+if [ "$PY_VER" != "True" ]; then
+    err "Python 3.8+ requis. Version détectée : $("$PY" --version 2>&1)"
+    exit 1
+fi
+
+echo ""
 echo "============================================================"
 echo "  Jenga Build Script — Dev + Distribution"
-echo "  Python : $($PY --version)"
+echo "  Python : $("$PY" --version 2>&1)  →  $(command -v "$PY")"
 echo "============================================================"
-echo
+echo ""
 
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[1/6] Nettoyage des fichiers .pyc et __pycache__ ..."
-find . -name "*.pyc" -delete 2>/dev/null || true
+# =============================================================================
+# Helper : installe un paquet pip uniquement s'il est absent
+# Usage  : pip_ensure <nom_paquet>
+# =============================================================================
+pip_ensure() {
+    local pkg="$1"
+    if "$PY" -m pip show "$pkg" &>/dev/null; then
+        echo "  [pip] $pkg déjà présent, aucune action réseau."
+    else
+        echo "  [pip] $pkg absent — installation en cours ..."
+        if "$PY" -m pip install "$pkg" --quiet; then
+            echo "  [pip] $pkg installé avec succès."
+        else
+            warn "impossible d'installer $pkg."
+        fi
+    fi
+}
+
+# =============================================================================
+# [1/6] Nettoyage .pyc et __pycache__
+# =============================================================================
+info "[1/6] Nettoyage des fichiers .pyc et __pycache__ ..."
+find . -type f -name "*.pyc" -delete
 find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[2/6] Suppression des artefacts de build précédents ..."
+# =============================================================================
+# [2/6] Suppression des artefacts de build précédents
+# =============================================================================
+info "[2/6] Suppression des artefacts de build précédents ..."
 rm -rf build dist
-rm -rf *.egg-info
+find . -maxdepth 1 -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
-# ─────────────────────────────────────────────────────────────────────────────
-echo "[3/6] Désinstallation de tous les anciens paquets Jenga ..."
-for pkg in Jenga jenga jenga-build-system; do
-    $PY -m pip uninstall -y "$pkg" 2>/dev/null || true
-done
+# =============================================================================
+# [3/6] Désinstallation des anciens paquets Jenga
+# =============================================================================
+info "[3/6] Désinstallation des anciens paquets Jenga ..."
+"$PY" -m pip uninstall Jenga jenga jenga-build-system -y 2>/dev/null || true
 
-# Mise à jour de pip, setuptools et wheel (versions minimales garantissant PEP 660)
-echo "[3/6] Mise à jour de pip, setuptools et wheel..."
-$PY -m pip install --upgrade pip --quiet
-$PY -m pip install --upgrade "setuptools>=64.0" wheel --quiet
+# Vérification (et installation si absents) de setuptools et wheel
+echo "[3/6] Vérification de setuptools et wheel ..."
+pip_ensure setuptools
+pip_ensure wheel
 
+# Installation éditable avec --no-build-isolation pour éviter
+# de recréer un env isolé et de retélécharger setuptools/wheel
 echo "[3/6] Réinstallation en mode développement (editable) ..."
-if ! $PY -m pip install -e . --quiet; then
-    echo "[AVERTISSEMENT] L'installation en mode éditable a échoué. Vous pourrez installer le wheel après le build."
+if "$PY" -m pip install -e . --no-build-isolation --quiet; then
+    ok "Installation dev terminée."
 else
-    echo "[OK] Installation dev terminée."
+    warn "L'installation en mode éditable a échoué."
+    warn "Vous pourrez installer le wheel après le build."
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-if [ "$RUN_TESTS" = "1" ]; then
-    echo
-    echo "[4/6] Lancement de la suite de tests pytest ..."
-    if $PY -m pytest tests/ -v --tb=short; then
-        echo "[OK] Tous les tests sont verts."
+# =============================================================================
+# [4/6] Tests (optionnels)
+# =============================================================================
+if [ "$RUN_TESTS" -eq 1 ]; then
+    echo ""
+    info "[4/6] Lancement de la suite de tests pytest ..."
+    pip_ensure pytest
+    if "$PY" -m pytest tests/ -v --tb=short; then
+        ok "Tous les tests sont verts."
     else
-        echo
-        echo "[AVERTISSEMENT] Des tests ont échoué — le build de distribution continue."
+        warn "Des tests ont échoué — le build de distribution continue."
     fi
 else
-    echo "[4/6] Tests ignorés  (utilisez --tests pour les lancer)"
+    info "[4/6] Tests ignorés (utilisez --tests pour les lancer)"
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-echo
-echo "[5/6] Build de la distribution utilisateur (wheel + sdist) ..."
-$PY -m pip install --upgrade build --quiet
-$PY -m build
-echo "[OK] Build terminé."
+# =============================================================================
+# [5/6] Build de la distribution (wheel + sdist)
+# =============================================================================
+echo ""
+info "[5/6] Build de la distribution utilisateur (wheel + sdist) ..."
+pip_ensure build
 
-# ─────────────────────────────────────────────────────────────────────────────
-echo
-echo "[6/6] Vérification des artefacts ..."
-$PY -m pip install --upgrade twine --quiet
-$PY -m twine check dist/*
+# Utilise --no-isolation si setuptools est déjà disponible localement,
+# ce qui évite tout appel réseau supplémentaire.
+if "$PY" -m pip show setuptools &>/dev/null; then
+    "$PY" -m build --no-isolation
+else
+    "$PY" -m build
+fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-echo
+# =============================================================================
+# [6/6] Vérification des artefacts avec twine
+# =============================================================================
+echo ""
+info "[6/6] Vérification des artefacts ..."
+pip_ensure twine
+if "$PY" -m twine check dist/*; then
+    ok "twine check OK."
+else
+    warn "twine check a signalé des problèmes."
+fi
+
+# =============================================================================
+# Résumé final
+# =============================================================================
+echo ""
 echo "============================================================"
 echo "  ARTEFACTS GÉNÉRÉS POUR DISTRIBUTION :"
 echo "============================================================"
-ls -1 dist/
-echo
+ls dist/
+echo ""
 echo "  Pour installer localement le wheel :"
-WHEEL=$(ls dist/*.whl 2>/dev/null | sort -r | head -1)
-if [ -n "$WHEEL" ]; then
-    echo "    pip install $WHEEL --force-reinstall"
+LATEST_WHL=$(ls -t dist/*.whl 2>/dev/null | head -1)
+if [ -n "$LATEST_WHL" ]; then
+    echo "    pip install $LATEST_WHL --force-reinstall"
 fi
-echo
+echo ""
 echo "  Pour publier sur PyPI :"
 echo "    python -m twine upload dist/*"
-echo
+echo ""
 echo "============================================================"
-echo "  TERMINÉ avec succès."
+ok "TERMINÉ avec succès."
 echo "============================================================"
-echo
+echo ""
