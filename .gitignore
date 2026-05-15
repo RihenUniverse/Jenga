@@ -7,6 +7,17 @@ __pycache__/
 .ruff_cache/
 .pyre/
 
+# Fichiers temporaires
+tmp_*
+*.pdb
+*.exe
+*.o
+*.apk
+logs/
+tombstone_*.txt
+nkmain_disasm.txt
+device_lib*.so
+
 # Virtual environments
 .venv/
 venv/
