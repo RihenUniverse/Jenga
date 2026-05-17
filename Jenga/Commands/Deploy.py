@@ -32,6 +32,14 @@ class DeployCommand:
         parser.add_argument("--device", help="Alias for --target (device serial/identifier)")
         parser.add_argument("--apk", help="Direct APK path for Android install (skip build/project lookup)")
         parser.add_argument("--list-devices", action="store_true", help="List Android adb devices and exit")
+        parser.add_argument("--detailed", action="store_true",
+                            help="With --list-devices, show device details (manufacturer, model, Android version, ABI)")
+        parser.add_argument("--uninstall", action="store_true",
+                            help="Android: uninstall existing app before installing (clean install)")
+        parser.add_argument("--force-stop", action="store_true",
+                            help="Android: force-stop existing app before installing (keeps data)")
+        parser.add_argument("--run", action="store_true",
+                            help="Android: launch the app after install (uses androidApplicationId from --apk's manifest)")
         parser.add_argument("--config", default="Release", help="Build configuration")
         parser.add_argument("--project", help="Project to deploy (default: first executable)")
         parser.add_argument("--no-daemon", action="store_true")
@@ -59,10 +67,55 @@ class DeployCommand:
                 return 1
 
             if parsed.list_devices:
-                result = Process.ExecuteCommand([str(adb), "devices"], captureOutput=False, silent=False)
-                if result.returnCode != 0:
-                    Colored.PrintError("Failed to list adb devices.")
-                    return 1
+                if parsed.detailed:
+                    # Mode detaille : parse `adb devices` et interroge chaque
+                    # device via getprop pour afficher marque/modele/Android/ABI.
+                    result = Process.ExecuteCommand([str(adb), "devices"], captureOutput=True, silent=True)
+                    if result.returnCode != 0:
+                        Colored.PrintError("Failed to list adb devices.")
+                        return 1
+                    serials = []
+                    for line in (result.stdout or "").splitlines():
+                        s = line.strip()
+                        if not s or s.startswith("List of devices"):
+                            continue
+                        # format: "<serial>\t<status>"
+                        parts = s.split()
+                        if len(parts) >= 2 and parts[1] == "device":
+                            serials.append(parts[0])
+                    if not serials:
+                        Colored.PrintWarning("No Android device connected.")
+                        if not parsed.apk:
+                            return 0
+                    else:
+                        def _getprop(serial: str, key: str) -> str:
+                            r = Process.ExecuteCommand(
+                                [str(adb), "-s", serial, "shell", "getprop", key],
+                                captureOutput=True, silent=True)
+                            return (r.stdout or "").strip() if r.returnCode == 0 else ""
+
+                        # Largeurs de colonnes (calculees dynamiquement)
+                        rows = []
+                        headers = ("SERIAL", "MARQUE", "MODELE", "ANDROID", "ABI")
+                        for serial in serials:
+                            man = _getprop(serial, "ro.product.manufacturer") or "?"
+                            mod = _getprop(serial, "ro.product.model") or "?"
+                            ver = _getprop(serial, "ro.build.version.release") or "?"
+                            abi = _getprop(serial, "ro.product.cpu.abi") or "?"
+                            rows.append((serial, man, mod, ver, abi))
+                        widths = [max(len(h), max((len(r[i]) for r in rows), default=0))
+                                  for i, h in enumerate(headers)]
+                        sep = "  "
+                        line_fmt = sep.join("{:<%d}" % w for w in widths)
+                        print(line_fmt.format(*headers))
+                        print(sep.join("-" * w for w in widths))
+                        for row in rows:
+                            print(line_fmt.format(*row))
+                else:
+                    result = Process.ExecuteCommand([str(adb), "devices"], captureOutput=False, silent=False)
+                    if result.returnCode != 0:
+                        Colored.PrintError("Failed to list adb devices.")
+                        return 1
                 if not parsed.apk:
                     return 0
 
@@ -71,13 +124,42 @@ class DeployCommand:
                 Colored.PrintError(f"APK not found: {apk_path}")
                 return 1
 
-            cmd = [str(adb)]
+            # Extraire le package id depuis le manifeste de l'APK pour les
+            # operations --uninstall / --force-stop / --run.
+            pkg_id = DeployCommand._GetApkPackageId(adb, apk_path)
+
+            adb_base = [str(adb)]
             if parsed.target:
-                cmd += ["-s", parsed.target]
-            cmd += ["install", "-r", str(apk_path)]
+                adb_base += ["-s", parsed.target]
+
+            # --uninstall : clean install (perd les donnees app).
+            if parsed.uninstall and pkg_id:
+                Colored.PrintInfo(f"Uninstalling existing {pkg_id}...")
+                Process.ExecuteCommand(adb_base + ["uninstall", pkg_id],
+                                       captureOutput=True, silent=True)
+
+            # --force-stop : tue le process en cours (utile si l'app tourne).
+            if parsed.force_stop and pkg_id:
+                Colored.PrintInfo(f"Force-stopping {pkg_id}...")
+                Process.ExecuteCommand(adb_base + ["shell", "am", "force-stop", pkg_id],
+                                       captureOutput=True, silent=True)
+
+            cmd = adb_base + ["install", "-r", str(apk_path)]
             result = Process.ExecuteCommand(cmd, captureOutput=False, silent=False)
             if result.returnCode == 0:
                 Colored.PrintSuccess(f"APK installed successfully: {apk_path}")
+                # --run : lance l'app via monkey.
+                if parsed.run and pkg_id:
+                    Colored.PrintInfo(f"Launching {pkg_id}...")
+                    launch = Process.ExecuteCommand(
+                        adb_base + ["shell", "monkey", "-p", pkg_id,
+                                    "-c", "android.intent.category.LAUNCHER", "1"],
+                        captureOutput=True, silent=True)
+                    if launch.returnCode == 0:
+                        Colored.PrintSuccess(f"App launched: {pkg_id}")
+                    else:
+                        Colored.PrintError(f"Launch failed for {pkg_id}.")
+                        return 1
                 return 0
 
             Colored.PrintError("adb install failed.")
@@ -211,6 +293,44 @@ class DeployCommand:
         else:
             Colored.PrintError("adb install failed.")
             return 1
+
+    @staticmethod
+    def _GetApkPackageId(adb: Path, apk_path: Path):
+        """Extrait l'applicationId d'un APK via aapt ou aapt2 (best-effort).
+        Retourne None si introuvable (les flags --uninstall/--force-stop/--run
+        seront alors silencieusement ignores).
+        """
+        candidates = []
+        sdk_path = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
+        if sdk_path:
+            bt_dir = Path(sdk_path) / "build-tools"
+            if bt_dir.exists():
+                versions = sorted([d for d in bt_dir.iterdir() if d.is_dir()],
+                                  reverse=True)
+                for v in versions:
+                    for name in ("aapt2", "aapt"):
+                        exe = v / (name + (".exe" if sys.platform == "win32" else ""))
+                        if exe.exists():
+                            candidates.append(exe)
+                            break
+                    if candidates:
+                        break
+        for tool in candidates:
+            try:
+                cmd = [str(tool), "dump", "badging", str(apk_path)]
+                r = Process.ExecuteCommand(cmd, captureOutput=True, silent=True)
+                if r.returnCode == 0 and r.stdout:
+                    for line in r.stdout.splitlines():
+                        if line.startswith("package:"):
+                            # ex: package: name='com.example.app' versionCode='1' ...
+                            i = line.find("name='")
+                            if i >= 0:
+                                j = line.find("'", i + 6)
+                                if j > i:
+                                    return line[i + 6:j]
+            except Exception:
+                continue
+        return None
 
     @staticmethod
     def _ResolveAdb(workspace) -> Path:

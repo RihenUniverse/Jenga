@@ -15,6 +15,7 @@ from ..Core.Builder import Builder
 from ..Core import Api
 from ..Utils import Colored, Process, FileSystem
 from .Build import BuildCommand
+from .Deploy import DeployCommand
 
 
 class RunCommand:
@@ -30,7 +31,12 @@ class RunCommand:
         parser.add_argument("--build", action="store_true", help="Force rebuild before running (default: skip build)")
         parser.add_argument("--no-daemon", action="store_true", help="Do not use daemon")
         parser.add_argument("--jenga-file", help="Path to the workspace .jenga file (default: auto-detected)")
+        parser.add_argument("--target", help="Mobile only: device serial / UDID to run on (skip if a single device is connected)")
+        parser.add_argument("--device", help="Alias for --target")
         parsed = parser.parse_args(args)
+
+        if parsed.device and not parsed.target:
+            parsed.target = parsed.device
 
         # Déterminer le répertoire de travail (workspace root)
         workspace_root = Path.cwd()
@@ -98,6 +104,66 @@ class RunCommand:
             return 1
 
         project = workspace.projects[project_name]
+
+        # ── Mode mobile : Android via adb monkey ─────────────────────────
+        # Si --platform android, on assume que l'APK est deja installe sur le
+        # device et on se contente de le lancer via adb. Pour faire un cycle
+        # complet (build + install + run), utiliser :
+        #   jenga deploy --platform android --apk <apk> --target <serial>
+        #   puis
+        #   jenga run --platform android --target <serial>
+        platform_norm = (parsed.platform or "").strip().lower()
+        if platform_norm == 'android':
+            pkg = getattr(project, 'androidApplicationId', None)
+            if not pkg:
+                Colored.PrintError(
+                    f"Project '{project_name}' has no androidApplicationId. "
+                    f"Set it via androidapplicationid(\"com.example.app\") in the .jenga file."
+                )
+                return 1
+
+            adb = DeployCommand._ResolveAdb(workspace=workspace)
+            if not adb:
+                Colored.PrintError("adb not found. Set ANDROID_SDK_ROOT or add adb to PATH.")
+                return 1
+
+            # Si pas de --target, verifier qu'un seul device est connecte.
+            target = parsed.target
+            if not target:
+                devices_result = Process.ExecuteCommand(
+                    [str(adb), "devices"], captureOutput=True, silent=True)
+                serials = []
+                for line in (devices_result.stdout or "").splitlines():
+                    s = line.strip()
+                    if not s or s.startswith("List of devices"):
+                        continue
+                    parts = s.split()
+                    if len(parts) >= 2 and parts[1] == "device":
+                        serials.append(parts[0])
+                if len(serials) == 0:
+                    Colored.PrintError("No Android device connected.")
+                    return 1
+                if len(serials) > 1:
+                    Colored.PrintError(
+                        "Multiple Android devices connected. Specify --target SERIAL. Available:")
+                    for s in serials:
+                        Colored.PrintError(f"  - {s}")
+                    return 1
+                target = serials[0]
+
+            # Lance via monkey (categorie LAUNCHER, marche pour NativeActivity).
+            cmd = [str(adb), "-s", target,
+                   "shell", "monkey", "-p", pkg,
+                   "-c", "android.intent.category.LAUNCHER", "1"]
+            Colored.PrintInfo(f"Launching {pkg} on {target}...")
+            result = Process.ExecuteCommand(cmd, captureOutput=True, silent=True)
+            if result.returnCode == 0:
+                Colored.PrintSuccess(f"App launched: {pkg}")
+                return 0
+            Colored.PrintError(f"Failed to launch {pkg} on {target}.")
+            if result.stderr:
+                Colored.PrintError(result.stderr.strip())
+            return 1
         is_test_project = bool(
             project.isTest
             or project.kind == Api.ProjectKind.TEST_SUITE
