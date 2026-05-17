@@ -1777,6 +1777,16 @@ class AndroidBuilder(Builder):
         has_java = bool(self._CollectJavaSourceFiles(project))
         application.set(f"{{{android_ns}}}hasCode", "true" if has_java else "false")
 
+        # Marquage "jeu" : si androidisgame(True) est defini dans le .jenga,
+        # on positionne les attributs reconnus par Android pour activer
+        # l'enregistrement d'ecran via Game Dashboard, les optimisations CPU/GPU
+        # et la categorisation correcte dans le Play Store.
+        if getattr(project, 'androidIsGame', False):
+            # android:isGame (deprecated mais encore reconnu sur API < 26)
+            application.set(f"{{{android_ns}}}isGame", "true")
+            # android:appCategory="game" (API 26+, valeur officielle)
+            application.set(f"{{{android_ns}}}appCategory", "game")
+
         if project.androidNativeActivity and not has_java:
             # NativeActivity sans code Java
             activity = ET.SubElement(application, "activity")

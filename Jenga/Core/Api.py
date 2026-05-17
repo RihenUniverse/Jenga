@@ -1608,6 +1608,25 @@ def androidassets(patterns: List[str]) -> None:
             _currentProject.androidAssets = []
         _currentProject.androidAssets.extend(patterns)
 
+def androidisgame(enable: bool = True) -> None:
+    """Marque l'application comme un jeu Android.
+
+    Active dans le manifest :
+      - android:isGame="true"            (API < 26, deprecated mais reconnu)
+      - android:appCategory="game"       (API 26+, valeur officielle)
+
+    Effets cote OS :
+      - Apparition dans le Game Dashboard (Android 12+)
+      - Enregistrement d'ecran via le Dashboard, capture audio
+      - Categorisation correcte sur le Play Store
+      - Optimisations CPU/GPU specifiques jeu (selon le constructeur)
+
+    Si la fonction n'est PAS appelee, l'application est traitee comme une
+    app normale (default).
+    """
+    if _currentProject:
+        _currentProject.androidIsGame = bool(enable)
+
 def androidpermissions(perms: List[str]) -> None:
     if _currentProject:
         if not hasattr(_currentProject, 'androidPermissions'):
@@ -3416,7 +3435,7 @@ __all__ = [
     'androidapplicationid', 'androidversioncode', 'androidversionname',
     'androidminsdk', 'androidtargetsdk', 'androidcompilesdk',
     'androidabis', 'androidproguard', 'androidproguardrules',
-    'androidassets', 'androidpermissions', 'androidnativeactivity',
+    'androidassets', 'androidisgame', 'androidpermissions', 'androidnativeactivity',
     'androidstl', 'androidallowrotation', 'androidscreenorientation',
     'androidjavafiles', 'androidjavalibs',
     'ndkversion', 'androidsign', 'androidkeystore', 'androidkeystorepass', 'androidkeyalias',
