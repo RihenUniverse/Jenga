@@ -42,6 +42,8 @@ from .Core.Api import (
     iosbuildsystem, iosdistributiontype, iosteamid, iosprovisioningprofile,
     # Cross-platform app icon API
     appicon, androidappicon, windowsicon, macosicon, webfavicon,
+    # Installer packaging DSL (MSI/EXE/DEB/PKG)
+    licensefile, createdesktopshortcut, apppublisher, appversion, installeroption,
     harmonyminsdk, harmonysdk,
     gdkpath, xboxmode, xboxplatform, xboxsigningmode, xboxpackagename, xboxpublisher, xboxversion, xboxlekbpath, xboxassetchunks,
     emscriptenshellfile, emscriptenfullscreenshell, emscriptencanvasid, emscripteninitialmemory,
@@ -101,6 +103,9 @@ __all__ = [
     'iosbuildsystem', 'iosdistributiontype', 'iosteamid', 'iosprovisioningprofile',
     # Cross-platform app icon API (voir Core/IconConverter.py)
     'appicon', 'androidappicon', 'windowsicon', 'macosicon', 'webfavicon',
+    # Installer packaging DSL (MSI/EXE/DEB/PKG)
+    'licensefile', 'createdesktopshortcut', 'apppublisher', 'appversion',
+    'installeroption',
     'harmonyminsdk', 'harmonysdk',
     'gdkpath', 'xboxmode', 'xboxplatform', 'xboxsigningmode', 'xboxpackagename', 'xboxpublisher', 'xboxversion', 'xboxlekbpath', 'xboxassetchunks',
     'emscriptenshellfile', 'emscriptenfullscreenshell', 'emscriptencanvasid', 'emscripteninitialmemory',

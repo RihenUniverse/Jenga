@@ -100,6 +100,16 @@ class Process:
         if sys.platform != "win32" and not shell:
             preexec_fn = os.setsid
 
+        # Cache la fenetre console des sous-processes sur Windows. Quand
+        # jenga est lance depuis un parent non-console (VSCode debugger,
+        # IDE jenga GUI, etc.), chaque sous-process console ouvre sinon
+        # une fenetre cmd.exe visible 1-2s — pollution visuelle. Le flag
+        # CREATE_NO_WINDOW (0x08000000) supprime cette fenetre tout en
+        # preservant la capture d'output normale.
+        creation_flags = 0
+        if sys.platform == "win32" and not shell:
+            creation_flags = 0x08000000   # CREATE_NO_WINDOW
+
         try:
             proc = subprocess.Popen(
                 args if isinstance(args, list) else args,
@@ -110,6 +120,7 @@ class Process:
                 stdin=stdin_dest,
                 shell=shell,
                 preexec_fn=preexec_fn,
+                creationflags=creation_flags,
                 text=True,
                 encoding="utf-8",
                 errors="replace"

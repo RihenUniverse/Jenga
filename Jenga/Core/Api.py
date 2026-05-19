@@ -265,6 +265,24 @@ class Project:
     # iosAppIcon est declare plus bas dans la section "iOS specifics".
     webFavicon:     str = ""
 
+    # Installer packaging (MSI/EXE/DEB/PKG). Voir Commands/Package.py.
+    #   licenseFile : path vers un .txt/.md/.rtf affiche pendant l'install
+    #                 (l'user doit l'accepter pour continuer). Si .txt/.md,
+    #                 jenga le convertit automatiquement en RTF minimal.
+    #   createDesktopShortcut : si True, l'installer cree un raccourci sur
+    #                 le bureau (toggle visible pour l'user pendant l'install).
+    #   appPublisher : nom du publisher affiche dans "Programs and Features"
+    #                 (sinon "Jenga" par defaut).
+    #   appVersion  : version semver "x.y.z" pour les metadonnees installer.
+    licenseFile:           str  = ""
+    createDesktopShortcut: bool = True
+    appPublisher:          str  = ""
+    appVersion:            str  = ""
+    # Bag d'options libres lues par les builders installer. Permet a l'user
+    # d'ajouter de nouvelles options (autostart, registry entries, branding,
+    # etc.) sans qu'on doive elargir l'API. Voir installeroption() ci-dessous.
+    installerOptions:      Dict[str, "object"] = field(default_factory=dict)
+
     # Compiler settings
     defines: List[str] = field(default_factory=list)
     optimize: Optimization = Optimization.OFF
@@ -1848,6 +1866,61 @@ def webfavicon(icon: str) -> None:
     are generated). Wins over appicon()."""
     if _currentProject:
         _currentProject.webFavicon = icon
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Installer packaging DSL (consomme par `jenga package` MSI/EXE/DEB/PKG)
+# ─────────────────────────────────────────────────────────────────────────────
+def licensefile(path: str) -> None:
+    """Definit le fichier de licence (LICENSE/EULA) affiche pendant
+    l'installation. Formats : .txt, .md, .rtf. Si .txt ou .md, jenga
+    convertit automatiquement en RTF minimal pour WiX/MSI."""
+    if _currentProject:
+        _currentProject.licenseFile = str(path or "").strip()
+
+
+def createdesktopshortcut(enable: bool = True) -> None:
+    """Active/desactive la creation d'un raccourci bureau lors de
+    l'installation (MSI + Inno EXE). True par defaut, l'user peut decocher
+    pendant l'install."""
+    if _currentProject:
+        _currentProject.createDesktopShortcut = bool(enable)
+
+
+def apppublisher(name: str) -> None:
+    """Nom du publisher/editeur de l'application (affiche dans 'Programs and
+    Features' Windows + Info Inno + control panel macOS)."""
+    if _currentProject:
+        _currentProject.appPublisher = str(name or "").strip()
+
+
+def appversion(version: str) -> None:
+    """Version semver de l'application (ex: '1.2.3'). Utilise dans
+    AppVersion (Inno), Version (MSI), CFBundleShortVersionString (macOS/iOS).
+    Si vide, fallback sur iosVersion puis '1.0.0'."""
+    if _currentProject:
+        _currentProject.appVersion = str(version or "").strip()
+
+
+def installeroption(key: str, value) -> None:
+    """
+    API extensible pour les options installer avancees. Permet d'ajouter
+    n'importe quelle cle de configuration sans elargir l'API jenga officielle.
+
+    Exemples d'utilisation futures :
+        installeroption("autostart_on_login", True)
+        installeroption("registry_entry", "HKLM\\\\Software\\\\Pong")
+        installeroption("custom_branding_image", "branding.bmp")
+        installeroption("autoupdate_url", "https://updates.example.com")
+        installeroption("require_admin", True)
+        installeroption("install_for_all_users", False)
+
+    Chaque builder (MSI WiX, Inno EXE, DEB, PKG) lit les options qu'il
+    reconnait et logue un warning + skip pour les autres. Si une option
+    devient frequente, elle peut etre promue en fonction DSL dediee.
+    """
+    if _currentProject:
+        _currentProject.installerOptions[str(key)] = value
 
 def iosbuildnumber(number: Union[str, int]) -> None:
     """Set the build number (CFBundleVersion) for iOS bundles."""
@@ -3510,6 +3583,9 @@ __all__ = [
     'iosbuildsystem', 'iosdistributiontype', 'iosteamid', 'iosprovisioningprofile',
     # Cross-platform app icon API (voir Core/IconConverter.py)
     'appicon', 'androidappicon', 'windowsicon', 'macosicon', 'webfavicon',
+    # Installer packaging DSL (MSI/EXE/DEB/PKG)
+    'licensefile', 'createdesktopshortcut', 'apppublisher', 'appversion',
+    'installeroption',
     'harmonyminsdk', 'harmonysdk',
     'testoptions', 'testfiles', 'testmainfile', 'testmaintemplate',
     'settarget', 'sysroot', 'targettriple', 'ccompiler', 'cppcompiler',

@@ -82,8 +82,22 @@ class WindowsBuilder(Builder):
             source_path.write_text(f'#include "{header_token}"\n', encoding="utf-8")
             project._jengaPchSourceResolved = str(source_path)
 
+        # Le PCH DOIT etre compile avec les MEMES flags d'optimisation et de
+        # symboles que les sources qui l'utilisent. Sinon clang/gcc rejettent
+        # le PCH avec "predefined macro was disabled in precompiled file"
+        # (__OPTIMIZE__, __OPTIMIZE_SIZE__, __NO_INLINE__ different selon -Ox).
+        opt  = self._EnumValue(project.optimize)
+        syms = bool(project.symbols)
+
         if self.is_msvc or self.is_clang_cl:
             args = [self.toolchain.ccPath, "/c", f"/Fo{objDir / '__jenga_pch.obj'}", "/nologo"]
+            # Flags optim/symbols equivalents a _CompileMSVC.
+            if syms:
+                args.append("/Zi")
+            if   opt == "Speed": args.append("/O2")
+            elif opt == "Size":  args.append("/O1")
+            elif opt == "Full":  args.append("/Ox")
+            else:                args.append("/Od")
             for inc in project.includeDirs:
                 args.append(f"/I{self.ResolveProjectPath(project, inc)}")
             args.append(f"/I{header_path.parent}")
@@ -105,6 +119,13 @@ class WindowsBuilder(Builder):
         # clang++ / mingw path
         compiler = self.toolchain.cxxPath or self.toolchain.ccPath
         args = [compiler, "-x", "c++-header", str(header_path), "-o", str(pch_file)]
+        # Flags optim/symbols equivalents a _CompileMinGW/_GetGCCCommonFlags.
+        if syms:
+            args.append("-g")
+        if   opt == "Off":   args.append("-O0")
+        elif opt == "Size":  args.append("-Os")
+        elif opt == "Speed": args.append("-O2")
+        elif opt == "Full":  args.append("-O3")
         for inc in project.includeDirs:
             args.append(f"-I{self.ResolveProjectPath(project, inc)}")
         args.append(f"-I{header_path.parent}")
@@ -266,8 +287,15 @@ class WindowsBuilder(Builder):
         # rc.exe, on utilise un nom relatif (les deux fichiers sont dans le
         # meme dossier).
         rc_path = obj_dir / "app_icon.rc"
+        # Important : on utilise l'ID NUMERIQUE "1" plutot que le nom
+        # symbolique "IDI_ICON1". Windres stocke IDI_ICON1 comme STRING name
+        # alors que LoadImage(hInst, MAKEINTRESOURCEW(1), ...) cherche un ID
+        # numerique. Avec "1" en literal, le windres genere un resource avec
+        # ID=1, donc MAKEINTRESOURCEW(1) le trouve. Bonus : Windows utilise
+        # "le plus petit ID d'icone" comme icone principale de l'exe (visible
+        # dans Explorer + ExtractAssociatedIcon).
         rc_path.write_text(
-            'IDI_ICON1 ICON DISCARDABLE "app_icon.ico"\n',
+            '1 ICON DISCARDABLE "app_icon.ico"\n',
             encoding="utf-8"
         )
 

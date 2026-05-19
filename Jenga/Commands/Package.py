@@ -383,8 +383,55 @@ class PackageCommand:
         return collected
 
     @staticmethod
+    def _AugmentPathForWindowsInstallerTools():
+        """
+        Ajoute au PATH (session uniquement) les emplacements standards des
+        outils installer Windows. L'user n'a pas besoin de bidouiller son
+        environnement : si WiX ou Inno Setup sont installes a leur
+        emplacement par defaut (winget, dotnet tool, MSI vendor), jenga les
+        trouve automatiquement au moment du package.
+
+        Locations cherchees :
+          - Inno Setup 6/5 (winget user install)
+          - Inno Setup 6/5 (vendor MSI install)
+          - WiX dotnet global tool
+          - WiX 3.x (legacy)
+        """
+        import os as _os
+        candidates = [
+            # Inno Setup (winget user)
+            _os.path.expandvars(r"%LOCALAPPDATA%\Programs\Inno Setup 6"),
+            _os.path.expandvars(r"%LOCALAPPDATA%\Programs\Inno Setup 5"),
+            # Inno Setup (vendor MSI install)
+            r"C:\Program Files (x86)\Inno Setup 6",
+            r"C:\Program Files (x86)\Inno Setup 5",
+            r"C:\Program Files\Inno Setup 6",
+            r"C:\Program Files\Inno Setup 5",
+            # WiX dotnet global tool (deja dans le PATH normalement)
+            _os.path.expandvars(r"%USERPROFILE%\.dotnet\tools"),
+            # WiX 3.x legacy
+            r"C:\Program Files (x86)\WiX Toolset v3.11\bin",
+            r"C:\Program Files (x86)\WiX Toolset v3.14\bin",
+        ]
+        added = []
+        for c in candidates:
+            if _os.path.isdir(c):
+                # Verifie qu'il n'est pas deja dans le PATH (case-insensitive
+                # sur Windows).
+                norm = _os.path.normpath(c).lower()
+                paths = _os.environ.get("PATH", "").split(_os.pathsep)
+                if not any(_os.path.normpath(p).lower() == norm for p in paths if p):
+                    _os.environ["PATH"] = c + _os.pathsep + _os.environ.get("PATH", "")
+                    added.append(c)
+        return added
+
+    @staticmethod
     def _PackageWindows(project, builder, pkg_type: str, output_dir: Path) -> int:
         """Création d'installateur Windows."""
+        # Augmente le PATH avec les emplacements standards d'Inno/WiX pour
+        # eviter que l'user doive le configurer manuellement.
+        PackageCommand._AugmentPathForWindowsInstallerTools()
+
         # Build project
         if not builder.BuildProject(project):
             return 1
@@ -407,21 +454,59 @@ class PackageCommand:
             return 0
 
         elif pkg_type == 'msi':
-            # Utiliser WiX Toolset (candle + light)
-            # Vérifier présence de wix
-            if not FileSystem.FindExecutable("candle"):
-                Colored.PrintError("WiX Toolset not found. Please install WiX.")
+            # WiX Toolset. On supporte 2 generations :
+            #   - WiX 4+ (commande `wix` unifiee, installable via
+            #     `dotnet tool install -g wix`, format XML moderne)
+            #   - WiX 3 (legacy `candle` + `light`)
+            # Detection : on essaie `wix` en premier (moderne), puis fallback
+            # sur candle/light si seule la version legacy est presente.
+            has_wix4 = FileSystem.FindExecutable("wix") is not None
+            has_wix3 = (FileSystem.FindExecutable("candle") is not None
+                     and FileSystem.FindExecutable("light")  is not None)
+
+            if not has_wix4 and not has_wix3:
+                Colored.PrintError(
+                    "WiX Toolset not found. Install options :\n"
+                    "  - WiX 4+ (recommande) : dotnet tool install --global wix\n"
+                    "  - WiX 3 (legacy)     : winget install WiX.Toolset (requiert admin)\n"
+                    "  - Ou utiliser `--type zip` ou `--type exe` (Inno Setup)"
+                )
                 return 1
-            # Générer .wxs
+
             wxs_path = output_dir / f"{project.name}.wxs"
-            PackageCommand._GenerateWiXTemplate(project, builder, exe_path, wxs_path)
-            # Compiler
-            obj_path = output_dir / f"{project.name}.wixobj"
             msi_path = output_dir / f"{project.name}.msi"
-            if Process.Run(["candle", str(wxs_path), "-o", str(obj_path)]) != 0:
-                return 1
-            if Process.Run(["light", str(obj_path), "-o", str(msi_path)]) != 0:
-                return 1
+
+            if has_wix4:
+                # Format moderne WiX 4+ : <Package> + <StandardDirectory>.
+                # UI installer (EULA + dir choice + shortcut) necessite
+                # l'extension WixToolset.UI.wixext. On l'ajoute idempotemment
+                # avant le build (no-op si deja installee). On utilise
+                # subprocess direct car Process.Run force captureOutput=False.
+                import subprocess as _sp
+                try:
+                    _sp.run(["wix", "extension", "add",
+                             "WixToolset.UI.wixext/5.0.2"],
+                            capture_output=True, text=True, timeout=120,
+                            shell=False)
+                except Exception:
+                    pass  # extension peut deja etre installee, on ignore
+                PackageCommand._GenerateWiX4Template(project, builder, exe_path, wxs_path)
+                # `-ext WixToolset.UI.wixext` active le namespace ui:* + les
+                # dialogues standards (WixUI_InstallDir, WixUI_Mondo, etc.).
+                cmd = ["wix", "build", str(wxs_path),
+                       "-ext", "WixToolset.UI.wixext",
+                       "-o", str(msi_path)]
+                if Process.Run(cmd) != 0:
+                    return 1
+            else:
+                # Format legacy WiX 3 : <Product>. Garde la backward compat.
+                PackageCommand._GenerateWiXTemplate(project, builder, exe_path, wxs_path)
+                obj_path = output_dir / f"{project.name}.wixobj"
+                if Process.Run(["candle", str(wxs_path), "-o", str(obj_path)]) != 0:
+                    return 1
+                if Process.Run(["light", str(obj_path), "-o", str(msi_path)]) != 0:
+                    return 1
+
             Colored.PrintSuccess(f"MSI package: {msi_path}")
             return 0
 
@@ -485,21 +570,417 @@ class PackageCommand:
         tree = ET.ElementTree(root)
         tree.write(output, encoding="utf-8", xml_declaration=True)
 
+    # -----------------------------------------------------------------------
+    # Helper : resout/genere un .ico Windows pour les raccourcis bureau /
+    # menu Demarrer. Reuse l'IconConverter (PNG -> ICO) en passant par
+    # ResolveIconFor (windowsicon override > appicon generique).
+    # Retourne le path absolu du .ico, ou None si pas configure / echec.
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def _ResolveWindowsIcoForPackage(project, builder, output_dir: Path) -> Optional[Path]:
+        try:
+            from ..Core.IconConverter import (
+                ResolveIconFor, DetectIconFormat, ConvertPngToIco, HasPillow,
+                PLATFORM_WINDOWS, FORMAT_PNG, FORMAT_JPG, FORMAT_ICO,
+            )
+        except Exception:
+            return None
+        icon_src = ResolveIconFor(project, PLATFORM_WINDOWS)
+        if not icon_src:
+            return None
+        try:
+            resolved = Path(builder.ResolveProjectPath(project, icon_src))
+        except Exception:
+            resolved = Path(icon_src)
+        if not resolved.exists():
+            return None
+        fmt = DetectIconFormat(resolved)
+        if fmt == FORMAT_ICO:
+            return resolved.resolve()
+        if fmt in (FORMAT_PNG, FORMAT_JPG) and HasPillow():
+            out_ico = output_dir / f"{project.name}_app.ico"
+            if ConvertPngToIco(resolved, out_ico):
+                return out_ico.resolve()
+        return None
+
+    # -----------------------------------------------------------------------
+    # Helper : resout le fichier de licence project vers un RTF utilisable
+    # par WiX (la dialogue EULA n'accepte QUE des .rtf). Si le user fournit
+    # un .txt ou .md, jenga convertit automatiquement en RTF minimal.
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def _ResolveLicenseRtf(project, builder, output_dir: Path) -> Optional[Path]:
+        license_src = getattr(project, "licenseFile", "")
+        if not license_src:
+            return None
+        try:
+            resolved = Path(builder.ResolveProjectPath(project, license_src))
+        except Exception:
+            resolved = Path(license_src)
+        if not resolved.exists():
+            Colored.PrintWarning(
+                f"[package] licensefile introuvable : {license_src}"
+            )
+            return None
+
+        ext = resolved.suffix.lower()
+        if ext == ".rtf":
+            return resolved.resolve()
+
+        # Conversion .txt / .md -> .rtf minimal.
+        try:
+            text = resolved.read_text(encoding="utf-8")
+        except Exception:
+            try:
+                text = resolved.read_text(encoding="latin-1")
+            except Exception:
+                Colored.PrintWarning(
+                    f"[package] impossible de lire licence : {resolved}"
+                )
+                return None
+
+        # Echappement RTF : { } \ doivent etre echappes par \. Les sauts de
+        # ligne deviennent \par. Les caracteres > 127 doivent etre encodes
+        # en \uXXXX (RTF utilise des decimales signees, 16-bit).
+        def _rtf_escape(s: str) -> str:
+            out = []
+            for ch in s:
+                cp = ord(ch)
+                if ch == '\\':
+                    out.append("\\\\")
+                elif ch == '{':
+                    out.append("\\{")
+                elif ch == '}':
+                    out.append("\\}")
+                elif ch == '\n':
+                    out.append("\\par\n")
+                elif ch == '\r':
+                    continue
+                elif 32 <= cp < 128:
+                    out.append(ch)
+                else:
+                    # \uN? avec N en 16-bit signed decimal.
+                    if cp > 32767:
+                        cp -= 65536
+                    out.append(f"\\u{cp}?")
+            return "".join(out)
+
+        body = _rtf_escape(text)
+        rtf = ("{\\rtf1\\ansi\\ansicpg1252\\deff0"
+               "{\\fonttbl{\\f0\\fnil\\fcharset0 Segoe UI;}}"
+               "\\viewkind4\\uc1\\pard\\f0\\fs20 "
+               + body + "}")
+        out_path = output_dir / f"{project.name}_license.rtf"
+        try:
+            out_path.write_text(rtf, encoding="utf-8")
+        except Exception as e:
+            Colored.PrintWarning(f"[package] echec ecriture licence RTF : {e}")
+            return None
+        return out_path.resolve()
+
+    # -----------------------------------------------------------------------
+    # WiX 4+ : format moderne <Package> + <StandardDirectory> + hierarchy
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _GenerateWiX4Template(project, builder, exe_path: Path, output: Path):
+        """
+        Genere un .wxs au format WiX 4+ avec hierarchie de dossiers complete.
+
+        Differences clefs vs WiX 3 :
+          - namespace : http://wixtoolset.org/schemas/v4/wxs
+          - <Package> remplace <Product>
+          - <StandardDirectory> remplace les Directory chaines
+            ProgramFiles64Folder
+          - <MediaTemplate> remplace <Media>
+          - Pas besoin de declarer InstallerVersion, Codepage explicites
+          - Guid="*" reste valide pour auto-generation
+
+        La hierarchie de dossiers est construite a partir des archive_paths
+        retournes par _CollectDependFiles. Un fichier `Resources/Pong/Textures/
+        logo.png` cree 3 niveaux : Resources -> Pong -> Textures, et le fichier
+        est place dans Textures avec son nom de base.
+        """
+        import xml.etree.ElementTree as ET
+        import uuid
+
+        ns    = "http://wixtoolset.org/schemas/v4/wxs"
+        ns_ui = "http://wixtoolset.org/schemas/v4/wxs/ui"
+        ET.register_namespace("",   ns)
+        ET.register_namespace("ui", ns_ui)
+
+        # ── Resolution des metadonnees app ────────────────────────────────
+        app_name      = project.targetName or project.name
+        publisher     = (project.appPublisher or "").strip() or "Jenga"
+        version       = (project.appVersion or project.iosVersion or "1.0.0").strip()
+
+        # ── Racine <Wix> + <Package> ───────────────────────────────────────
+        root = ET.Element(f"{{{ns}}}Wix")
+        pkg = ET.SubElement(root, f"{{{ns}}}Package",
+                            Name=app_name,
+                            Manufacturer=publisher,
+                            Version=version,
+                            UpgradeCode=str(uuid.uuid4()).upper())
+        ET.SubElement(pkg, f"{{{ns}}}MediaTemplate", EmbedCab="yes")
+
+        # ── UI : EULA (si licence fournie) + choix dossier d'install ──────
+        # WixUI_InstallDir presente un wizard standard :
+        #   Welcome -> EULA -> InstallDir (choix dossier) -> Confirm -> Install
+        # Necessite WIXUI_INSTALLDIR pour pointer vers notre INSTALLDIR.
+        license_rtf = PackageCommand._ResolveLicenseRtf(
+            project, builder, output.parent)
+        if license_rtf is not None:
+            # WixUILicenseRtf = fichier RTF affiche dans le dialogue EULA.
+            ET.SubElement(pkg, f"{{{ns}}}WixVariable",
+                          Id="WixUILicenseRtf",
+                          Value=str(license_rtf))
+        ET.SubElement(pkg, f"{{{ns}}}Property",
+                      Id="WIXUI_INSTALLDIR",
+                      Value="INSTALLDIR")
+        ET.SubElement(pkg, f"{{{ns_ui}}}WixUI", Id="WixUI_InstallDir")
+
+        # ── Icone applicative pour les raccourcis (.lnk Bureau/Menu) ──────
+        # Si on a un .ico (PNG converti via appicon ou .ico direct), on
+        # declare une <Icon> referencable par les <Shortcut> ci-dessous.
+        # Sans ca, Windows essaie d'extraire l'icone depuis l'exe mais avec
+        # Advertise="yes" il faut souvent un Icon explicite pour qu'elle
+        # s'affiche correctement.
+        ico_path = PackageCommand._ResolveWindowsIcoForPackage(
+            project, builder, output.parent)
+        icon_id_attr = None
+        if ico_path is not None:
+            ET.SubElement(pkg, f"{{{ns}}}Icon",
+                          Id="AppIcon.ico",
+                          SourceFile=str(ico_path))
+            ET.SubElement(pkg, f"{{{ns}}}Property",
+                          Id="ARPPRODUCTICON",
+                          Value="AppIcon.ico")
+            icon_id_attr = "AppIcon.ico"
+
+        # ── Hierarchy <StandardDirectory> -> INSTALLDIR -> ... ────────────
+        # Declaration des dossiers systeme utilises pour les raccourcis.
+        # WiX 4+ requiert ces declarations explicites quand on cree des
+        # <Shortcut Directory="ProgramMenuFolder"> ou DesktopFolder.
+        ET.SubElement(pkg, f"{{{ns}}}StandardDirectory", Id="ProgramMenuFolder")
+        ET.SubElement(pkg, f"{{{ns}}}StandardDirectory", Id="DesktopFolder")
+        std_dir = ET.SubElement(pkg, f"{{{ns}}}StandardDirectory",
+                                Id="ProgramFiles64Folder")
+        install_dir = ET.SubElement(std_dir, f"{{{ns}}}Directory",
+                                    Id="INSTALLDIR",
+                                    Name=project.targetName or project.name)
+
+        # Construit l'arbre des sous-dossiers a partir des archive_paths.
+        # Chaque cle de l'arbre est un nom de dossier (segment), valeur =
+        # sous-arbre. Les feuilles sont None.
+        #   { "Resources": { "Pong": { "Textures": None, ... }, ... } }
+        deps = PackageCommand._CollectDependFiles(project, builder)
+        tree_dirs: Dict = {}
+        files_at: Dict = {}    # archive_path -> src_abs
+        for src_abs, arc in deps:
+            arc_norm = arc.replace("\\", "/")
+            files_at[arc_norm] = src_abs
+            parts = arc_norm.split("/")
+            # Tous les segments sauf le dernier sont des dossiers.
+            cursor = tree_dirs
+            for seg in parts[:-1]:
+                if seg not in cursor or cursor[seg] is None:
+                    cursor[seg] = {}
+                cursor = cursor[seg]
+
+        # Pour generer des Id WiX uniques mais lisibles, on prefixe par
+        # "Dir_" + chemin sanitize. WiX Id doit etre [A-Za-z][A-Za-z0-9_.]*.
+        def _safe_id(prefix: str, raw: str) -> str:
+            cleaned = []
+            for ch in raw:
+                if ch.isalnum() or ch == '_':
+                    cleaned.append(ch)
+                else:
+                    cleaned.append('_')
+            res = prefix + "_" + "".join(cleaned)
+            # Tronque pour eviter les Id trop longs (limite MSI ~72 chars).
+            return res[:64]
+
+        # Recursion : cree les <Directory> imbriques. Retourne le dict
+        # path -> element XML pour pouvoir ajouter des Components dedans.
+        dir_elements: Dict[str, ET.Element] = {"": install_dir}
+
+        def _create_dirs(parent_path: str, parent_elem, subtree):
+            for name, child in sorted(subtree.items()):
+                if child is None:
+                    continue
+                child_path = (parent_path + "/" + name) if parent_path else name
+                d = ET.SubElement(parent_elem, f"{{{ns}}}Directory",
+                                  Id=_safe_id("Dir", child_path),
+                                  Name=name)
+                dir_elements[child_path] = d
+                _create_dirs(child_path, d, child)
+
+        _create_dirs("", install_dir, tree_dirs)
+
+        # ── Composants : un Component par fichier (chacun avec son <File>) ─
+        # Note : la regle MSI est "1 fichier = 1 component" pour le KeyPath.
+        # Plusieurs files dans un meme component est possible mais complique
+        # le PatchAdd/Remove. On garde simple.
+        component_ids: List[str] = []
+
+        # Composant principal : l'executable. Il porte aussi le raccourci
+        # menu Demarrer + Bureau (si createdesktopshortcut(True)).
+        exe_comp_id = "Comp_Exe"
+        exe_comp = ET.SubElement(install_dir, f"{{{ns}}}Component",
+                                 Id=exe_comp_id,
+                                 Guid=str(uuid.uuid4()).upper())
+        exe_file = ET.SubElement(exe_comp, f"{{{ns}}}File",
+                                 Id="ExeFile",
+                                 Source=str(exe_path),
+                                 Name=exe_path.name,
+                                 KeyPath="yes")
+        # Raccourci menu Demarrer (toujours cree, behavior standard).
+        # Si on a un .ico, on l'attache explicitement (Icon + IconIndex) :
+        # ca garantit l'affichage correct du visuel du jeu sur le .lnk.
+        sm_attrs = {
+            "Id": "StartMenuShortcut",
+            "Directory": "ProgramMenuFolder",
+            "Name": app_name,
+            "Description": f"Lancer {app_name}",
+            "WorkingDirectory": "INSTALLDIR",
+            "Advertise": "yes",
+        }
+        if icon_id_attr is not None:
+            sm_attrs["Icon"]      = icon_id_attr
+            sm_attrs["IconIndex"] = "0"
+        ET.SubElement(exe_file, f"{{{ns}}}Shortcut", **sm_attrs)
+
+        # Raccourci Bureau : optionnel (DSL createdesktopshortcut).
+        if getattr(project, "createDesktopShortcut", True):
+            dt_attrs = {
+                "Id": "DesktopShortcut",
+                "Directory": "DesktopFolder",
+                "Name": app_name,
+                "Description": f"Lancer {app_name}",
+                "WorkingDirectory": "INSTALLDIR",
+                "Advertise": "yes",
+            }
+            if icon_id_attr is not None:
+                dt_attrs["Icon"]      = icon_id_attr
+                dt_attrs["IconIndex"] = "0"
+            ET.SubElement(exe_file, f"{{{ns}}}Shortcut", **dt_attrs)
+        component_ids.append(exe_comp_id)
+
+        # Composants pour chaque depend file, dans son dossier respectif.
+        for idx, (src_abs, arc) in enumerate(deps):
+            arc_norm = arc.replace("\\", "/")
+            parts = arc_norm.split("/")
+            file_name = parts[-1]
+            sub_path = "/".join(parts[:-1])
+            parent_elem = dir_elements.get(sub_path, install_dir)
+            comp_id = _safe_id("Comp", arc_norm) + f"_{idx}"
+            comp = ET.SubElement(parent_elem, f"{{{ns}}}Component",
+                                 Id=comp_id,
+                                 Guid=str(uuid.uuid4()).upper())
+            ET.SubElement(comp, f"{{{ns}}}File",
+                          Source=str(src_abs),
+                          Name=file_name,
+                          KeyPath="yes")
+            component_ids.append(comp_id)
+
+        # ── Feature : declare tous les composants installables ─────────────
+        feature = ET.SubElement(pkg, f"{{{ns}}}Feature",
+                                Id="ProductFeature",
+                                Title=project.name,
+                                Level="1")
+        for cid in component_ids:
+            ET.SubElement(feature, f"{{{ns}}}ComponentRef", Id=cid)
+
+        # Ecriture du fichier .wxs
+        tree = ET.ElementTree(root)
+        ET.indent(tree, space="  ")
+        tree.write(output, encoding="utf-8", xml_declaration=True)
+
     @staticmethod
     def _GenerateInnoScript(project, builder, exe_path: Path, output: Path):
-        """Génère un script Inno Setup."""
+        """Genere un script Inno Setup avec UI complete : EULA (si licence
+        fournie), choix dossier d'install, raccourci bureau optionnel,
+        et estimation precise de l'espace disque requis."""
+        app_name  = project.targetName or project.name
+        publisher = (getattr(project, "appPublisher", "") or "").strip() or "Jenga"
+        version   = ((getattr(project, "appVersion", "") or "").strip()
+                  or (project.iosVersion or "1.0.0"))
+
+        # Calcul de l'espace disque total : taille de l'exe + tous les
+        # dependfiles (resources + DLLs auto). Inno utilisera cette valeur
+        # pour valider que le disque cible a assez d'espace AVANT install,
+        # et l'affichera dans le dialogue "Espace requis".
+        total_bytes = 0
+        try:
+            total_bytes += exe_path.stat().st_size
+        except Exception:
+            pass
+        for src_abs, _arc in PackageCommand._CollectDependFiles(project, builder):
+            try:
+                total_bytes += src_abs.stat().st_size
+            except Exception:
+                pass
+        # Inno ExtraDiskSpaceRequired est en BYTES (le total est ajoute au
+        # calcul automatique des fichiers [Files], mais on peut aussi mettre
+        # 0 si on veut juste l'auto-calcul Inno. Mettre la taille reelle
+        # rend l'estimation plus robuste si certains [Files] sont skipes
+        # via {code:...} conditionnels).
+
+        # Licence : Inno accepte .txt, .rtf, .md (en .txt). On laisse le path
+        # tel quel — la conversion RTF n'est requise que par WiX/MSI.
+        license_line = ""
+        license_src = getattr(project, "licenseFile", "")
+        if license_src:
+            try:
+                resolved = Path(builder.ResolveProjectPath(project, license_src))
+            except Exception:
+                resolved = Path(license_src)
+            if resolved.exists():
+                license_line = f"LicenseFile={resolved}\n"
+            else:
+                Colored.PrintWarning(f"[package] licensefile introuvable : {license_src}")
+
+        # Icone applicative pour les raccourcis Bureau/Menu Demarrer. Inno
+        # extrait normalement l'icone de l'exe automatiquement (si embed via
+        # .rc/.res au link), mais sur certains setups Windows le cache des
+        # icones .lnk affiche un fichier blanc. Forcer `IconFilename=` avec
+        # un .ico explicite garantit le visuel correct.
+        ico_path = PackageCommand._ResolveWindowsIcoForPackage(
+            project, builder, output.parent)
+        icon_filename_attr = ""
+        if ico_path is not None:
+            icon_filename_attr = f'; IconFilename: "{{app}}\\app.ico"'
+
+        # Raccourci bureau optionnel : controle par DSL createdesktopshortcut.
+        desktop_task = ""
+        desktop_icon_line = ""
+        if getattr(project, "createDesktopShortcut", True):
+            desktop_task = (
+                '\n[Tasks]\n'
+                'Name: "desktopicon"; Description: "Creer un raccourci sur le bureau"; '
+                'GroupDescription: "Raccourcis supplementaires :"\n'
+            )
+            desktop_icon_line = (
+                f'Name: "{{userdesktop}}\\{app_name}"; '
+                f'Filename: "{{app}}\\{exe_path.name}"'
+                f'{icon_filename_attr}; Tasks: desktopicon\n'
+            )
+
         script = f"""
 [Setup]
-AppName={project.targetName or project.name}
-AppVersion={project.iosVersion or '1.0.0'}
-DefaultDirName={{pf}}\\{project.targetName or project.name}
-DefaultGroupName={project.targetName or project.name}
+AppName={app_name}
+AppPublisher={publisher}
+AppVersion={version}
+DefaultDirName={{pf}}\\{app_name}
+DefaultGroupName={app_name}
 UninstallDisplayIcon={{app}}\\{exe_path.name}
+{license_line}DisableDirPage=no
+DisableProgramGroupPage=no
 Compression=lzma2
 SolidCompression=yes
 OutputDir=.
 OutputBaseFilename={project.name}_setup
-
+{desktop_task}
 [Files]
 Source: "{exe_path}"; DestDir: "{{app}}"
 """
@@ -509,6 +990,21 @@ Source: "{exe_path}"; DestDir: "{{app}}"
             sub_dir = Path(archive_path).parent
             dest_dir = "{app}" if str(sub_dir) in (".", "") else f"{{app}}\\{sub_dir}"
             script += f'Source: "{src_abs}"; DestDir: "{dest_dir}"\n'
+
+        # Inclut le .ico dans {app}\app.ico pour que les raccourcis le
+        # referencent avec un path absolu connu (evite le bug d'icone
+        # blanche de Windows pour les .lnk).
+        if ico_path is not None:
+            script += f'Source: "{ico_path}"; DestDir: "{{app}}"; DestName: "app.ico"\n'
+
+        # Icones : menu Demarrer (toujours) + bureau (optionnel via Tasks).
+        script += f"""
+[Icons]
+Name: "{{group}}\\{app_name}"; Filename: "{{app}}\\{exe_path.name}"{icon_filename_attr}
+{desktop_icon_line}
+[Run]
+Filename: "{{app}}\\{exe_path.name}"; Description: "Lancer {app_name}"; Flags: nowait postinstall skipifsilent
+"""
         output.write_text(script, encoding='utf-8')
 
     # -----------------------------------------------------------------------
