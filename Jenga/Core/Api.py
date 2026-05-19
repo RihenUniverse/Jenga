@@ -250,6 +250,21 @@ class Project:
     # Embedded resources (compiled into binary)
     embedResources: List[str] = field(default_factory=list)
 
+    # Icone d'application (cross-platform). Voir Core/IconConverter.py pour
+    # les regles de dispatch :
+    #   - appIcon est l'API "single source" : un PNG/JPG distribue a toutes
+    #     les plateformes (jenga convertit en .ico/.icns/mipmap-*/favicon).
+    #     Si le format n'est pas universel (.ico, .icns, mipmap-*), seule la
+    #     plateforme concernee l'utilisera.
+    #   - androidAppIcon / windowsIcon / macosIcon / iosAppIcon / webFavicon
+    #     sont des overrides par plateforme : ils gagnent sur appIcon.
+    appIcon:        str = ""
+    androidAppIcon: str = ""
+    windowsIcon:    str = ""
+    macosIcon:      str = ""
+    # iosAppIcon est declare plus bas dans la section "iOS specifics".
+    webFavicon:     str = ""
+
     # Compiler settings
     defines: List[str] = field(default_factory=list)
     optimize: Optimization = Optimization.OFF
@@ -1784,6 +1799,55 @@ def iosappicon(icon: str) -> None:
     """Set the path to the app icon file (PNG, ICNS) for iOS bundles."""
     if _currentProject:
         _currentProject.iosAppIcon = icon
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cross-platform app icon API
+# ─────────────────────────────────────────────────────────────────────────────
+# Pattern :
+#   - appicon(path) est l'API "single source" : un PNG/JPG est convertit en
+#     interne par jenga (via Core/IconConverter.py) vers tous les formats
+#     natifs requis (.ico Windows, .icns macOS, hierarchie mipmap-* Android,
+#     favicon set Web). Si le fichier passe n'est PAS universel (.ico, .icns,
+#     mipmap-*/), seule la plateforme compatible l'utilisera.
+#   - androidappicon / windowsicon / macosicon / iosappicon / webfavicon sont
+#     des overrides : ils gagnent sur appicon().
+# Voir Core/IconConverter.py::ResolveIconFor pour la logique de dispatch.
+# ─────────────────────────────────────────────────────────────────────────────
+def appicon(icon: str) -> None:
+    """Set a single app icon dispatched to ALL platforms (PNG/JPG recommended).
+    Native formats (.ico/.icns/mipmap-*) are applied only to their target
+    platform. Per-platform overrides (androidappicon, windowsicon, ...) win."""
+    if _currentProject:
+        _currentProject.appIcon = icon
+
+
+def androidappicon(icon: str) -> None:
+    """Override Android-specific app icon. Accepts PNG (auto mipmap generation)
+    or a res/mipmap-*/ directory tree (copied as-is). Wins over appicon()."""
+    if _currentProject:
+        _currentProject.androidAppIcon = icon
+
+
+def windowsicon(icon: str) -> None:
+    """Override Windows-specific app icon. Accepts PNG (converted to .ico)
+    or an .ico file (linked directly). Wins over appicon()."""
+    if _currentProject:
+        _currentProject.windowsIcon = icon
+
+
+def macosicon(icon: str) -> None:
+    """Override macOS-specific app icon. Accepts PNG (converted to .icns) or
+    .icns file (copied as-is). Wins over appicon()."""
+    if _currentProject:
+        _currentProject.macosIcon = icon
+
+
+def webfavicon(icon: str) -> None:
+    """Override Emscripten/Web favicon. Accepts PNG (favicon.ico + sizes set
+    are generated). Wins over appicon()."""
+    if _currentProject:
+        _currentProject.webFavicon = icon
 
 def iosbuildnumber(number: Union[str, int]) -> None:
     """Set the build number (CFBundleVersion) for iOS bundles."""
@@ -3444,6 +3508,8 @@ __all__ = [
     'iosbundleid', 'iosversion', 'iosminsdk', 'tvosminsdk', 'watchosminsdk', 'ipadosminsdk', 'visionosminsdk',
     'iossigningidentity', 'iosentitlements', 'iosappicon', 'iosbuildnumber',
     'iosbuildsystem', 'iosdistributiontype', 'iosteamid', 'iosprovisioningprofile',
+    # Cross-platform app icon API (voir Core/IconConverter.py)
+    'appicon', 'androidappicon', 'windowsicon', 'macosicon', 'webfavicon',
     'harmonyminsdk', 'harmonysdk',
     'testoptions', 'testfiles', 'testmainfile', 'testmaintemplate',
     'settarget', 'sysroot', 'targettriple', 'ccompiler', 'cppcompiler',

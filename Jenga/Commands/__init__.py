@@ -32,6 +32,7 @@ from .Profile import ProfileCommand
 from .Bench import BenchCommand
 from .Config import ConfigCommand
 from .Examples import ExamplesCommand
+from .IdeSetup import IdeSetupCommand
 
 # Enregistrement des commandes
 COMMANDS.update({
@@ -60,6 +61,8 @@ COMMANDS.update({
     'bench': BenchCommand,
     'config': ConfigCommand,
     'examples': ExamplesCommand,
+    'ide-setup': IdeSetupCommand,
+    'ide': IdeSetupCommand,         # alias court
     'help': HelpCommand,
 })
 
@@ -89,4 +92,5 @@ __all__ = [
     'KeygenCommand', 'SignCommand', 'DocsCommand', 'HelpCommand',
     'PackageCommand', 'DeployCommand', 'PublishCommand',
     'ProfileCommand', 'BenchCommand', 'ConfigCommand', 'ExamplesCommand',
+    'IdeSetupCommand',
 ]

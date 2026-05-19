@@ -7,11 +7,17 @@ Gère les .dylib, .a, .app bundles, frameworks.
 """
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
+import plistlib
+import shutil
 
 from Jenga.Core.Api import Project, ProjectKind, CompilerFamily, TargetArch
-from ...Utils import Process, FileSystem, ProcessResult
+from ...Utils import Process, FileSystem, ProcessResult, Colored
 from ..Builder import Builder
+from ..IconConverter import (
+    ResolveIconFor, DetectIconFormat, ConvertPngToIcns, HasPillow,
+    PLATFORM_MACOS, FORMAT_PNG, FORMAT_JPG, FORMAT_ICNS,
+)
 
 
 class MacOSBuilder(Builder):
@@ -157,7 +163,103 @@ class MacOSBuilder(Builder):
 
         result = Process.ExecuteCommand(args, captureOutput=True, silent=False)
         self._lastResult = result
-        return result.returnCode == 0
+        if result.returnCode != 0:
+            return False
+
+        # Si c'est une app windowed avec icone configuree, on cree un bundle
+        # .app minimal a cote de l'exe pour que l'icone soit visible dans
+        # Finder. L'exe standalone reste accessible pour les workflows CLI.
+        if project.kind == ProjectKind.WINDOWED_APP:
+            self._CreateMacosAppBundle(project, out)
+
+        return True
+
+    # -----------------------------------------------------------------------
+    # App bundle .app minimal pour macOS (avec icone)
+    # -----------------------------------------------------------------------
+
+    def _CreateMacosAppBundle(self, project: Project, exe_path: Path) -> Optional[Path]:
+        """
+        Cree (ou met a jour) un bundle .app minimal a cote de l'executable :
+          <exe>.app/
+            Contents/
+              Info.plist        (CFBundleExecutable + CFBundleIconFile)
+              MacOS/<exe>       (copie de l'exe)
+              Resources/AppIcon.icns
+
+        Ne fait rien si aucune icone macOS n'est configuree.
+        Retourne le path du bundle ou None.
+        """
+        icon_src = ResolveIconFor(project, PLATFORM_MACOS)
+        if not icon_src:
+            return None
+
+        icon_path = Path(self.ResolveProjectPath(project, icon_src))
+        if not icon_path.exists():
+            Colored.PrintWarn(
+                f"[macOS:icon] icone configuree introuvable : {icon_path}"
+            )
+            return None
+
+        bundle_name = (project.targetName or project.name) + ".app"
+        bundle_dir  = exe_path.parent / bundle_name
+        macos_dir   = bundle_dir / "Contents" / "MacOS"
+        res_dir     = bundle_dir / "Contents" / "Resources"
+        macos_dir.mkdir(parents=True, exist_ok=True)
+        res_dir.mkdir  (parents=True, exist_ok=True)
+
+        # 1) Copie de l'executable dans Contents/MacOS/. On garde aussi l'exe
+        #    standalone pour les workflows non-bundle (jenga run, CI).
+        exe_name = exe_path.name
+        try:
+            shutil.copy2(exe_path, macos_dir / exe_name)
+        except Exception as e:
+            Colored.PrintWarn(f"[macOS:icon] copie exe -> bundle echouee : {e}")
+            return None
+
+        # 2) Conversion de l'icone en .icns (ou copie si deja .icns).
+        icns_path = res_dir / "AppIcon.icns"
+        fmt = DetectIconFormat(icon_path)
+        if fmt == FORMAT_ICNS:
+            try:
+                shutil.copy2(icon_path, icns_path)
+            except Exception:
+                return None
+        elif fmt in (FORMAT_PNG, FORMAT_JPG):
+            if not HasPillow():
+                Colored.PrintWarn(
+                    "[macOS:icon] Pillow non installe -- conversion PNG->ICNS "
+                    "ignoree. Installer : pip install Pillow"
+                )
+                return None
+            if not ConvertPngToIcns(icon_path, icns_path):
+                Colored.PrintWarn(f"[macOS:icon] conversion PNG->ICNS echouee : {icon_path}")
+                return None
+        else:
+            Colored.PrintWarn(
+                f"[macOS:icon] format non supporte ({fmt}) pour macOS : {icon_path}"
+            )
+            return None
+
+        # 3) Info.plist minimal. CFBundleIconFile pointe sur AppIcon (sans .icns).
+        plist = {
+            "CFBundleExecutable":      exe_name,
+            "CFBundleIdentifier":      f"com.jenga.{project.name.lower()}",
+            "CFBundleName":            project.name,
+            "CFBundlePackageType":     "APPL",
+            "CFBundleShortVersionString": "1.0",
+            "CFBundleVersion":         "1",
+            "CFBundleIconFile":        "AppIcon",
+        }
+        plist_path = bundle_dir / "Contents" / "Info.plist"
+        try:
+            with open(plist_path, "wb") as f:
+                plistlib.dump(plist, f)
+        except Exception as e:
+            Colored.PrintWarn(f"[macOS:icon] ecriture Info.plist echouee : {e}")
+            return None
+
+        return bundle_dir
 
     def _GetCompilerFlags(self, project: Project) -> List[str]:
         flags = []

@@ -12,6 +12,10 @@ colorama>=0.4.4; sys_platform == 'win32'
 # HTTP requests (for package managers, deployment)
 requests>=2.28.0
 
+# Image processing (icon conversion : PNG -> .ico/.icns/mipmap-*/favicon)
+# Voir Core/IconConverter.py
+Pillow>=10.0.0
+
 # (Optional) Rich console output
 # rich>=12.0.1
 

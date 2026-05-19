@@ -17,6 +17,11 @@ from Jenga.Core.Api import Project, ProjectKind, CompilerFamily, TargetEnv, Targ
 from ...Utils import Process, FileSystem, Colored, ProcessResult
 from ..Builder import Builder
 from ..Toolchains import ToolchainManager
+from ..IconConverter import (
+    ResolveIconFor, DetectIconFormat, ConvertPngToIco, HasPillow,
+    PLATFORM_WINDOWS, FORMAT_PNG, FORMAT_JPG, FORMAT_ICO,
+)
+import shutil as _shutil
 
 
 class WindowsBuilder(Builder):
@@ -187,6 +192,15 @@ class WindowsBuilder(Builder):
     def Link(self, project: Project, objectFiles: List[str], outputFile: str) -> bool:
         out = Path(outputFile)
         FileSystem.MakeDirectory(out.parent)
+
+        # Icone d'app : on prepare un .res (resource object) que tous les
+        # linkers Windows (link.exe, lld-link, gcc/clang+windres) acceptent en
+        # entree comme un .obj normal. Ne s'applique pas aux libs (kind != APP).
+        if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+            res_obj = self._PrepareWindowsIconObject(project)
+            if res_obj is not None:
+                objectFiles = list(objectFiles) + [str(res_obj)]
+
         if self.is_msvc:
             return self._LinkMSVC(project, objectFiles, out)
         elif self.is_clang:
@@ -196,6 +210,97 @@ class WindowsBuilder(Builder):
         else:
             Colored.PrintError(f"Unsupported compiler family for Windows: {self.toolchain.compilerFamily}")
             return False
+
+    # -----------------------------------------------------------------------
+    # App icon : PNG/ICO -> .res (resource object embedded in PE/COFF)
+    # -----------------------------------------------------------------------
+
+    def _PrepareWindowsIconObject(self, project: Project) -> Optional[Path]:
+        """
+        Genere un fichier .res (ou .res.o pour MinGW) contenant l'icone d'app.
+        Retourne le path, ou None si pas d'icone configuree / si la compilation
+        ressource echoue (un warning est logue).
+
+        Etapes :
+          1. Resolve l'icone via IconConverter.
+          2. Si PNG -> convertit en .ico (Pillow).
+          3. Genere un .rc minimal qui declare IDI_ICON1 ICON "icon.ico".
+          4. Compile via rc.exe (MSVC) / llvm-rc (clang) / windres (MinGW).
+        """
+        icon_src = ResolveIconFor(project, PLATFORM_WINDOWS)
+        if not icon_src:
+            return None
+
+        icon_path = Path(self.ResolveProjectPath(project, icon_src))
+        if not icon_path.exists():
+            Colored.PrintWarn(
+                f"[Windows:icon] icone configuree introuvable : {icon_path}"
+            )
+            return None
+
+        obj_dir = Path(self.GetObjectDir(project)) / "app-icon"
+        obj_dir.mkdir(parents=True, exist_ok=True)
+
+        # Etape 1 : on resout l'icone vers un .ico (convertit si necessaire).
+        fmt = DetectIconFormat(icon_path)
+        ico_path = obj_dir / "app_icon.ico"
+        if fmt == FORMAT_ICO:
+            _shutil.copy2(icon_path, ico_path)
+        elif fmt in (FORMAT_PNG, FORMAT_JPG):
+            if not HasPillow():
+                Colored.PrintWarn(
+                    "[Windows:icon] Pillow non installe -- conversion PNG->ICO "
+                    "ignoree. Installer : pip install Pillow"
+                )
+                return None
+            if not ConvertPngToIco(icon_path, ico_path):
+                Colored.PrintWarn(f"[Windows:icon] conversion PNG->ICO echouee : {icon_path}")
+                return None
+        else:
+            Colored.PrintWarn(
+                f"[Windows:icon] format non supporte ({fmt}) pour Windows : {icon_path}"
+            )
+            return None
+
+        # Etape 2 : on genere le .rc. Pour eviter les soucis de chemin avec
+        # rc.exe, on utilise un nom relatif (les deux fichiers sont dans le
+        # meme dossier).
+        rc_path = obj_dir / "app_icon.rc"
+        rc_path.write_text(
+            'IDI_ICON1 ICON DISCARDABLE "app_icon.ico"\n',
+            encoding="utf-8"
+        )
+
+        # Etape 3 : compilation .rc -> .res (ou .res.o pour MinGW).
+        if self.is_mingw:
+            res_out = obj_dir / "app_icon.res.o"
+            windres = "windres"
+            cmd = [windres, "-O", "coff", "-i", str(rc_path), "-o", str(res_out)]
+        else:
+            res_out = obj_dir / "app_icon.res"
+            # Pour MSVC/clang-cl, on essaie rc.exe en premier (Windows SDK),
+            # puis llvm-rc en fallback (LLVM bin). Les deux acceptent /fo et /nologo.
+            tool = "rc.exe" if (self.is_msvc or self.is_clang_cl) else "llvm-rc"
+            cmd = [tool, "/nologo", f"/fo{res_out}", str(rc_path)]
+
+        if self.verbose:
+            Colored.PrintInfo(f"[Windows:icon] {' '.join(cmd)}")
+
+        result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+        if result.returnCode != 0:
+            # Fallback : si rc.exe absent, essayer llvm-rc.
+            if not self.is_mingw and cmd[0] == "rc.exe":
+                cmd[0] = "llvm-rc"
+                result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
+
+        if result.returnCode != 0:
+            Colored.PrintWarn(
+                f"[Windows:icon] compilation du .rc echouee ({cmd[0]}). "
+                f"L'executable sera produit sans icone. Verifier rc.exe/llvm-rc dans le PATH."
+            )
+            return None
+
+        return res_out
 
     # -----------------------------------------------------------------------
     # Compilation MSVC

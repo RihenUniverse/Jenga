@@ -12,8 +12,12 @@ import os
 import shutil
 
 from Jenga.Core.Api import Project, ProjectKind
-from ...Utils import Process, FileSystem, ProcessResult
+from ...Utils import Process, FileSystem, ProcessResult, Colored
 from ..Builder import Builder
+from ..IconConverter import (
+    ResolveIconFor, DetectIconFormat, GenerateFaviconSet, HasPillow,
+    PLATFORM_WEB, FORMAT_PNG, FORMAT_JPG,
+)
 
 
 class EmscriptenBuilder(Builder):
@@ -193,8 +197,47 @@ class EmscriptenBuilder(Builder):
 
         if result.returnCode == 0:
             self._GenerateRunnerScripts(project, out)
+            # Genere les favicons (favicon.ico + favicon-*.png) a cote du .html
+            # pour les apps web. Pas d'effet pour les libs ou si aucune icone
+            # n'est configuree via appicon() ou webfavicon().
+            if project.kind in (ProjectKind.CONSOLE_APP, ProjectKind.WINDOWED_APP):
+                self._GenerateWebFavicons(project, out)
 
         return result.returnCode == 0
+
+    # -----------------------------------------------------------------------
+    # Favicon set : genere favicon.ico + favicon-*.png a cote du .html
+    # Le template emscripten_fullscreen.html reference ces fichiers via <link>.
+    # -----------------------------------------------------------------------
+    def _GenerateWebFavicons(self, project: Project, output_path: Path) -> None:
+        icon_src = ResolveIconFor(project, PLATFORM_WEB)
+        if not icon_src:
+            return
+
+        icon_path = Path(self.ResolveProjectPath(project, icon_src))
+        if not icon_path.exists():
+            Colored.PrintWarn(
+                f"[Web:icon] icone configuree introuvable : {icon_path}"
+            )
+            return
+
+        fmt = DetectIconFormat(icon_path)
+        if fmt not in (FORMAT_PNG, FORMAT_JPG):
+            Colored.PrintWarn(
+                f"[Web:icon] format non supporte ({fmt}) pour le favicon : {icon_path}"
+            )
+            return
+        if not HasPillow():
+            Colored.PrintWarn(
+                "[Web:icon] Pillow non installe -- generation favicons ignoree. "
+                "Installer : pip install Pillow"
+            )
+            return
+
+        dst_dir = output_path.parent
+        generated = GenerateFaviconSet(icon_path, dst_dir)
+        if not generated:
+            Colored.PrintWarn(f"[Web:icon] generation favicon set echouee : {icon_path}")
 
     def _GenerateRunnerScripts(self, project: Project, output_path: Path) -> None:
         """Génère les scripts de lancement pour le serveur HTTP local."""

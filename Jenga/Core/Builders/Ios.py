@@ -18,6 +18,7 @@ from Jenga.Core.Api import CompilerFamily, Project, ProjectKind, TargetArch, Tar
 from ...Utils import Colored, FileSystem, Process, ProcessResult
 from ..Builder import Builder
 from ..Platform import Platform
+from ..IconConverter import ResolveIconFor, PLATFORM_IOS
 
 
 class DirectIOSBuilder(Builder):
@@ -360,9 +361,12 @@ class DirectIOSBuilder(Builder):
         if plist_path:
             shutil.copy2(plist_path, bundle_dir / "Info.plist")
 
-        # Icône
-        if project.iosAppIcon:
-            icon_path = Path(self.ResolveProjectPath(project, project.iosAppIcon))
+        # Icone : iosAppIcon (specifique) gagne, sinon fallback sur appicon()
+        # generique (via IconConverter.ResolveIconFor). Le format doit etre
+        # compatible iOS (PNG/JPG, ou .appiconset).
+        resolved_icon = ResolveIconFor(project, PLATFORM_IOS)
+        if resolved_icon:
+            icon_path = Path(self.ResolveProjectPath(project, resolved_icon))
             if icon_path.exists():
                 shutil.copy2(icon_path, bundle_dir / icon_path.name)
 
@@ -406,8 +410,10 @@ class DirectIOSBuilder(Builder):
                 "UIInterfaceOrientationLandscapeRight",
             ]
 
-        if project.iosAppIcon:
-            plist["CFBundleIconFile"] = Path(project.iosAppIcon).name
+        # Voir _CreateAppBundle pour la logique de fallback iosAppIcon -> appIcon.
+        resolved_icon = ResolveIconFor(project, PLATFORM_IOS)
+        if resolved_icon:
+            plist["CFBundleIconFile"] = Path(resolved_icon).name
 
         plist_path = bundle_dir / "Info.plist"
         with open(plist_path, "wb") as f:

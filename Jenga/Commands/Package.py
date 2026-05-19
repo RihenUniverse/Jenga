@@ -292,6 +292,96 @@ class PackageCommand:
     # Windows
     # -----------------------------------------------------------------------
 
+    # -----------------------------------------------------------------------
+    # Depend files collection (commun a tous les packagers)
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def _CollectDependFiles(project, builder) -> List[tuple]:
+        """
+        Collecte tous les fichiers a embarquer dans le package, declares via
+        `dependfiles()` dans le .jenga. Retourne une liste de tuples
+        (src_absolu, archive_path_relatif).
+
+        Strategie de archive_path :
+          - Si la source resolue est SOUS le workspace root, on preserve sa
+            structure relative au workspace. Exemple :
+              dependfiles(["../../Resources/Pong"])  dans Applications/Pong/
+              -> src abs = <wks>/Resources/Pong/
+              -> archive_path commence par "Resources/Pong/..."
+            C'est le comportement attendu pour les ressources d'app : le code
+            C++ utilise `Resources/Pong/Textures/logo.png` au runtime.
+          - Sinon (source hors workspace, ex: une DLL externe), on copie au
+            basename du chemin source.
+
+        Dossiers : on recurse via rglob("*") pour ajouter chaque fichier.
+        Fichiers manquants : silencieusement skippes (un warning est emis).
+        """
+        if not project.dependFiles:
+            return []
+
+        try:
+            workspace_root = Path(builder.workspace.location).resolve()
+        except Exception:
+            workspace_root = None
+
+        collected: List[tuple] = []
+        for dep in project.dependFiles:
+            # Resolve via builder pour gerer correctement les chemins
+            # relatifs au project.location (ex: "../../Resources/Pong").
+            try:
+                resolved = Path(builder.ResolveProjectPath(project, dep)).resolve()
+            except Exception:
+                resolved = Path(dep).resolve()
+
+            if not resolved.exists():
+                Colored.PrintWarning(f"[package] dependfile introuvable : {dep}")
+                continue
+
+            def _archive_path_for(file_abs: Path) -> str:
+                """Calcule le chemin relatif dans l'archive pour un fichier source."""
+                if workspace_root is not None:
+                    try:
+                        rel = file_abs.relative_to(workspace_root)
+                        return str(rel).replace("\\", "/")
+                    except ValueError:
+                        pass  # hors workspace : fallback basename
+                return file_abs.name
+
+            if resolved.is_file():
+                collected.append((resolved, _archive_path_for(resolved)))
+            elif resolved.is_dir():
+                for f in resolved.rglob("*"):
+                    if f.is_file():
+                        collected.append((f, _archive_path_for(f)))
+
+        # Auto-detection des SHARED_LIB dependances : si le project depend
+        # d'une SHARED_LIB construite par jenga, on embarque automatiquement
+        # son binaire (.dll/.so/.dylib) a cote de l'executable dans le package.
+        # Le user n'a pas a declarer manuellement chaque DLL transitive.
+        try:
+            from ..Core.Api import ProjectKind
+            for dep_name in (project.dependsOn or []):
+                dep_proj = builder.workspace.projects.get(dep_name)
+                if dep_proj is None or dep_proj.kind != ProjectKind.SHARED_LIB:
+                    continue
+                try:
+                    dep_lib_path = Path(builder.GetTargetPath(dep_proj)).resolve()
+                except Exception:
+                    continue
+                if not dep_lib_path.exists():
+                    continue
+                # Les DLLs Windows / .dylib macOS / .so Linux doivent vivre a
+                # cote de l'executable au runtime -> on les met au basename
+                # (pas de sous-dossier). Eviter les doublons.
+                arc = dep_lib_path.name
+                if not any(p[0] == dep_lib_path for p in collected):
+                    collected.append((dep_lib_path, arc))
+        except Exception:
+            # Defensif : ne jamais casser le packaging pour une auto-detection.
+            pass
+
+        return collected
+
     @staticmethod
     def _PackageWindows(project, builder, pkg_type: str, output_dir: Path) -> int:
         """Création d'installateur Windows."""
@@ -310,11 +400,9 @@ class PackageCommand:
             zip_path = output_dir / f"{project.targetName or project.name}.zip"
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.write(exe_path, exe_path.name)
-                # Ajouter les DLLs dépendantes
-                for dep in project.dependFiles:
-                    dep_path = Path(dep)
-                    if dep_path.exists():
-                        zf.write(dep_path, dep_path.name)
+                # Embarquer les dependfiles (ressources, DLLs, dossiers entiers)
+                for src_abs, archive_path in PackageCommand._CollectDependFiles(project, builder):
+                    zf.write(src_abs, archive_path)
             Colored.PrintSuccess(f"ZIP package: {zip_path}")
             return 0
 
@@ -375,11 +463,20 @@ class PackageCommand:
         app_dir = ET.SubElement(prog_files, "Directory", Id="INSTALLDIR", Name=project.targetName or project.name)
         comp = ET.SubElement(app_dir, "Component", Id="MainExecutable", Guid="*")
         file_elem = ET.SubElement(comp, "File", Id="ExeFile", Name=exe_path.name, Source=str(exe_path), KeyPath="yes")
-        # Ajouter les DLLs
-        for dep in project.dependFiles:
-            dep_path = Path(dep)
-            if dep_path.exists():
-                ET.SubElement(comp, "File", Id=dep_path.stem, Name=dep_path.name, Source=str(dep_path))
+        # Embarquer les dependfiles. WiX gere les sous-dossiers via une
+        # hierarchie <Directory> imbriquee — on garde ici un schema plat (les
+        # fichiers heritent du INSTALLDIR). Pour une vraie hierarchy MSI, voir
+        # le pattern Wix Heat Harvester ; on garde simple pour l'instant.
+        for idx, (src_abs, archive_path) in enumerate(
+            PackageCommand._CollectDependFiles(project, builder)
+        ):
+            file_id = f"DepFile{idx}"
+            ET.SubElement(
+                comp, "File",
+                Id=file_id,
+                Name=Path(archive_path).name,
+                Source=str(src_abs),
+            )
 
         # Features
         feature = ET.SubElement(product, "Feature", Id="ProductFeature", Title=project.name, Level="1")
@@ -406,10 +503,12 @@ OutputBaseFilename={project.name}_setup
 [Files]
 Source: "{exe_path}"; DestDir: "{{app}}"
 """
-        for dep in project.dependFiles:
-            dep_path = Path(dep)
-            if dep_path.exists():
-                script += f'Source: "{dep_path}"; DestDir: "{{app}}"\n'
+        # Embarquer les dependfiles avec preservation de la hierarchie via
+        # DestDir relatif ({{app}}\<sous-dossier>).
+        for src_abs, archive_path in PackageCommand._CollectDependFiles(project, builder):
+            sub_dir = Path(archive_path).parent
+            dest_dir = "{app}" if str(sub_dir) in (".", "") else f"{{app}}\\{sub_dir}"
+            script += f'Source: "{src_abs}"; DestDir: "{dest_dir}"\n'
         output.write_text(script, encoding='utf-8')
 
     # -----------------------------------------------------------------------
@@ -453,6 +552,15 @@ Source: "{exe_path}"; DestDir: "{{app}}"
             usr_bin = deb_root / "usr" / "bin"
             usr_bin.mkdir(parents=True)
             shutil.copy2(exe_path, usr_bin / exe_path.name)
+
+            # Embarquer les dependfiles dans /usr/share/<app>/ en preservant
+            # la hierarchie. Convention Linux pour les data files.
+            app_name_lower = (project.targetName or project.name).lower()
+            share_dir = deb_root / "usr" / "share" / app_name_lower
+            for src_abs, archive_path in PackageCommand._CollectDependFiles(project, builder):
+                dst = share_dir / archive_path
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_abs, dst)
 
             # Créer le fichier DEBIAN/control
             control_dir = deb_root / "DEBIAN"
@@ -510,8 +618,15 @@ Description: {project.name} packaged by Jenga
             if not app_bundle.exists():
                 Colored.PrintError(f".app bundle not found: {app_bundle}")
                 return 1
+            # Copie des dependfiles a cote du .app dans le root scanne par
+            # pkgbuild. Ils preservent leur hierarchie relative au workspace.
+            pkg_root = app_bundle.parent
+            for src_abs, archive_path in PackageCommand._CollectDependFiles(project, builder):
+                dst = pkg_root / archive_path
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_abs, dst)
             pkg_path = output_dir / f"{project.name}.pkg"
-            cmd = ["pkgbuild", "--root", str(app_bundle.parent), "--identifier", project.iosBundleId or f"com.{project.name}",
+            cmd = ["pkgbuild", "--root", str(pkg_root), "--identifier", project.iosBundleId or f"com.{project.name}",
                    "--version", project.iosVersion or "1.0.0", str(pkg_path)]
             if Process.Run(cmd) == 0:
                 Colored.PrintSuccess(f"PKG package: {pkg_path}")
@@ -549,12 +664,19 @@ Description: {project.name} packaged by Jenga
             return 1
 
         target_dir = builder.GetTargetDir(project)
-        # Rechercher .html, .js, .wasm
+        # Inclure les artefacts WebAssembly + favicons generes par le builder
+        # Emscripten (favicon.ico, favicon-*.png).
         import zipfile
         zip_path = output_dir / f"{project.targetName or project.name}.zip"
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for ext in ['.html', '.js', '.wasm', '.data']:
+            for ext in ['.html', '.js', '.wasm', '.data', '.ico']:
                 for f in target_dir.glob(f"*{ext}"):
                     zf.write(f, f.name)
+            # PNG favicons (favicon-16.png, favicon-32.png, ...)
+            for f in target_dir.glob("favicon-*.png"):
+                zf.write(f, f.name)
+            # Dependfiles (assets data, etc.)
+            for src_abs, archive_path in PackageCommand._CollectDependFiles(project, builder):
+                zf.write(src_abs, archive_path)
         Colored.PrintSuccess(f"Web ZIP package: {zip_path}")
         return 0

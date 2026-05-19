@@ -489,6 +489,18 @@ class BuildCommand:
                 return 1
         workspace_root = entry_file.parent
 
+        # ── Auto-config IDE (silencieuse + idempotente) ─────────────────────
+        # Configure VSCode/Cursor/Windsurf + pyrightconfig.json pour que les
+        # fichiers *.jenga aient coloration syntaxique Python + autocomplete.
+        # No-op si la config est deja a jour (verif par marker).
+        # Desactiver via JENGA_NO_IDE_CONFIG=1.
+        try:
+            from ..Core.IDEConfigurator import AutoConfigure
+            AutoConfigure(workspace_root, force=False, verbose=False)
+        except Exception:
+            # On ne fait JAMAIS echouer le build pour une erreur IDE setup.
+            pass
+
         if BuildCommand.IsAllPlatformsRequest(parsed.platform):
             # Multi-platform orchestration is done in direct mode from CLI.
             parsed.no_daemon = True

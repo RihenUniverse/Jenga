@@ -23,6 +23,11 @@ from Jenga.Core.Api import Project, ProjectKind, TargetArch, TargetOS
 from ...Utils import Process, FileSystem, Colored, Reporter, ProcessResult
 from ..Builder import Builder
 from ..Toolchains import ToolchainManager
+from ..IconConverter import (
+    ResolveIconFor, DetectIconFormat, GenerateAndroidMipmaps,
+    CopyAndroidMipmapsFromDir, HasPillow,
+    PLATFORM_ANDROID, FORMAT_PNG, FORMAT_JPG, FORMAT_MIPMAP_DIR,
+)
 
 
 class AndroidBuilder(Builder):
@@ -1704,6 +1709,63 @@ class AndroidBuilder(Builder):
         dex_files = list(dex_out.glob("*.dex"))
         return dex_files
 
+    def _PrepareAppIconRes(self, project: Project, build_dir: Path) -> Optional[Path]:
+        """
+        Genere (ou copie) l'icone d'app Android dans un sous-dossier res/ du
+        build_dir, sous forme de hierarchie res/mipmap-{ldpi..xxxhdpi}/ic_launcher.png.
+
+        Source priorisee via IconConverter.ResolveIconFor :
+          1. project.androidAppIcon (override)
+          2. project.appIcon si format compatible Android (PNG/JPG/mipmap-dir)
+
+        Retourne le path du dossier res/ genere, ou None si aucune icone n'est
+        configuree ou si la generation a echoue (un warning est logue).
+        """
+        icon_src = ResolveIconFor(project, PLATFORM_ANDROID)
+        if not icon_src:
+            return None
+
+        icon_path = Path(self.ResolveProjectPath(project, icon_src))
+        if not icon_path.exists():
+            Colored.PrintWarn(
+                f"[Android:icon] icone configuree introuvable : {icon_path}"
+            )
+            return None
+
+        # Dossier res/ dedie aux icones generees, separe des res utilisateur.
+        gen_res = build_dir / "app-icon-res"
+        # Nettoie pour eviter d'accumuler les anciennes densites.
+        if gen_res.exists():
+            shutil.rmtree(gen_res, ignore_errors=True)
+        gen_res.mkdir(parents=True, exist_ok=True)
+
+        fmt = DetectIconFormat(icon_path)
+        ok = False
+        if fmt in (FORMAT_PNG, FORMAT_JPG):
+            if not HasPillow():
+                Colored.PrintWarn(
+                    "[Android:icon] Pillow non installe -- conversion PNG->mipmap "
+                    "ignoree. Installer : pip install Pillow"
+                )
+                return None
+            ok = GenerateAndroidMipmaps(icon_path, gen_res)
+        elif fmt == FORMAT_MIPMAP_DIR:
+            ok = CopyAndroidMipmapsFromDir(icon_path, gen_res)
+        else:
+            Colored.PrintWarn(
+                f"[Android:icon] format non supporte ({fmt}) pour Android : {icon_path}"
+            )
+            return None
+
+        if not ok:
+            Colored.PrintWarn(
+                f"[Android:icon] echec generation res/mipmap-* depuis {icon_path}"
+            )
+            return None
+
+        Reporter.Info(f"App icon Android genere : {gen_res}")
+        return gen_res
+
     def _CompileResources(self, project: Project, build_dir: Path, output_zip: Path) -> bool:
         """aapt2 compile avec support de dossiers de ressources multiples."""
         proj_root = Path(self.ResolveProjectPath(project, "."))
@@ -1719,6 +1781,11 @@ class AndroidBuilder(Builder):
             default_res = proj_root / "res"
             if default_res.exists():
                 res_dirs.append(default_res)
+
+        # Ajout des icones d'app generees (appicon/androidappicon).
+        icon_res = self._PrepareAppIconRes(project, build_dir)
+        if icon_res is not None:
+            res_dirs.append(icon_res)
 
         if not res_dirs:
             # Pas de ressources, créer un zip vide
@@ -1776,6 +1843,15 @@ class AndroidBuilder(Builder):
         # Détection de la présence de code Java
         has_java = bool(self._CollectJavaSourceFiles(project))
         application.set(f"{{{android_ns}}}hasCode", "true" if has_java else "false")
+
+        # Icone d'app : si appicon() ou androidappicon() est configure et que
+        # le format est compatible Android, on reference @mipmap/ic_launcher.
+        # Le dossier res/ correspondant est genere par _PrepareAppIconRes et
+        # injecte dans aapt2 via _CompileResources.
+        if ResolveIconFor(project, PLATFORM_ANDROID):
+            application.set(f"{{{android_ns}}}icon", "@mipmap/ic_launcher")
+            # roundIcon (API 25+) reference le meme asset par defaut.
+            application.set(f"{{{android_ns}}}roundIcon", "@mipmap/ic_launcher")
 
         # Marquage "jeu" : si androidisgame(True) est defini dans le .jenga,
         # on positionne les attributs reconnus par Android pour activer
