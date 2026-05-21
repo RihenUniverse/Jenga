@@ -1291,15 +1291,16 @@ class AndroidBuilder(Builder):
         if not self._Zipalign(apk_unsigned_unaligned, apk_unsigned_aligned):
             return False
 
-        # 9. Signer
+        # 9. Signer (Debug ET Release : Android refuse les APK non signes).
+        # Si pas de keystore custom configure via androidSign+androidKeystore,
+        # on auto-sign avec debug.keystore (OK pour testeurs internes, pas
+        # pour Play Store qui exige une signature stable production).
         if project.androidSign:
             if not self._SignApk(project, apk_unsigned_aligned, apk_signed):
                 return False
-        elif self.config == "Debug":
-            # Auto-sign Debug builds with debug.keystore
+        else:
             debug_ks = Path.home() / ".android" / "debug.keystore"
             if debug_ks.exists():
-                # Temporarily set signing properties for debug
                 orig_sign = getattr(project, 'androidSign', False)
                 orig_ks = getattr(project, 'androidKeystore', None)
                 orig_pass = getattr(project, 'androidKeystorePass', None)
@@ -1312,7 +1313,6 @@ class AndroidBuilder(Builder):
 
                 success = self._SignApk(project, apk_unsigned_aligned, apk_signed)
 
-                # Restore original properties
                 project.androidSign = orig_sign
                 if orig_ks: project.androidKeystore = orig_ks
                 if orig_pass: project.androidKeystorePass = orig_pass
@@ -1320,11 +1320,16 @@ class AndroidBuilder(Builder):
 
                 if not success:
                     return False
+                if self.config != "Debug":
+                    Reporter.Info(f"APK {self.config} signe avec debug.keystore "
+                                  f"(OK testeurs internes, pas Play Store).")
             else:
-                Reporter.Warning(f"Debug keystore not found at {debug_ks} - APK will not be signed")
+                Reporter.Warning(f"Debug keystore not found at {debug_ks} - APK ne sera "
+                                 f"PAS signe ; Android refusera l'install. Generer via: "
+                                 f"keytool -genkeypair -keystore ~/.android/debug.keystore "
+                                 f"-alias androiddebugkey -storepass android -keypass android "
+                                 f"-keyalg RSA -validity 10000")
                 shutil.copy2(apk_unsigned_aligned, apk_signed)
-        else:
-            shutil.copy2(apk_unsigned_aligned, apk_signed)
 
         # Also expose final APK in target dir for package/deploy commands
         final_apk = Path(self.GetTargetDir(project)) / f"{project.targetName or project.name}.apk"
@@ -1446,15 +1451,16 @@ class AndroidBuilder(Builder):
         if not self._Zipalign(apk_unsigned_unaligned, apk_unsigned_aligned):
             return False
 
-        # 9. Signer
+        # 9. Signer (Debug ET Release : Android refuse les APK non signes).
+        # Si pas de keystore custom configure via androidSign+androidKeystore,
+        # on auto-sign avec debug.keystore (OK pour testeurs internes, pas
+        # pour Play Store qui exige une signature stable production).
         if project.androidSign:
             if not self._SignApk(project, apk_unsigned_aligned, apk_signed):
                 return False
-        elif self.config == "Debug":
-            # Auto-sign Debug builds with debug.keystore
+        else:
             debug_ks = Path.home() / ".android" / "debug.keystore"
             if debug_ks.exists():
-                # Temporarily set signing properties for debug
                 orig_sign = getattr(project, 'androidSign', False)
                 orig_ks = getattr(project, 'androidKeystore', None)
                 orig_pass = getattr(project, 'androidKeystorePass', None)
@@ -1467,7 +1473,6 @@ class AndroidBuilder(Builder):
 
                 success = self._SignApk(project, apk_unsigned_aligned, apk_signed)
 
-                # Restore original properties
                 project.androidSign = orig_sign
                 if orig_ks: project.androidKeystore = orig_ks
                 if orig_pass: project.androidKeystorePass = orig_pass
@@ -1475,11 +1480,16 @@ class AndroidBuilder(Builder):
 
                 if not success:
                     return False
+                if self.config != "Debug":
+                    Reporter.Info(f"APK {self.config} signe avec debug.keystore "
+                                  f"(OK testeurs internes, pas Play Store).")
             else:
-                Reporter.Warning(f"Debug keystore not found at {debug_ks} - APK will not be signed")
+                Reporter.Warning(f"Debug keystore not found at {debug_ks} - APK ne sera "
+                                 f"PAS signe ; Android refusera l'install. Generer via: "
+                                 f"keytool -genkeypair -keystore ~/.android/debug.keystore "
+                                 f"-alias androiddebugkey -storepass android -keypass android "
+                                 f"-keyalg RSA -validity 10000")
                 shutil.copy2(apk_unsigned_aligned, apk_signed)
-        else:
-            shutil.copy2(apk_unsigned_aligned, apk_signed)
 
         # Also expose final APK in target dir for package/deploy commands.
         final_apk = Path(self.GetTargetDir(project)) / f"{project.targetName or project.name}.apk"

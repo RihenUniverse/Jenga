@@ -891,6 +891,55 @@ class PackageCommand:
         for cid in component_ids:
             ET.SubElement(feature, f"{{{ns}}}ComponentRef", Id=cid)
 
+        # ── CustomActions : ajout/retrait regle Firewall Windows ──────────
+        # Sans cette regle, Windows Defender bloque silencieusement les
+        # connexions UDP/TCP entrantes vers l'exe -> les jeux multijoueurs
+        # LAN echouent cote PC quand un mobile (ou autre PC) tente de
+        # rejoindre. On utilise netsh.exe (livre Windows depuis XP) plutot
+        # que la WiX Firewall extension qui requiert un wixext separe a
+        # installer. La regle s'applique aux 3 profils (Domain/Private/Public).
+        #
+        # Execute="deferred" + Impersonate="no" : la CA tourne en NT AUTHORITY\
+        # SYSTEM (privileges admin necessaires pour modifier le firewall).
+        # Return="ignore" : on tolere les erreurs (ex: regle deja existante).
+        firewall_rule_name = f"{app_name} (Network)"
+        exe_full_path = f"[#ExeFile]"   # MSI substitue le chemin d'install reel
+        netsh_add_cmd = (
+            f'netsh advfirewall firewall add rule '
+            f'name="{firewall_rule_name}" dir=in action=allow '
+            f'program="{exe_full_path}" enable=yes profile=any'
+        )
+        netsh_del_cmd = (
+            f'netsh advfirewall firewall delete rule '
+            f'name="{firewall_rule_name}"'
+        )
+        # 1) Action d'ajout (apres install des fichiers)
+        ET.SubElement(pkg, f"{{{ns}}}CustomAction",
+                      Id="Nk_FirewallAdd",
+                      Directory="INSTALLDIR",
+                      ExeCommand=netsh_add_cmd,
+                      Execute="deferred",
+                      Impersonate="no",
+                      Return="ignore")
+        # 2) Action de suppression (uninstall)
+        ET.SubElement(pkg, f"{{{ns}}}CustomAction",
+                      Id="Nk_FirewallDel",
+                      Directory="INSTALLDIR",
+                      ExeCommand=netsh_del_cmd,
+                      Execute="deferred",
+                      Impersonate="no",
+                      Return="ignore")
+        # Sequences : add apres InstallFiles, del avant RemoveFiles.
+        seq = ET.SubElement(pkg, f"{{{ns}}}InstallExecuteSequence")
+        add_action = ET.SubElement(seq, f"{{{ns}}}Custom",
+                                   Action="Nk_FirewallAdd",
+                                   After="InstallFiles")
+        add_action.set("Condition", "NOT Installed")
+        del_action = ET.SubElement(seq, f"{{{ns}}}Custom",
+                                   Action="Nk_FirewallDel",
+                                   Before="RemoveFiles")
+        del_action.set("Condition", "Installed AND REMOVE=\"ALL\"")
+
         # Ecriture du fichier .wxs
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ")
@@ -998,12 +1047,41 @@ Source: "{exe_path}"; DestDir: "{{app}}"
             script += f'Source: "{ico_path}"; DestDir: "{{app}}"; DestName: "app.ico"\n'
 
         # Icones : menu Demarrer (toujours) + bureau (optionnel via Tasks).
+        # [Run] : 2 actions post-install transparentes pour l'user :
+        #   1. Ajout regle Firewall Windows pour autoriser l'exe en TCP+UDP
+        #      entrant sur les profils Private+Public+Domain. Sans ca, les
+        #      jeux multijoueurs LAN ne peuvent pas accepter de connexions
+        #      entrantes (cas classique observe sur Pong PC<->Android).
+        #      Cf [[pong_firewall_lan_fix]].
+        #   2. Lancement de l'app (skipifsilent : pas en mode CI).
+        #
+        # [UninstallRun] : retire la regle Firewall a la desinstallation pour
+        # ne pas polluer les regles avec des entries orphelines.
+        firewall_rule_name = f"{app_name} (Network)"
+        # Inno escape : "" represente un guillemet litteral dans une string.
+        # On construit les commandes netsh en concatenation pour eviter les
+        # triples guillemets qui casseraient le f-string Python triple-quoted.
+        dq = '""'   # double-guillemet litteral pour Inno
+        inno_add_params = (
+            f'advfirewall firewall add rule '
+            f'name={dq}{firewall_rule_name}{dq} dir=in action=allow '
+            f'program={dq}{{app}}\\{exe_path.name}{dq} enable=yes profile=any'
+        )
+        inno_del_params = (
+            f'advfirewall firewall delete rule '
+            f'name={dq}{firewall_rule_name}{dq}'
+        )
+
         script += f"""
 [Icons]
 Name: "{{group}}\\{app_name}"; Filename: "{{app}}\\{exe_path.name}"{icon_filename_attr}
 {desktop_icon_line}
 [Run]
+Filename: "{{sys}}\\netsh.exe"; Parameters: "{inno_add_params}"; StatusMsg: "Configuration du pare-feu Windows..."; Flags: runhidden
 Filename: "{{app}}\\{exe_path.name}"; Description: "Lancer {app_name}"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+Filename: "{{sys}}\\netsh.exe"; Parameters: "{inno_del_params}"; Flags: runhidden
 """
         output.write_text(script, encoding='utf-8')
 
