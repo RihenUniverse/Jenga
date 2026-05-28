@@ -34,7 +34,7 @@ Auto-trigger :
   - IDEConfigurator.AutoConfigure() est appelee silencieusement au debut de
     `jenga build`. Le marker assure qu'on ne re-ecrit pas si rien n'a change.
 
-Auteur : Jenga Team
+Auteur : Rihen
 """
 
 from __future__ import annotations

@@ -103,6 +103,30 @@ class CreateCommand:
             return CreateCommand._CreateProjectDirect(args, entry_file)
 
     @staticmethod
+    def _ResolveProjectRelativeLocation(name: str, location: str) -> str:
+        """
+        Calcule le chemin relatif (au workspace) ou vivra le projet.
+
+        Regle (demandee par l'utilisateur) : chaque projet est place dans un
+        dossier portant SON nom, sous le workspace — ou sous un sous-dossier
+        si l'utilisateur le precise via --location.
+
+          location "." (defaut)  -> "<name>"
+          location "apps"        -> "apps/<name>"
+          location "src/games"   -> "src/games/<name>"
+
+        Si l'utilisateur termine deja --location par le nom du projet (ex.
+        "apps/MonApp" pour le projet "MonApp"), on ne duplique pas le segment.
+        """
+        raw = (location or ".").strip().replace("\\", "/").strip("/")
+        if raw in ("", "."):
+            return name
+        # Eviter "apps/MonApp/MonApp" si l'user a deja inclus le nom.
+        if raw == name or raw.endswith("/" + name):
+            return raw
+        return f"{raw}/{name}"
+
+    @staticmethod
     def _CreateProjectDirect(args, entry_file: Path) -> int:
         """Création directe d'un projet."""
         # Charger le workspace
@@ -119,25 +143,29 @@ class CreateCommand:
             Colored.PrintError(f"Project '{args.name}' already exists.")
             return 1
 
-        # Déterminer le chemin du projet
-        project_dir = Path(workspace.location) / args.location
+        # Déterminer le chemin du projet : un dossier au nom du projet, sous le
+        # workspace (ou sous le sous-dossier demande via --location).
+        relative_location = CreateCommand._ResolveProjectRelativeLocation(
+            args.name, args.location)
+        project_dir = Path(workspace.location) / relative_location
         FileSystem.MakeDirectory(project_dir)
 
         # Ajouter le projet au workspace
         kind_enum = getattr(Api.ProjectKind, CreateCommand.PROJECT_KINDS[args.kind])
         lang_enum = getattr(Api.Language, args.lang.upper().replace('+', 'P').replace('-', ''))
 
-        # Ajouter l'entrée dans le fichier .jenga
+        # Ajouter l'entrée dans le fichier .jenga (location() = dossier du projet)
         dialect = getattr(args, 'dialect', '')
         CreateCommand._AppendProjectToJengaFile(
-            entry_file, args.name, kind_enum, lang_enum, args.location, dialect=dialect
+            entry_file, args.name, kind_enum, lang_enum, relative_location, dialect=dialect
         )
 
         # Créer des fichiers source par défaut
         if args.kind in ('console', 'windowed', 'test'):
             CreateCommand._CreateDefaultSource(project_dir, args.name, args.lang)
 
-        Colored.PrintSuccess(f"Project '{args.name}' created.")
+        Colored.PrintSuccess(
+            f"Project '{args.name}' created in '{relative_location}/'.")
         return 0
 
     @staticmethod
@@ -193,10 +221,11 @@ class CreateCommand:
         print(f"  Directories:  {'Yes' if create_dirs else 'No'}")
         print(f"  Starter files:{'Yes' if create_files else 'No'}")
 
-        # Structure preview
-        project_root = Path(entry_file.parent) / location
+        # Structure preview — le projet vit dans un dossier a son nom.
+        relative_location = CreateCommand._ResolveProjectRelativeLocation(name, location)
+        project_root = Path(entry_file.parent) / relative_location
         print(f"\n  Structure:")
-        print(f"  {name}/")
+        print(f"  {relative_location}/")
         if create_dirs:
             print(f"  +-- src/")
             if create_files:

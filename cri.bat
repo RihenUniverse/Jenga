@@ -88,7 +88,7 @@ if "%RUN_TESTS%"=="1" (
 
 REM ─────────────────────────────────────────────────────────────
 echo.
-echo [5/6] Build de la distribution utilisateur ^(wheel + sdist^) ...
+echo [5/7] Build de la distribution utilisateur ^(wheel + sdist^) — LEGER ...
 call :pip_ensure build
 
 REM Utilise --no-isolation si setuptools est deja dispo localement,
@@ -104,13 +104,37 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM Affiche la taille du wheel : il doit etre LEGER (~1 Mo). S'il fait
+REM plusieurs dizaines de Mo, pyproject embarque Exemples par erreur.
+for /f "delims=" %%F in ('dir /b /o-d dist\*.whl 2^>nul') do (
+    for %%S in ("dist\%%F") do echo   ^> wheel : %%F  ^(%%~zS octets^)
+    goto :whl_done
+)
+:whl_done
+
 REM ─────────────────────────────────────────────────────────────
 echo.
-echo [6/6] Verification des artefacts ...
+echo [6/7] Verification du package avec twine ...
 call :pip_ensure twine
-%PY% -m twine check dist\*
+REM  Les vieux twine importent pkg_resources, retire par setuptools recent /
+REM  Python 3.13+. Si twine est casse, on le met a jour (importlib.metadata).
+%PY% -m twine --version >nul 2>&1
 if errorlevel 1 (
-    echo [AVERTISSEMENT] twine check a signale des problemes.
+    echo   twine casse ^(pkg_resources manquant^) - mise a jour ...
+    %PY% -m pip install -U twine --quiet
+)
+REM  On ne verifie QUE le package (wheel + sdist), pas l'archive d'exemples.
+%PY% -m twine check dist\*.whl dist\jenga-[0-9]*.tar.gz
+if errorlevel 1 (
+    echo [AVERTISSEMENT] twine check a signale des problemes ^(non bloquant^).
+)
+
+REM ─────────────────────────────────────────────────────────────
+echo.
+echo [7/7] Construction de l'archive d'exemples allegee ^(sans Nkentseu^) ...
+%PY% scripts\build_examples_archive.py dist
+if errorlevel 1 (
+    echo [AVERTISSEMENT] Echec de la generation de l'archive d'exemples.
 )
 
 REM ─────────────────────────────────────────────────────────────
@@ -127,8 +151,10 @@ for /f "delims=" %%F in ('dir /b /o-d dist\*.whl 2^>nul') do (
 )
 :show_done
 echo.
-echo   Pour publier sur PyPI :
-echo     python -m twine upload dist\*
+echo   Pour publier le package sur PyPI ^(wheel + sdist uniquement^) :
+echo     python -m twine upload dist\*.whl dist\jenga-[0-9]*.tar.gz
+echo     ^(NB: ne pas uploader jenga-examples-*.zip/.tar.gz sur PyPI —
+echo          ces archives vont sur la release GitHub.^)
 echo.
 echo ============================================================
 echo   TERMINE avec succes.

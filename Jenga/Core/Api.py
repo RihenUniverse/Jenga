@@ -200,6 +200,36 @@ class UnitestConfig:
 
 
 @dataclass
+class FirewallRule:
+    """
+    Regle de pare-feu cree par l'installer au deploiement de l'app.
+
+    Champs :
+      name      : nom de la regle (visible dans le pare-feu OS). Si vide,
+                  l'installer utilise "{AppName} (Network)".
+      direction : "in" (entrant, defaut) | "out" (sortant) | "both"
+      action    : "allow" (defaut) | "block"
+      protocol  : "any" (defaut) | "tcp" | "udp"
+      ports     : liste de ports/ranges, ex ["7777", "8000-8100"]. Vide = tous.
+      profiles  : profils Windows actifs : "any" (defaut), ou sous-ensemble de
+                  {"domain","private","public"}. Sur macOS/Linux, ignore.
+      programOverride : si fourni, applique la regle a un autre exe que
+                  l'exe principal du projet (rare, ex helper process).
+
+    Une regle minimale `FirewallRule()` cree la meme regle que l'ancien
+    comportement code en dur : entrant, allow, tous protocoles/ports, tous
+    profils, sur l'exe du projet.
+    """
+    name:            str       = ""
+    direction:       str       = "in"
+    action:          str       = "allow"
+    protocol:        str       = "any"
+    ports:           List[str] = field(default_factory=list)
+    profiles:        List[str] = field(default_factory=lambda: ["any"])
+    programOverride: str       = ""
+
+
+@dataclass
 class Project:
     """Project configuration – cross‑platform ready."""
     name: str
@@ -282,6 +312,36 @@ class Project:
     # d'ajouter de nouvelles options (autostart, registry entries, branding,
     # etc.) sans qu'on doive elargir l'API. Voir installeroption() ci-dessous.
     installerOptions:      Dict[str, "object"] = field(default_factory=dict)
+
+    # Permissions reseau / firewall — installer-time. Voir DSL networkenabled()
+    # et firewallrule(). Les builders d'installer (MSI WiX 3/4, Inno EXE, DEB
+    # postinst, PKG postinstall) creent les regles necessaires pour que l'app
+    # puisse accepter des connexions LAN/Internet entrantes sans intervention
+    # manuelle de l'utilisateur (cf [[pong_firewall_lan_fix]]).
+    #
+    #   networkEnabled        : True par defaut pour les apps exe/windowed.
+    #                           Si False, aucune regle firewall n'est creee.
+    #   firewallRules         : liste de regles personnalisees (FirewallRule).
+    #                           Si vide ET networkEnabled, une regle par defaut
+    #                           "{AppName} (Network)" est creee, dir=in,
+    #                           profile=any, allow all programs/ports.
+    #   networkUsageDescription : phrase affichee a l'utilisateur (iOS
+    #                           NSLocalNetworkUsageDescription, prompts macOS
+    #                           si firewall stealth mode activement). Si vide,
+    #                           fallback "{AppName} a besoin d'acceder au reseau
+    #                           local pour fonctionner".
+    #   bonjourServices       : liste de types Bonjour/mDNS (ex "_http._tcp")
+    #                           publies/decouverts par l'app. Injecte dans
+    #                           NSBonjourServices (iOS) et dans la regle
+    #                           firewall macOS (port 5353).
+    #   allowArbitraryLoads   : iOS NSAppTransportSecurity allowsArbitraryLoads
+    #                           (autorise HTTP en clair, requis pour LAN sans
+    #                           TLS). False par defaut.
+    networkEnabled:           bool         = False
+    firewallRules:            List["FirewallRule"] = field(default_factory=list)
+    networkUsageDescription:  str          = ""
+    bonjourServices:          List[str]    = field(default_factory=list)
+    allowArbitraryLoads:      bool         = False
 
     # Compiler settings
     defines: List[str] = field(default_factory=list)
@@ -373,6 +433,26 @@ class Project:
 
     # HarmonyOs
     harmonyMinSdk: str = ""
+    harmonyTargetApi: int = 12
+    harmonyBundleName: str = ""
+    harmonyVersionCode: int = 1
+    harmonyVersionName: str = "1.0.0"
+    harmonySign: bool = False
+    harmonyCertFile: str = ""
+    harmonyProfile: str = ""
+    harmonyAppIcon: str = ""
+    harmonyKeyPwd : str = ""
+    harmonyKeyAlias : str = ""
+    harmonyKeystore : str = ""
+    harmonyResDirs: List[str] = field(default_factory=list)
+    harmonyAssets: List[str] = field(default_factory=list)
+    # Permissions HarmonyOS (ohos.permission.*) injectees dans module.json5 >
+    # requestPermissions. Fusionnees avec les permissions reseau auto si
+    # networkenabled(True). Voir harmonypermissions() + Core/FirewallSpec.py.
+    harmonyPermissions: List[str] = field(default_factory=list)
+    # Repertoires de sources ArkTS/ETS (.ets) a copier dans entry/src/main/ets.
+    # Le builder les cherche via getattr(project, 'harmonyEtsDirs', []).
+    harmonyEtsDirs: List[str] = field(default_factory=list)
 
     # Test settings
     isTest: bool = False
@@ -467,6 +547,9 @@ class Workspace:
     gdkPath: str = ""
     xboxPlatform: str = ""      # XboxOne, Scarlett, Desktop
     xboxMode: str = "gdk"       # gdk (GameCore) or uwp (Dev Mode)
+
+    # ← AJOUTER CETTE LIGNE
+    harmonySdkPath: str = ""
 
     # Current context
     _currentProject: Optional[Project] = None
@@ -1922,6 +2005,117 @@ def installeroption(key: str, value) -> None:
     if _currentProject:
         _currentProject.installerOptions[str(key)] = value
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Network / Firewall DSL — installer-time
+# ─────────────────────────────────────────────────────────────────────────────
+# Le bloc ci-dessous configure les permissions reseau ajoutees AU MOMENT DE
+# L'INSTALLATION (pas au runtime). Couvre Windows (netsh advfirewall via WiX 3,
+# WiX 4 et Inno Setup), macOS (socketfilterfw), Linux DEB (ufw/firewall-cmd/
+# iptables fallback), Android (uses-permission INTERNET) et iOS (Info.plist :
+# NSLocalNetworkUsageDescription, NSBonjourServices, NSAppTransportSecurity).
+#
+# Usage minimal — autorise les connexions LAN entrantes :
+#     with project("MyGame"):
+#         consoleapp()
+#         networkenabled(True)   # une regle par defaut sur l'exe est creee
+#
+# Usage avance — regles specifiques :
+#     with project("MyServer"):
+#         consoleapp()
+#         networkenabled(True)
+#         firewallrule(name="MyServer TCP", protocol="tcp", ports=["7777"])
+#         firewallrule(name="MyServer UDP discovery", protocol="udp",
+#                      ports=["5353"], profiles=["private", "public"])
+#         networkusagedescription("MyServer a besoin du LAN pour la decouverte "
+#                                 "de pairs.")
+#         bonjourservices(["_myserver._tcp"])
+#         iosallowarbitraryloads(True)  # iOS HTTP sans TLS pour LAN
+def networkenabled(enable: bool = True) -> None:
+    """Active les permissions reseau / regles firewall a l'installation.
+
+    True par defaut cree une regle "in/allow/any" sur l'exe pour les 3 profils
+    Windows. Sur Android, injecte automatiquement android.permission.INTERNET
+    et android.permission.ACCESS_NETWORK_STATE si pas deja declarees. Sur iOS,
+    declenche l'injection de NSLocalNetworkUsageDescription dans Info.plist."""
+    if _currentProject:
+        _currentProject.networkEnabled = bool(enable)
+
+
+def firewallrule(name:            str       = "",
+                 direction:       str       = "in",
+                 action:          str       = "allow",
+                 protocol:        str       = "any",
+                 ports:           Optional[List[str]] = None,
+                 profiles:        Optional[List[str]] = None,
+                 programOverride: str       = "") -> None:
+    """Declare une regle de pare-feu personnalisee creee par l'installer.
+
+    Si au moins un firewallrule() est declare, networkEnabled est implicitement
+    active. Les regles personnalisees REMPLACENT la regle par defaut "tout
+    autoriser" — pour la garder en plus, declare-la explicitement.
+
+    Parametres :
+      name      : nom visible (ex "MyGame TCP"). Vide -> auto "{AppName} (Network)"
+      direction : "in" | "out" | "both"
+      action    : "allow" | "block"
+      protocol  : "any" | "tcp" | "udp"
+      ports     : liste ["7777", "8000-8100"]. Vide = tous.
+      profiles  : Windows-only, sous-ensemble de {"any","domain","private","public"}
+      programOverride : autre exe que celui du projet (rare)
+    """
+    if not _currentProject:
+        return
+    rule = FirewallRule(
+        name            = str(name or "").strip(),
+        direction       = str(direction or "in").strip().lower(),
+        action          = str(action or "allow").strip().lower(),
+        protocol        = str(protocol or "any").strip().lower(),
+        ports           = [str(p) for p in (ports or [])],
+        profiles        = [str(p).strip().lower() for p in (profiles or ["any"])],
+        programOverride = str(programOverride or "").strip(),
+    )
+    # Validation defensive : evite que l'user passe des valeurs aberrantes qui
+    # produiraient un netsh / socketfilterfw invalide.
+    if rule.direction not in ("in", "out", "both"):
+        raise ValueError(f"firewallrule(direction) invalide: {rule.direction!r}")
+    if rule.action not in ("allow", "block"):
+        raise ValueError(f"firewallrule(action) invalide: {rule.action!r}")
+    if rule.protocol not in ("any", "tcp", "udp"):
+        raise ValueError(f"firewallrule(protocol) invalide: {rule.protocol!r}")
+    _currentProject.firewallRules.append(rule)
+    # Declarer au moins une regle implique vouloir le reseau active.
+    _currentProject.networkEnabled = True
+
+
+def networkusagedescription(text: str) -> None:
+    """Phrase expliquant pourquoi l'app a besoin du reseau local.
+
+    Affichee a l'utilisateur sur iOS (NSLocalNetworkUsageDescription, requis
+    pour Bonjour/mDNS) et sur macOS si le firewall demande confirmation."""
+    if _currentProject:
+        _currentProject.networkUsageDescription = str(text or "").strip()
+
+
+def bonjourservices(services: List[str]) -> None:
+    """Liste des services Bonjour/mDNS publies/decouverts par l'app.
+
+    Ex: ["_http._tcp", "_mygame._udp"]. Injecte dans NSBonjourServices
+    (Info.plist iOS) + ouverture port 5353/udp sur macOS si firewall actif."""
+    if not _currentProject:
+        return
+    _currentProject.bonjourServices = [str(s).strip() for s in (services or []) if s]
+
+
+def iosallowarbitraryloads(enable: bool = True) -> None:
+    """Autorise les requetes HTTP non-TLS sur iOS (LAN/IoT sans certificat).
+
+    Ajoute NSAppTransportSecurity > NSAllowsArbitraryLoads dans Info.plist.
+    NB: l'App Store peut demander une justification a la review."""
+    if _currentProject:
+        _currentProject.allowArbitraryLoads = bool(enable)
+
+
 def iosbuildnumber(number: Union[str, int]) -> None:
     """Set the build number (CFBundleVersion) for iOS bundles."""
     if _currentProject:
@@ -1999,6 +2193,113 @@ def harmonysdk(path: str) -> None:
     """Set the HarmonyOS SDK path for this workspace."""
     if _currentWorkspace:
         _currentWorkspace.harmonySdkPath = str(path or "").strip()
+
+def harmonybundlename(name: str) -> None:
+    """Set HarmonyOS bundle name (ex: com.nkentseu.game)."""
+    if _currentProject:
+        _currentProject.harmonyBundleName = str(name or "").strip()
+
+def harmonyversioncode(code: int) -> None:
+    if _currentProject:
+        _currentProject.harmonyVersionCode = int(code)
+
+def harmonyversionname(name: str) -> None:
+    if _currentProject:
+        _currentProject.harmonyVersionName = str(name or "").strip()
+
+def harmonytargetapi(api: int) -> None:
+    if _currentProject:
+        _currentProject.harmonyTargetApi = int(api)
+
+def harmonysign(enable: bool = True) -> None:
+    if _currentProject:
+        _currentProject.harmonySign = bool(enable)
+
+def harmonycertfile(path: str) -> None:
+    if _currentProject:
+        _currentProject.harmonyCertFile = str(path or "").strip()
+
+def harmonyprofile(path: str) -> None:
+    if _currentProject:
+        _currentProject.harmonyProfile = str(path or "").strip()
+
+def harmonykeystore(path: str) -> None:
+    if _currentProject:
+        _currentProject.harmonyKeystore = str(path or "").strip()
+
+def harmonykeyalias(alias: str) -> None:
+    if _currentProject:
+        _currentProject.harmonyKeyAlias = str(alias or "").strip()
+
+def harmonykeypwd(pwd: str) -> None:
+    if _currentProject:
+        _currentProject.harmonyKeyPwd = str(pwd or "").strip()
+
+def harmonyappicon(path: str) -> None:
+    if _currentProject:
+        _currentProject.harmonyAppIcon = str(path or "").strip()
+
+def harmonyresources(dirs: List[str]) -> None:
+    """Dossiers de ressources HarmonyOS à inclure dans le HAP.
+    
+    Copiés dans entry/src/main/resources/ de la structure de build.
+    Équivalent de androidresDirs() pour Android.
+    
+    Structure attendue dans chaque dossier :
+      base/element/string.json
+      base/element/color.json  
+      base/media/icon.png
+      base/profile/main_pages.json
+      en_US/element/string.json  (i18n)
+    """
+    if _currentProject:
+        if not hasattr(_currentProject, 'harmonyResDirs'):
+            _currentProject.harmonyResDirs = []
+        _currentProject.harmonyResDirs.extend(dirs)
+
+def harmonyassets(dirs: List[str]) -> None:
+    """Assets HarmonyOS (fichiers bruts) copiés dans entry/src/main/resources/rawfile/.
+
+    Équivalent de androidassets() pour Android.
+    Accessibles via $rawfile('filename') dans ArkTS.
+    """
+    if _currentProject:
+        if not hasattr(_currentProject, 'harmonyAssets'):
+            _currentProject.harmonyAssets = []
+        _currentProject.harmonyAssets.extend(dirs)
+
+
+def harmonypermissions(perms: List[str]) -> None:
+    """Permissions HarmonyOS (ohos.permission.*) injectees dans module.json5 >
+    requestPermissions.
+
+    Equivalent de androidpermissions() pour HarmonyOS. Fusionne avec les
+    permissions reseau auto-injectees si networkenabled(True) est actif
+    (ohos.permission.INTERNET, GET_NETWORK_INFO, GET_WIFI_INFO).
+
+    Exemple :
+        harmonypermissions(["ohos.permission.CAMERA",
+                            "ohos.permission.MICROPHONE"])
+    """
+    if _currentProject:
+        if not hasattr(_currentProject, 'harmonyPermissions'):
+            _currentProject.harmonyPermissions = []
+        _currentProject.harmonyPermissions.extend(perms)
+
+
+def harmonyets(dirs: List[str]) -> None:
+    """Repertoires de sources ArkTS/ETS (.ets) a copier dans le HAP.
+
+    Copies dans entry/src/main/ets/ de la structure de build. Si non declare,
+    le builder utilise les .ets trouves via files() ou l'auto-detection.
+
+    Exemple :
+        harmonyets(["ets/", "ui/pages/"])
+    """
+    if _currentProject:
+        if not hasattr(_currentProject, 'harmonyEtsDirs'):
+            _currentProject.harmonyEtsDirs = []
+        _currentProject.harmonyEtsDirs.extend(dirs)
 
 
 def gdkpath(path: str) -> None:
@@ -3586,7 +3887,14 @@ __all__ = [
     # Installer packaging DSL (MSI/EXE/DEB/PKG)
     'licensefile', 'createdesktopshortcut', 'apppublisher', 'appversion',
     'installeroption',
+    # Network / firewall DSL (installer-time) — voir Commands/Package.py
+    'networkenabled', 'firewallrule', 'networkusagedescription',
+    'bonjourservices', 'iosallowarbitraryloads', 'FirewallRule',
     'harmonyminsdk', 'harmonysdk',
+    'harmonybundlename', 'harmonyversioncode', 'harmonyversionname',
+    'harmonytargetapi', 'harmonysign', 'harmonycertfile', 'harmonyprofile',
+    'harmonykeystore', 'harmonykeyalias', 'harmonykeypwd', 'harmonyappicon',
+    'harmonyresources', 'harmonyassets', 'harmonypermissions', 'harmonyets',
     'testoptions', 'testfiles', 'testmainfile', 'testmaintemplate',
     'settarget', 'sysroot', 'targettriple', 'ccompiler', 'cppcompiler',
     'linker', 'archiver', 'addcflag', 'addcxxflag', 'addldflag',

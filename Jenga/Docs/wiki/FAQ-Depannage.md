@@ -1,76 +1,144 @@
-# FAQ / Dépannage
+# FAQ / Dépannage — FAQ / Troubleshooting
 
-## `No .jenga workspace file found`
+**Langues / Languages :** [Français](#français) · [English](#english)
 
-Tu exécutes une commande dans un dossier sans fichier workspace.
+---
 
-Solution:
+## Français
+
+### `No .jenga workspace file found`
+
+Vous exécutez une commande dans un dossier sans fichier workspace.
 
 ```bash
 jenga workspace MonWorkspace
-```
-
-Ou préciser un fichier:
-
-```bash
+# ou préciser le fichier :
 jenga build --jenga-file ./MonWorkspace.jenga
 ```
 
-## `Project 'X' not found`
+### `Project 'X' not found`
 
-Le nom du projet n'existe pas dans le workspace chargé.
+Le nom du projet n'existe pas dans le workspace chargé. Vérifiez le nom exact
+dans le `.jenga` et le bon fichier workspace.
 
-Vérifier:
+### `Toolchain 'X' not defined`
 
-- le nom exact dans le `.jenga`
-- le bon fichier workspace
+Vous appelez `usetoolchain("X")` sans l'avoir déclaré.
 
-## `Toolchain 'X' not defined`
+- Déclarez `with toolchain("X", "..."):` dans le workspace, **ou**
+- ajoutez `RegisterJengaGlobalToolchains()` pour la détection auto, **ou**
+- enregistrez une toolchain globale : `jenga install toolchain install ...`.
 
-Tu appelles `usetoolchain("X")` sans l'avoir déclaré.
-
-Solution:
-
-- déclarer un bloc `with toolchain("X", "..."):` dans le workspace
-- ou charger une toolchain globale via `jenga install toolchain ...`
-
-## Build lent ou incohérent
-
-Essayer:
+### Build lent ou incohérent
 
 ```bash
 jenga clean --all
 jenga build --no-cache --no-daemon --verbose
 ```
 
-## Erreur Android SDK / NDK introuvable
+### Android SDK / NDK introuvable
 
-Vérifier:
-
-- variables d'environnement (`ANDROID_SDK_ROOT`, `ANDROID_NDK_ROOT`)
-- ou configuration DSL:
+Vérifiez `ANDROID_SDK_ROOT` / `ANDROID_NDK_ROOT`, ou en DSL :
 
 ```python
-androidsdkpath("...")
-androidndkpath("...")
+androidsdkpath("..."); androidndkpath("...")
 ```
 
-## Tests qui ne se lancent pas
+### Tests qui ne se lancent pas
 
-Vérifier:
+Vérifiez la présence de `with unitest() as u: u.Precompiled()`, d'un bloc
+`with test():` imbriqué dans un `project()`, et l'existence des fichiers
+`testfiles([...])`.
 
-- présence du bloc `unitest()`
-- présence du bloc `test()` dans un `project()`
-- existence des fichiers listés dans `testfiles([...])`
+### Débogage : « no debugger found »
 
-## Génération docs vide
+`jenga gdb` nécessite GDB (ou LLDB). Installez-le :
+- Windows (MSYS2/UCRT64) : `pacman -S mingw-w64-ucrt-x86_64-gdb`
+- Linux : `sudo apt install gdb`
+- macOS : `xcode-select --install` (LLDB inclus).
 
-Vérifier:
+### L'app ne reçoit pas de connexions réseau (LAN)
 
-- présence de commentaires Doxygen / `///`
-- sources dans `src/` et `include/`
-- commande:
+Ajoutez `networkenabled(True)` (ou `firewallrule(...)`) au projet et
+re-packagez : la règle de pare-feu est créée à l'installation. Voir
+[Réseau et Pare-feu](Reseau-et-Pare-feu.md).
+
+### Génération docs vide
+
+Vérifiez la présence de commentaires Doxygen / `///`, des sources dans `src/` et
+`include/`, puis `jenga docs extract --verbose`.
+
+### `command not found: jenga`
+
+Le dossier `Scripts` (Windows) ou `~/.local/bin` (Linux) de pip n'est pas dans le
+PATH. Ajoutez-le, ou lancez `python -m Jenga ...`.
+
+---
+
+## English
+
+### `No .jenga workspace file found`
+
+You ran a command in a folder without a workspace file.
 
 ```bash
-jenga docs extract --verbose
+jenga workspace MyWorkspace
+# or point to the file:
+jenga build --jenga-file ./MyWorkspace.jenga
 ```
+
+### `Project 'X' not found`
+
+The project name doesn't exist in the loaded workspace. Check the exact name in
+the `.jenga` and the right workspace file.
+
+### `Toolchain 'X' not defined`
+
+You call `usetoolchain("X")` without declaring it.
+
+- Declare `with toolchain("X", "..."):` in the workspace, **or**
+- add `RegisterJengaGlobalToolchains()` for auto-detection, **or**
+- register a global toolchain: `jenga install toolchain install ...`.
+
+### Slow or inconsistent build
+
+```bash
+jenga clean --all
+jenga build --no-cache --no-daemon --verbose
+```
+
+### Android SDK / NDK not found
+
+Check `ANDROID_SDK_ROOT` / `ANDROID_NDK_ROOT`, or in DSL:
+
+```python
+androidsdkpath("..."); androidndkpath("...")
+```
+
+### Tests don't run
+
+Ensure `with unitest() as u: u.Precompiled()` is present, a `with test():`
+block is nested inside a `project()`, and the `testfiles([...])` exist.
+
+### Debugging: "no debugger found"
+
+`jenga gdb` needs GDB (or LLDB). Install it:
+- Windows (MSYS2/UCRT64): `pacman -S mingw-w64-ucrt-x86_64-gdb`
+- Linux: `sudo apt install gdb`
+- macOS: `xcode-select --install` (LLDB included).
+
+### The app doesn't receive network (LAN) connections
+
+Add `networkenabled(True)` (or `firewallrule(...)`) to the project and re-package:
+the firewall rule is created at install time. See
+[Networking & Firewall](Reseau-et-Pare-feu.md).
+
+### Empty documentation output
+
+Ensure Doxygen `///` comments exist, sources are under `src/` and `include/`,
+then run `jenga docs extract --verbose`.
+
+### `command not found: jenga`
+
+pip's `Scripts` dir (Windows) or `~/.local/bin` (Linux) isn't on PATH. Add it, or
+run `python -m Jenga ...`.

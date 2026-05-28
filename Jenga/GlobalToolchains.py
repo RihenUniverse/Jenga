@@ -939,6 +939,60 @@ def ToolchainZigDefaults(options: Optional[Dict[str, Any]] = None) -> bool:
 	return registered
 
 
+def ToolchainHarmonyOsDefault(options: Optional[Dict[str, Any]] = None) -> bool:
+    options = options or {}
+    name = "ohos-ndk"
+    if _workspace_has_toolchain(name):
+        return False
+
+    # Résolution du SDK OHOS
+    ohos_sdk = _expand_path(
+        options.get("ohos_sdk", "")
+        or os.getenv("OHOS_SDK", "")
+        or os.getenv("HARMONY_SDK", "")
+    )
+    if not ohos_sdk:
+        # Chemin par défaut Windows
+        default = Path("C:/ohos/command-line-tools/sdk/default/openharmony")
+        if default.exists():
+            ohos_sdk = str(default)
+    if not ohos_sdk:
+        return False
+
+    ndk_path = Path(ohos_sdk) / "native"
+    llvm_bin = ndk_path / "llvm" / "bin"
+    sysroot_path = ndk_path / "sysroot"
+
+    if not llvm_bin.exists():
+        return False
+
+    exe = ".exe" if os.name == "nt" else ""
+    cc  = str(llvm_bin / f"clang{exe}")
+    cxx = str(llvm_bin / f"clang++{exe}")
+    ar  = str(llvm_bin / f"llvm-ar{exe}")
+    ld  = str(llvm_bin / f"ld{exe}")
+
+    if not Path(cc).exists() or not Path(cxx).exists():
+        return False
+
+    triple = "aarch64-linux-ohos"
+
+    with toolchain(name, "clang"):
+        settarget("HarmonyOS", "arm64")
+        targettriple(triple)
+        if sysroot_path.exists():
+            sysroot(str(sysroot_path))
+        ccompiler(cc)
+        cppcompiler(cxx)
+        linker(cxx)
+        if Path(ar).exists():
+            archiver(ar)
+        cflags([f"--target={triple}", "-fPIC", "-D__OHOS__"])
+        cxxflags([f"--target={triple}", "-fPIC", "-D__OHOS__"])
+        ldflags([f"--target={triple}"])
+    return True
+
+
 def RegisterDefaultPathToolchains(options: Optional[Dict[str, Any]] = None,
 								  registry: Optional[Dict[str, Any]] = None) -> None:
 	options = options or {}
@@ -960,6 +1014,8 @@ def RegisterDefaultPathToolchains(options: Optional[Dict[str, Any]] = None,
 	ToolchainEmscriptenDefault(options, registry)
 	ToolchainAndroidNdkDefault(options, registry)
 	ToolchainZigDefaults(options)
+	
+	ToolchainHarmonyOsDefault(options)  # ← ajouter ici
 
 
 def RegisterJengaGlobalToolchains(options: Optional[Dict[str, Any]] = None):

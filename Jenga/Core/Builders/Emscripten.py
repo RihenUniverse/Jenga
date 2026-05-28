@@ -216,19 +216,19 @@ class EmscriptenBuilder(Builder):
 
         icon_path = Path(self.ResolveProjectPath(project, icon_src))
         if not icon_path.exists():
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[Web:icon] icone configuree introuvable : {icon_path}"
             )
             return
 
         fmt = DetectIconFormat(icon_path)
         if fmt not in (FORMAT_PNG, FORMAT_JPG):
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[Web:icon] format non supporte ({fmt}) pour le favicon : {icon_path}"
             )
             return
         if not HasPillow():
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 "[Web:icon] Pillow non installe -- generation favicons ignoree. "
                 "Installer : pip install Pillow"
             )
@@ -237,7 +237,7 @@ class EmscriptenBuilder(Builder):
         dst_dir = output_path.parent
         generated = GenerateFaviconSet(icon_path, dst_dir)
         if not generated:
-            Colored.PrintWarn(f"[Web:icon] generation favicon set echouee : {icon_path}")
+            Colored.PrintWarning(f"[Web:icon] generation favicon set echouee : {icon_path}")
 
     def _GenerateRunnerScripts(self, project: Project, output_path: Path) -> None:
         """Génère les scripts de lancement pour le serveur HTTP local."""

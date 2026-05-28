@@ -11,6 +11,7 @@ from .Registry import COMMANDS, ALIASES, get_command_class, execute_command
 # Import de toutes les commandes (les classes sont enregistrées dans COMMANDS au fur et à mesure)
 from .Build import BuildCommand
 from .Run import RunCommand
+from .Gdb import GdbCommand
 from .Test import TestCommand
 from .Clean import CleanCommand
 from .Rebuild import RebuildCommand
@@ -38,6 +39,8 @@ from .IdeSetup import IdeSetupCommand
 COMMANDS.update({
     'build': BuildCommand,
     'run': RunCommand,
+    'gdb': GdbCommand,
+    'debug': GdbCommand,        # alias
     'test': TestCommand,
     'clean': CleanCommand,
     'rebuild': RebuildCommand,
@@ -70,6 +73,7 @@ COMMANDS.update({
 ALIASES.update({
     'b': 'build',
     'r': 'run',
+    'g': 'gdb',
     't': 'test',
     'c': 'clean',
     'w': 'watch',

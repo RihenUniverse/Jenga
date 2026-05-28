@@ -1737,7 +1737,7 @@ class AndroidBuilder(Builder):
 
         icon_path = Path(self.ResolveProjectPath(project, icon_src))
         if not icon_path.exists():
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[Android:icon] icone configuree introuvable : {icon_path}"
             )
             return None
@@ -1753,7 +1753,7 @@ class AndroidBuilder(Builder):
         ok = False
         if fmt in (FORMAT_PNG, FORMAT_JPG):
             if not HasPillow():
-                Colored.PrintWarn(
+                Colored.PrintWarning(
                     "[Android:icon] Pillow non installe -- conversion PNG->mipmap "
                     "ignoree. Installer : pip install Pillow"
                 )
@@ -1762,13 +1762,13 @@ class AndroidBuilder(Builder):
         elif fmt == FORMAT_MIPMAP_DIR:
             ok = CopyAndroidMipmapsFromDir(icon_path, gen_res)
         else:
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[Android:icon] format non supporte ({fmt}) pour Android : {icon_path}"
             )
             return None
 
         if not ok:
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[Android:icon] echec generation res/mipmap-* depuis {icon_path}"
             )
             return None
@@ -1912,8 +1912,22 @@ class AndroidBuilder(Builder):
             # Pour l'instant, on ne fait rien, l'utilisateur doit fournir son manifeste.
             pass
 
-        # Ajouter les permissions
-        for perm in getattr(project, 'androidPermissions', []):
+        # Ajouter les permissions.
+        # 1) Permissions reseau auto-injectees si networkenabled(True) ou
+        #    firewallrule() declares dans le DSL. Permet a un .jenga simple
+        #    "networkenabled(True)" de produire un APK qui peut faire du LAN
+        #    sans que l'user duplique INTERNET dans androidpermissions().
+        #    Voir Core/FirewallSpec.py.
+        # 2) Permissions explicites declarees par l'user.
+        # Dedup via un set : la meme permission n'est ecrite qu'une fois.
+        from ..FirewallSpec import ResolveAndroidNetworkPermissions
+        seen = set()
+        all_perms = (ResolveAndroidNetworkPermissions(project) +
+                     list(getattr(project, 'androidPermissions', [])))
+        for perm in all_perms:
+            if perm in seen:
+                continue
+            seen.add(perm)
             ET.SubElement(manifest, "uses-permission", {f"{{{android_ns}}}name": perm})
 
         tree = ET.ElementTree(manifest)

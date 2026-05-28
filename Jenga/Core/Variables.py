@@ -28,6 +28,7 @@ from typing import Dict, Any, Optional, Union, List, Callable
 from functools import lru_cache
 
 from ..Utils import FileSystem  # déjà implémenté
+from .._version import __version__
 
 # ✅ Import absolu cohérent avec l'API utilisateur
 from Jenga.Core import Api
@@ -224,7 +225,7 @@ class VariableExpander:
 
         mapping = {
             'root': str(self._jengaRoot),
-            'version': '2.0.1',  # À définir globalement
+            'version': __version__,
             'unitest.source': str(unitest_root),
             'unitest.include': str(unitest_root / 'src'),
             'unitest.lib': str(unitest_root / 'libs' / 'Unitest.lib'),

@@ -9,6 +9,7 @@ import sys
 import time
 from typing import List, Any, Optional, Union, Iterator
 from .Colored import Colored
+from .._version import __version__, __author__
 
 # ---------------------------------------------------------------------------
 # Private helpers (module level) – _PascalCase
@@ -163,7 +164,7 @@ class Display:
         print(f"{Colored.Colorize('[DEBUG]', dim=True)} {message}")
 
     @staticmethod
-    def PrintBanner(version: str = "2.0.1") -> None:
+    def PrintBanner(version: str = __version__) -> None:
         """Print Jenga banner with exact design."""
         banner = f"""
 {Colored.Colorize('╔══════════════════════════════════════════════════════════════════╗', color='cyan')}
@@ -186,8 +187,8 @@ class Display:
             print(f"Jenga - Multi-platform C/C++ Build System v{version}")
 
     @staticmethod
-    def PrintVersion(version: str = "2.0.1", copyright_year: str = "2025", 
-                     copyright_holder: str = "Rihen", license_type: str = "Proprietary") -> None:
+    def PrintVersion(version: str = __version__, copyright_year: str = "2025", 
+                     copyright_holder: str = __author__, license_type: str = "Proprietary") -> None:
         """Print version information."""
         version_info = f"""
 {Colored.Colorize('Jenga Build System', bold=True)}
@@ -319,13 +320,13 @@ License: {license_type}
         Display.Debug(message)
 
     @staticmethod
-    def print_banner(version: str = "2.0.1") -> None:
+    def print_banner(version: str = __version__) -> None:
         """Alias for PrintBanner()."""
         Display.PrintBanner(version)
 
     @staticmethod
-    def print_version(version: str = "2.0.1", copyright_year: str = "2025", 
-                      copyright_holder: str = "Rihen", license_type: str = "Proprietary") -> None:
+    def print_version(version: str = __version__, copyright_year: str = "2025", 
+                      copyright_holder: str = __author__, license_type: str = "Proprietary") -> None:
         """Alias for PrintVersion()."""
         Display.PrintVersion(version, copyright_year, copyright_holder, license_type)
 

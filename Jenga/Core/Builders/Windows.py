@@ -254,7 +254,7 @@ class WindowsBuilder(Builder):
 
         icon_path = Path(self.ResolveProjectPath(project, icon_src))
         if not icon_path.exists():
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[Windows:icon] icone configuree introuvable : {icon_path}"
             )
             return None
@@ -269,16 +269,16 @@ class WindowsBuilder(Builder):
             _shutil.copy2(icon_path, ico_path)
         elif fmt in (FORMAT_PNG, FORMAT_JPG):
             if not HasPillow():
-                Colored.PrintWarn(
+                Colored.PrintWarning(
                     "[Windows:icon] Pillow non installe -- conversion PNG->ICO "
                     "ignoree. Installer : pip install Pillow"
                 )
                 return None
             if not ConvertPngToIco(icon_path, ico_path):
-                Colored.PrintWarn(f"[Windows:icon] conversion PNG->ICO echouee : {icon_path}")
+                Colored.PrintWarning(f"[Windows:icon] conversion PNG->ICO echouee : {icon_path}")
                 return None
         else:
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[Windows:icon] format non supporte ({fmt}) pour Windows : {icon_path}"
             )
             return None
@@ -322,7 +322,7 @@ class WindowsBuilder(Builder):
                 result = Process.ExecuteCommand(cmd, captureOutput=True, silent=False)
 
         if result.returnCode != 0:
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[Windows:icon] compilation du .rc echouee ({cmd[0]}). "
                 f"L'executable sera produit sans icone. Verifier rc.exe/llvm-rc dans le PATH."
             )

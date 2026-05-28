@@ -774,7 +774,14 @@ end
                 "UIInterfaceOrientationLandscapeLeft",
                 "UIInterfaceOrientationLandscapeRight",
             ]
-        # Pour tvOS/watchOS, on n'ajoute pas les orientations
+        # Pour tvOS/watchOS, on n'ajoute pas les orientations.
+        # Permissions reseau auto-injectees depuis le DSL (networkenabled,
+        # bonjourservices, iosallowarbitraryloads). Voir Core/FirewallSpec.py.
+        try:
+            from ..FirewallSpec import BuildIosInfoPlistNetworkKeys
+            plist.update(BuildIosInfoPlistNetworkKeys(project))
+        except Exception:
+            pass
         with open(plist_path, "wb") as f:
             plistlib.dump(plist, f)
         return plist_path

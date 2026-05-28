@@ -16,7 +16,7 @@ import os
 import shutil
 import multiprocessing
 import concurrent.futures
-from typing import List, Dict, Optional, Any, Tuple
+from typing import List, Dict, Optional, Any, Tuple, Set
 from pathlib import Path
 
 from Jenga.Core import Api
@@ -26,6 +26,40 @@ from .State import BuildState
 from .DependencyResolver import DependencyResolver
 from .Toolchains import ToolchainManager
 from .Platform import Platform
+ 
+ 
+# ---------------------------------------------------------------------------
+# Extensions de fichiers — constantes partagées entre tous les builders
+# ---------------------------------------------------------------------------
+ 
+# Extensions compilables par le compilateur natif C/C++/ObjC/ASM
+NATIVE_COMPILABLE_EXTENSIONS: Set[str] = {
+    '.c',
+    '.cpp', '.cc', '.cxx', '.c++',
+    '.cppm', '.ixx', '.mpp', '.c++m',   # C++20 modules
+    '.m',                                 # Objective-C
+    '.mm',                                # Objective-C++
+    '.s', '.asm', '.S',                   # Assembleur
+    '.rs',                                # Rust
+    '.zig',                               # Zig
+}
+ 
+# Extensions gérées par des builders platform-spécifiques (pas par le compilateur natif)
+# Ces fichiers sont déclarables dans files() mais ne passent pas dans Compile().
+PLATFORM_SPECIFIC_EXTENSIONS: Dict[str, str] = {
+    # HarmonyOS ArkTS — copiés dans entry/src/main/ets/ par HarmonyOsBuilder
+    '.ts':   'harmonyos',
+    '.ets':  'harmonyos',
+    # Swift — compilé par XcodeBuilder (jamais par clang++ direct)
+    '.swift': 'xcode',
+    # Kotlin/Java Android — compilés par AndroidBuilder (javac + d8)
+    '.kt':   'android',
+    '.java': 'android',
+    # Shaders — compilés par un shader compiler dédié (futur)
+    '.hlsl': 'shader',
+    '.glsl': 'shader',
+    '.metal': 'xcode',
+}
 
 
 class Builder(abc.ABC):
@@ -149,6 +183,8 @@ class Builder(abc.ABC):
             prefer = ['host-apple-clang']
         elif self.targetOs == TargetOS.WEB:
             prefer = ['emscripten', 'zig-web-wasm32']
+        elif self.targetOs == TargetOS.HARMONYOS:
+            prefer = ['ohos-ndk']
         tc_name = self.toolchainManager.ResolveForTarget(self.targetOs, self.targetArch, self.targetEnv, prefer=prefer)
         # Apple mobile targets (iOS/tvOS/watchOS) are compiled with host Apple Clang.
         # Detected host toolchain is usually tagged as macOS; fallback to macOS lookup.
@@ -273,6 +309,116 @@ class Builder(abc.ABC):
     # -----------------------------------------------------------------------
     # Hook : copie des bibliothèques dynamiques dans le dossier de l'application
     # -----------------------------------------------------------------------
+
+
+    # -----------------------------------------------------------------------
+    # API pour les fichiers platform-spécifiques (.ts/.ets/.swift/.java...)
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def IsPlatformSpecificFile(sourceFile: str) -> bool:
+        """
+        Retourne True si le fichier est géré par un builder platform-spécifique
+        et NE DOIT PAS être compilé par le compilateur natif C/C++.
+
+        Fichiers reconnus :
+          .ts / .ets  → HarmonyOS ArkTS (copié dans HAP par HarmonyOsBuilder)
+          .swift      → Swift (XcodeBuilder)
+          .kt / .java → Kotlin/Java (AndroidBuilder)
+          .hlsl/.glsl → Shaders (ShaderBuilder)
+          .metal      → Metal (XcodeBuilder)
+        """
+        return Path(sourceFile).suffix.lower() in PLATFORM_SPECIFIC_EXTENSIONS
+
+    @staticmethod
+    def IsNativeCompilable(sourceFile: str) -> bool:
+        """
+        Retourne True si le fichier est compilable par le compilateur natif.
+        Exclut les fichiers platform-spécifiques (.ts, .ets, .swift, etc.).
+        """
+        ext = Path(sourceFile).suffix.lower()
+        return ext in NATIVE_COMPILABLE_EXTENSIONS and ext not in PLATFORM_SPECIFIC_EXTENSIONS
+
+    def GetPlatformSpecificFiles(self, project: Project,
+                                  extensions: Optional[List[str]] = None) -> List[str]:
+        """
+        Retourne les fichiers platform-spécifiques déclarés dans files() du projet.
+
+        C'est la méthode que les builders platform utilisent pour récupérer
+        leurs fichiers depuis files() — même logique que .mm pour Cocoa.
+
+        Usage dans HarmonyOsBuilder :
+          arkts = self.GetPlatformSpecificFiles(project, ['.ts', '.ets'])
+          # → ["harmony/ets/NkHarmonyBridge.ts", "harmony/ets/EntryAbility.ets"]
+
+        Usage dans AndroidBuilder :
+          java_files = self.GetPlatformSpecificFiles(project, ['.java', '.kt'])
+
+        Args:
+          project    : projet à analyser
+          extensions : liste d'extensions à filtrer (None = toutes les platform-spécifiques)
+        """
+        if extensions is None:
+            target_exts = set(PLATFORM_SPECIFIC_EXTENSIONS.keys())
+        else:
+            target_exts = {e.lower() for e in extensions}
+
+        result = []
+        all_files = self._CollectAllDeclaredFiles(project)
+        for f in all_files:
+            p = Path(f)
+            if p.suffix.lower() in target_exts and p.exists():
+                result.append(str(p))
+        return result
+
+    def _CollectAllDeclaredFiles(self, project: Project) -> List[str]:
+        """
+        Résout TOUS les fichiers déclarés dans files() du projet, quelle que soit
+        leur extension. Utilisé pour extraire les fichiers platform-spécifiques.
+
+        Contrairement à _CollectSourceFiles(), ne filtre PAS par extension —
+        retourne tout ce que files() et les filtres actifs déclarent.
+        """
+        result = []
+        workspace_base = Path(self.workspace.location).resolve() \
+            if self.workspace and self.workspace.location else Path.cwd()
+
+        if project.location:
+            base_dir_str = project.location
+            if self._expander:
+                self._expander.SetProject(project)
+                base_dir_str = self._expander.Expand(base_dir_str, recursive=True)
+            base_dir_path = Path(base_dir_str)
+            if not base_dir_path.is_absolute():
+                base_dir_path = workspace_base / base_dir_path
+            base_dir = base_dir_path.resolve()
+        else:
+            base_dir = workspace_base
+
+        # Patterns depuis files() + filtres actifs
+        all_patterns = list(project.files)
+        for filter_name, ffiles in getattr(project, '_filteredFiles', {}).items():
+            if self._FilterMatches(filter_name, project):
+                all_patterns.extend(ffiles)
+
+        for pattern in all_patterns:
+            expanded = pattern
+            if self._expander:
+                self._expander.SetProject(project)
+                expanded = self._expander.Expand(pattern, recursive=True)
+            p = Path(expanded)
+            if p.is_absolute():
+                if any(ch in expanded for ch in ('*', '?', '[')):
+                    result.extend(m for m in glob.glob(expanded, recursive=True)
+                                  if Path(m).is_file())
+                elif p.exists():
+                    result.append(str(p))
+            else:
+                matched = FileSystem.ListFiles(base_dir, pattern=expanded,
+                                               recursive=True, fullPath=True)
+                result.extend(matched)
+
+        return result
 
     def GetSharedLibExtensions(self) -> List[str]:
         """
@@ -1833,6 +1979,13 @@ class Builder(abc.ABC):
             else:
                 matched = FileSystem.ListFiles(base_dir, pattern=expanded_pattern, recursive=True, fullPath=True)
             for f in matched:
+                # Exclure silencieusement les fichiers platform-spécifiques
+                # (.ts, .ets, .swift, .java, .kt...) — ils sont gérés par
+                # GetPlatformSpecificFiles() dans les builders platform.
+                # Même logique que .mm pour Cocoa : déclaré dans files(),
+                # ignoré par le compilateur natif si le builder ne le supporte pas.
+                if Path(f).suffix.lower() in PLATFORM_SPECIFIC_EXTENSIONS:
+                    continue
                 if any(f.lower().endswith(ext) for ext in src_exts):
                     files.append(f)
         exclude = set()

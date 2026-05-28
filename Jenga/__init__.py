@@ -8,8 +8,9 @@ Package principal exposant l'API publique, les commandes et les utilitaires.
 import sys
 import types
 
-__version__ = "2.0.1"
-__author__ = "Jenga Team"
+# Métadonnées : source unique de vérité dans Jenga/_version.py. Rihen est
+# l'éditeur, Jenga l'un de ses produits. Ne PAS hardcoder ici.
+from ._version import __version__, __author__
 __license__ = "Proprietary"
 
 # Exposer l'API publique directement depuis le package racine
@@ -44,7 +45,8 @@ from .Core.Api import (
     appicon, androidappicon, windowsicon, macosicon, webfavicon,
     # Installer packaging DSL (MSI/EXE/DEB/PKG)
     licensefile, createdesktopshortcut, apppublisher, appversion, installeroption,
-    harmonyminsdk, harmonysdk,
+    harmonyminsdk, harmonysdk, harmonybundlename, harmonyversioncode, harmonyversionname, harmonytargetapi, harmonysign, harmonycertfile, harmonyprofile,
+
     gdkpath, xboxmode, xboxplatform, xboxsigningmode, xboxpackagename, xboxpublisher, xboxversion, xboxlekbpath, xboxassetchunks,
     emscriptenshellfile, emscriptenfullscreenshell, emscriptencanvasid, emscripteninitialmemory,
     emscriptenstacksize, emscriptenexportname, emscriptenextraflags,
@@ -106,7 +108,7 @@ __all__ = [
     # Installer packaging DSL (MSI/EXE/DEB/PKG)
     'licensefile', 'createdesktopshortcut', 'apppublisher', 'appversion',
     'installeroption',
-    'harmonyminsdk', 'harmonysdk',
+    'harmonyminsdk', 'harmonysdk', 'harmonybundlename', 'harmonyversioncode', 'harmonyversionname', 'harmonytargetapi', 'harmonysign', 'harmonycertfile', 'harmonyprofile',
     'gdkpath', 'xboxmode', 'xboxplatform', 'xboxsigningmode', 'xboxpackagename', 'xboxpublisher', 'xboxversion', 'xboxlekbpath', 'xboxassetchunks',
     'emscriptenshellfile', 'emscriptenfullscreenshell', 'emscriptencanvasid', 'emscripteninitialmemory',
     'emscriptenstacksize', 'emscriptenexportname', 'emscriptenextraflags',

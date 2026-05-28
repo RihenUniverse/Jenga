@@ -415,6 +415,21 @@ class DirectIOSBuilder(Builder):
         if resolved_icon:
             plist["CFBundleIconFile"] = Path(resolved_icon).name
 
+        # Permissions reseau iOS auto-injectees depuis le DSL :
+        #   - networkenabled(True) -> NSLocalNetworkUsageDescription (requis
+        #     pour Bonjour/mDNS sur iOS 14+, sinon les sockets locales sont
+        #     bloquees silencieusement par le sandbox).
+        #   - bonjourservices([...]) -> NSBonjourServices
+        #   - iosallowarbitraryloads(True) -> NSAppTransportSecurity
+        #     (NSAllowsArbitraryLoads = autorise HTTP non-TLS pour LAN/IoT).
+        # Voir Core/FirewallSpec.py.
+        try:
+            from ..FirewallSpec import BuildIosInfoPlistNetworkKeys
+            plist.update(BuildIosInfoPlistNetworkKeys(project))
+        except Exception:
+            # Defensif : ne jamais casser le build iOS pour un probleme firewall.
+            pass
+
         plist_path = bundle_dir / "Info.plist"
         with open(plist_path, "wb") as f:
             plistlib.dump(plist, f)

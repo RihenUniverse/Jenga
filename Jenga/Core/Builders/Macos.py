@@ -196,7 +196,7 @@ class MacOSBuilder(Builder):
 
         icon_path = Path(self.ResolveProjectPath(project, icon_src))
         if not icon_path.exists():
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[macOS:icon] icone configuree introuvable : {icon_path}"
             )
             return None
@@ -214,7 +214,7 @@ class MacOSBuilder(Builder):
         try:
             shutil.copy2(exe_path, macos_dir / exe_name)
         except Exception as e:
-            Colored.PrintWarn(f"[macOS:icon] copie exe -> bundle echouee : {e}")
+            Colored.PrintWarning(f"[macOS:icon] copie exe -> bundle echouee : {e}")
             return None
 
         # 2) Conversion de l'icone en .icns (ou copie si deja .icns).
@@ -227,16 +227,16 @@ class MacOSBuilder(Builder):
                 return None
         elif fmt in (FORMAT_PNG, FORMAT_JPG):
             if not HasPillow():
-                Colored.PrintWarn(
+                Colored.PrintWarning(
                     "[macOS:icon] Pillow non installe -- conversion PNG->ICNS "
                     "ignoree. Installer : pip install Pillow"
                 )
                 return None
             if not ConvertPngToIcns(icon_path, icns_path):
-                Colored.PrintWarn(f"[macOS:icon] conversion PNG->ICNS echouee : {icon_path}")
+                Colored.PrintWarning(f"[macOS:icon] conversion PNG->ICNS echouee : {icon_path}")
                 return None
         else:
-            Colored.PrintWarn(
+            Colored.PrintWarning(
                 f"[macOS:icon] format non supporte ({fmt}) pour macOS : {icon_path}"
             )
             return None
@@ -247,16 +247,22 @@ class MacOSBuilder(Builder):
             "CFBundleIdentifier":      f"com.jenga.{project.name.lower()}",
             "CFBundleName":            project.name,
             "CFBundlePackageType":     "APPL",
-            "CFBundleShortVersionString": "1.0",
+            "CFBundleShortVersionString": project.appVersion or "1.0",
             "CFBundleVersion":         "1",
             "CFBundleIconFile":        "AppIcon",
         }
+        # Permissions reseau auto-injectees (macOS 11+ Local Network privacy).
+        try:
+            from ..FirewallSpec import BuildIosInfoPlistNetworkKeys
+            plist.update(BuildIosInfoPlistNetworkKeys(project))
+        except Exception:
+            pass
         plist_path = bundle_dir / "Contents" / "Info.plist"
         try:
             with open(plist_path, "wb") as f:
                 plistlib.dump(plist, f)
         except Exception as e:
-            Colored.PrintWarn(f"[macOS:icon] ecriture Info.plist echouee : {e}")
+            Colored.PrintWarning(f"[macOS:icon] ecriture Info.plist echouee : {e}")
             return None
 
         return bundle_dir

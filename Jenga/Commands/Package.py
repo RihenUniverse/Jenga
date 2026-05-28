@@ -22,6 +22,8 @@ from ..Core.Loader import Loader
 from ..Core.Cache import Cache
 from ..Core.Builder import Builder
 from ..Core import Api
+# Éditeur par défaut des installeurs (Rihen). Source unique : Jenga/_version.py.
+from .._version import __publisher__ as DEFAULT_PUBLISHER, __email__ as DEFAULT_EMAIL
 
 
 class PackageCommand:
@@ -36,6 +38,7 @@ class PackageCommand:
         'linux': {'deb', 'rpm', 'appimage', 'snap'},
         'macos': {'pkg', 'dmg'},
         'web': {'zip'},
+        'harmonyos': {'hap'},
     }
 
     DEFAULT_PACKAGE_TYPE = {
@@ -47,6 +50,7 @@ class PackageCommand:
         'linux': 'deb',
         'macos': 'pkg',
         'web': 'zip',
+        'harmonyos': 'hap',
     }
 
     @staticmethod
@@ -184,6 +188,8 @@ class PackageCommand:
             return PackageCommand._PackageMacOS(project, builder, pkg_type, output_dir)
         elif parsed.platform == 'web':
             return PackageCommand._PackageWeb(project, builder, pkg_type, output_dir)
+        elif parsed.platform == 'harmonyos':
+            return PackageCommand._PackageHarmonyOS(project, builder, pkg_type, output_dir)
         else:
             Colored.PrintError(f"Packaging for platform '{parsed.platform}' not implemented.")
             return 1
@@ -527,17 +533,27 @@ class PackageCommand:
 
     @staticmethod
     def _GenerateWiXTemplate(project, builder, exe_path: Path, output: Path):
-        """Génère un fichier .wxs pour WiX."""
+        """Genere un fichier .wxs pour WiX 3 legacy.
+
+        Format : namespace 2006 + <Product> root. Cette generation est plus
+        simple que WiX 4 (pas de Wizard UI, pas de hierarchie de dossiers
+        complete pour les dependfiles — fichiers a plat dans INSTALLDIR).
+
+        Inclut les CustomActions firewall (parite avec WiX 4 et Inno Setup)
+        via Core/FirewallSpec.py. Sans cette regle, les apps reseau ne peuvent
+        pas accepter de connexions entrantes (cf [[pong_firewall_lan_fix]]).
+        """
         import xml.etree.ElementTree as ET
+        from ..Core import FirewallSpec
         root = ET.Element("Wix", xmlns="http://schemas.microsoft.com/wix/2006/wi")
         product = ET.SubElement(root, "Product",
                                 Name=project.targetName or project.name,
-                                Manufacturer="Jenga",
+                                Manufacturer=(project.appPublisher or DEFAULT_PUBLISHER),
                                 Id="*",
                                 UpgradeCode="*",
                                 Language="1033",
                                 Codepage="1252",
-                                Version="1.0.0")
+                                Version=(project.appVersion or project.iosVersion or "1.0.0"))
         package = ET.SubElement(product, "Package",
                                 InstallerVersion="200",
                                 Compressed="yes",
@@ -566,6 +582,41 @@ class PackageCommand:
         # Features
         feature = ET.SubElement(product, "Feature", Id="ProductFeature", Title=project.name, Level="1")
         ET.SubElement(feature, "ComponentRef", Id="MainExecutable")
+
+        # ── CustomActions firewall (parite WiX 4 / Inno) ───────────────────
+        # Format WiX 3 : pas de namespace, attribut "Condition" en enfant texte
+        # de <Custom>. Sequences sous <InstallExecuteSequence>.
+        add_cmds = FirewallSpec.BuildNetshAddCommands(project, "[#ExeFile]")
+        del_cmds = FirewallSpec.BuildNetshDeleteCommands(project)
+        if add_cmds or del_cmds:
+            seq = ET.SubElement(product, "InstallExecuteSequence")
+            for idx, cmd in enumerate(add_cmds):
+                ca_id = f"Nk_FirewallAdd_{idx}"
+                ET.SubElement(product, "CustomAction",
+                              Id=ca_id,
+                              Directory="INSTALLDIR",
+                              ExeCommand=cmd,
+                              Execute="deferred",
+                              Impersonate="no",
+                              Return="ignore")
+                custom = ET.SubElement(seq, "Custom",
+                                       Action=ca_id,
+                                       After="InstallFiles")
+                # WiX 3 : la condition est le TEXT du noeud <Custom>, pas un attribut.
+                custom.text = "NOT Installed"
+            for idx, cmd in enumerate(del_cmds):
+                ca_id = f"Nk_FirewallDel_{idx}"
+                ET.SubElement(product, "CustomAction",
+                              Id=ca_id,
+                              Directory="INSTALLDIR",
+                              ExeCommand=cmd,
+                              Execute="deferred",
+                              Impersonate="no",
+                              Return="ignore")
+                custom = ET.SubElement(seq, "Custom",
+                                       Action=ca_id,
+                                       Before="RemoveFiles")
+                custom.text = "Installed AND REMOVE=\"ALL\""
 
         tree = ET.ElementTree(root)
         tree.write(output, encoding="utf-8", xml_declaration=True)
@@ -711,7 +762,7 @@ class PackageCommand:
 
         # ── Resolution des metadonnees app ────────────────────────────────
         app_name      = project.targetName or project.name
-        publisher     = (project.appPublisher or "").strip() or "Jenga"
+        publisher     = (project.appPublisher or "").strip() or DEFAULT_PUBLISHER
         version       = (project.appVersion or project.iosVersion or "1.0.0").strip()
 
         # ── Racine <Wix> + <Package> ───────────────────────────────────────
@@ -897,48 +948,47 @@ class PackageCommand:
         # LAN echouent cote PC quand un mobile (ou autre PC) tente de
         # rejoindre. On utilise netsh.exe (livre Windows depuis XP) plutot
         # que la WiX Firewall extension qui requiert un wixext separe a
-        # installer. La regle s'applique aux 3 profils (Domain/Private/Public).
+        # installer.
+        #
+        # Les commandes netsh sont generees par Core/FirewallSpec.py a partir
+        # du DSL : networkenabled() + firewallrule(). Une seule CustomAction
+        # par commande (add / del). Si rien n'est declare et networkEnabled
+        # est False, aucune CustomAction n'est emise.
         #
         # Execute="deferred" + Impersonate="no" : la CA tourne en NT AUTHORITY\
         # SYSTEM (privileges admin necessaires pour modifier le firewall).
         # Return="ignore" : on tolere les erreurs (ex: regle deja existante).
-        firewall_rule_name = f"{app_name} (Network)"
-        exe_full_path = f"[#ExeFile]"   # MSI substitue le chemin d'install reel
-        netsh_add_cmd = (
-            f'netsh advfirewall firewall add rule '
-            f'name="{firewall_rule_name}" dir=in action=allow '
-            f'program="{exe_full_path}" enable=yes profile=any'
-        )
-        netsh_del_cmd = (
-            f'netsh advfirewall firewall delete rule '
-            f'name="{firewall_rule_name}"'
-        )
-        # 1) Action d'ajout (apres install des fichiers)
-        ET.SubElement(pkg, f"{{{ns}}}CustomAction",
-                      Id="Nk_FirewallAdd",
-                      Directory="INSTALLDIR",
-                      ExeCommand=netsh_add_cmd,
-                      Execute="deferred",
-                      Impersonate="no",
-                      Return="ignore")
-        # 2) Action de suppression (uninstall)
-        ET.SubElement(pkg, f"{{{ns}}}CustomAction",
-                      Id="Nk_FirewallDel",
-                      Directory="INSTALLDIR",
-                      ExeCommand=netsh_del_cmd,
-                      Execute="deferred",
-                      Impersonate="no",
-                      Return="ignore")
-        # Sequences : add apres InstallFiles, del avant RemoveFiles.
-        seq = ET.SubElement(pkg, f"{{{ns}}}InstallExecuteSequence")
-        add_action = ET.SubElement(seq, f"{{{ns}}}Custom",
-                                   Action="Nk_FirewallAdd",
-                                   After="InstallFiles")
-        add_action.set("Condition", "NOT Installed")
-        del_action = ET.SubElement(seq, f"{{{ns}}}Custom",
-                                   Action="Nk_FirewallDel",
-                                   Before="RemoveFiles")
-        del_action.set("Condition", "Installed AND REMOVE=\"ALL\"")
+        from ..Core import FirewallSpec
+        add_cmds = FirewallSpec.BuildNetshAddCommands(project, "[#ExeFile]")
+        del_cmds = FirewallSpec.BuildNetshDeleteCommands(project)
+        if add_cmds or del_cmds:
+            seq = ET.SubElement(pkg, f"{{{ns}}}InstallExecuteSequence")
+            for idx, cmd in enumerate(add_cmds):
+                ca_id = f"Nk_FirewallAdd_{idx}"
+                ET.SubElement(pkg, f"{{{ns}}}CustomAction",
+                              Id=ca_id,
+                              Directory="INSTALLDIR",
+                              ExeCommand=cmd,
+                              Execute="deferred",
+                              Impersonate="no",
+                              Return="ignore")
+                add_action = ET.SubElement(seq, f"{{{ns}}}Custom",
+                                           Action=ca_id,
+                                           After="InstallFiles")
+                add_action.set("Condition", "NOT Installed")
+            for idx, cmd in enumerate(del_cmds):
+                ca_id = f"Nk_FirewallDel_{idx}"
+                ET.SubElement(pkg, f"{{{ns}}}CustomAction",
+                              Id=ca_id,
+                              Directory="INSTALLDIR",
+                              ExeCommand=cmd,
+                              Execute="deferred",
+                              Impersonate="no",
+                              Return="ignore")
+                del_action = ET.SubElement(seq, f"{{{ns}}}Custom",
+                                           Action=ca_id,
+                                           Before="RemoveFiles")
+                del_action.set("Condition", "Installed AND REMOVE=\"ALL\"")
 
         # Ecriture du fichier .wxs
         tree = ET.ElementTree(root)
@@ -951,7 +1001,7 @@ class PackageCommand:
         fournie), choix dossier d'install, raccourci bureau optionnel,
         et estimation precise de l'espace disque requis."""
         app_name  = project.targetName or project.name
-        publisher = (getattr(project, "appPublisher", "") or "").strip() or "Jenga"
+        publisher = (getattr(project, "appPublisher", "") or "").strip() or DEFAULT_PUBLISHER
         version   = ((getattr(project, "appVersion", "") or "").strip()
                   or (project.iosVersion or "1.0.0"))
 
@@ -1047,41 +1097,60 @@ Source: "{exe_path}"; DestDir: "{{app}}"
             script += f'Source: "{ico_path}"; DestDir: "{{app}}"; DestName: "app.ico"\n'
 
         # Icones : menu Demarrer (toujours) + bureau (optionnel via Tasks).
-        # [Run] : 2 actions post-install transparentes pour l'user :
-        #   1. Ajout regle Firewall Windows pour autoriser l'exe en TCP+UDP
-        #      entrant sur les profils Private+Public+Domain. Sans ca, les
-        #      jeux multijoueurs LAN ne peuvent pas accepter de connexions
-        #      entrantes (cas classique observe sur Pong PC<->Android).
+        # [Run] : actions post-install transparentes pour l'user :
+        #   1. Une entree par regle firewall declaree via DSL (networkenabled
+        #      + firewallrule). Sans regle, le jeu multijoueur LAN ne peut pas
+        #      accepter de connexions entrantes (cas Pong PC<->Android).
         #      Cf [[pong_firewall_lan_fix]].
         #   2. Lancement de l'app (skipifsilent : pas en mode CI).
         #
-        # [UninstallRun] : retire la regle Firewall a la desinstallation pour
-        # ne pas polluer les regles avec des entries orphelines.
-        firewall_rule_name = f"{app_name} (Network)"
-        # Inno escape : "" represente un guillemet litteral dans une string.
-        # On construit les commandes netsh en concatenation pour eviter les
-        # triples guillemets qui casseraient le f-string Python triple-quoted.
-        dq = '""'   # double-guillemet litteral pour Inno
-        inno_add_params = (
-            f'advfirewall firewall add rule '
-            f'name={dq}{firewall_rule_name}{dq} dir=in action=allow '
-            f'program={dq}{{app}}\\{exe_path.name}{dq} enable=yes profile=any'
-        )
-        inno_del_params = (
-            f'advfirewall firewall delete rule '
-            f'name={dq}{firewall_rule_name}{dq}'
-        )
+        # [UninstallRun] : retire chaque regle Firewall ajoutee, pour ne pas
+        # polluer les entries orphelines.
+        from ..Core import FirewallSpec
+        # Inno : on passe l'exe sous forme "{app}\<exe>" (chemin developpe a
+        # l'install). On utilise des marqueurs uniques en input et on les
+        # remplace par "" (le double-guillemet litteral d'Inno) en sortie pour
+        # eviter de casser le f-string Python avec des triples guillemets.
+        netsh_add_cmds = FirewallSpec.BuildNetshAddCommands(
+            project, f"{{app}}\\{exe_path.name}")
+        netsh_del_cmds = FirewallSpec.BuildNetshDeleteCommands(project)
+
+        def _to_inno_params(netsh_full_cmd: str) -> str:
+            """Convertit 'netsh advfirewall firewall add rule ...' en
+            'advfirewall firewall add rule ...' (sans le prog netsh prefix)
+            et echappe les " en "" (litteral Inno)."""
+            stripped = netsh_full_cmd
+            if stripped.startswith("netsh "):
+                stripped = stripped[len("netsh "):]
+            return stripped.replace('"', '""')
+
+        firewall_run_lines: List[str] = []
+        for cmd in netsh_add_cmds:
+            params = _to_inno_params(cmd)
+            firewall_run_lines.append(
+                f'Filename: "{{sys}}\\netsh.exe"; Parameters: "{params}"; '
+                f'StatusMsg: "Configuration du pare-feu Windows..."; Flags: runhidden'
+            )
+        firewall_uninst_lines: List[str] = []
+        for cmd in netsh_del_cmds:
+            params = _to_inno_params(cmd)
+            firewall_uninst_lines.append(
+                f'Filename: "{{sys}}\\netsh.exe"; Parameters: "{params}"; Flags: runhidden'
+            )
+
+        firewall_run_block = "\n".join(firewall_run_lines)
+        firewall_uninst_block = "\n".join(firewall_uninst_lines)
 
         script += f"""
 [Icons]
 Name: "{{group}}\\{app_name}"; Filename: "{{app}}\\{exe_path.name}"{icon_filename_attr}
 {desktop_icon_line}
 [Run]
-Filename: "{{sys}}\\netsh.exe"; Parameters: "{inno_add_params}"; StatusMsg: "Configuration du pare-feu Windows..."; Flags: runhidden
+{firewall_run_block}
 Filename: "{{app}}\\{exe_path.name}"; Description: "Lancer {app_name}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "{{sys}}\\netsh.exe"; Parameters: "{inno_del_params}"; Flags: runhidden
+{firewall_uninst_block}
 """
         output.write_text(script, encoding='utf-8')
 
@@ -1140,14 +1209,32 @@ Filename: "{{sys}}\\netsh.exe"; Parameters: "{inno_del_params}"; Flags: runhidde
             control_dir = deb_root / "DEBIAN"
             control_dir.mkdir()
             control = f"""Package: {project.targetName or project.name}
-Version: {project.iosVersion or '1.0.0'}
+Version: {project.appVersion or project.iosVersion or '1.0.0'}
 Section: utils
 Priority: optional
 Architecture: amd64
-Maintainer: Jenga <team@jenga.build>
+Maintainer: {project.appPublisher or DEFAULT_PUBLISHER} <{DEFAULT_EMAIL}>
 Description: {project.name} packaged by Jenga
 """
             (control_dir / "control").write_text(control, encoding='utf-8')
+
+            # Hooks postinst / postrm : ouvre/retire les ports firewall si
+            # networkenabled() / firewallrule() declares. Detection runtime
+            # de ufw/firewalld/iptables. Voir Core/FirewallSpec.py.
+            from ..Core import FirewallSpec
+            postinst_lines = FirewallSpec.BuildLinuxFirewallAddScript(project)
+            postrm_lines = FirewallSpec.BuildLinuxFirewallRemoveScript(project)
+            if postinst_lines:
+                postinst = control_dir / "postinst"
+                postinst.write_text("\n".join(postinst_lines), encoding="utf-8")
+                # dpkg-deb exige que les hooks soient executables.
+                import stat as _stat
+                postinst.chmod(postinst.stat().st_mode | _stat.S_IEXEC | _stat.S_IXGRP | _stat.S_IXOTH)
+            if postrm_lines:
+                postrm = control_dir / "postrm"
+                postrm.write_text("\n".join(postrm_lines), encoding="utf-8")
+                import stat as _stat
+                postrm.chmod(postrm.stat().st_mode | _stat.S_IEXEC | _stat.S_IXGRP | _stat.S_IXOTH)
 
             # Construire le .deb
             deb_path = output_dir / f"{project.name}.deb"
@@ -1200,8 +1287,25 @@ Description: {project.name} packaged by Jenga
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src_abs, dst)
             pkg_path = output_dir / f"{project.name}.pkg"
-            cmd = ["pkgbuild", "--root", str(pkg_root), "--identifier", project.iosBundleId or f"com.{project.name}",
-                   "--version", project.iosVersion or "1.0.0", str(pkg_path)]
+
+            # Postinstall script firewall (si reseau active via DSL). Il
+            # autorise l'app dans /usr/libexec/ApplicationFirewall/socketfilterfw.
+            # On le place dans un dossier scripts/ separe (pas dans pkg_root,
+            # sinon pkgbuild le verrait comme un fichier a installer).
+            from ..Core import FirewallSpec
+            scripts_dir = PackageCommand._BuildMacosPkgScripts(
+                project, output_dir, FirewallSpec)
+
+            cmd = ["pkgbuild",
+                   "--root", str(pkg_root),
+                   "--identifier", project.iosBundleId or f"com.{project.name}",
+                   "--version", project.appVersion or project.iosVersion or "1.0.0"]
+            if scripts_dir is not None:
+                # --scripts : pkgbuild execute postinstall apres copie des
+                # fichiers. Le script herite des privileges admin (l'install
+                # macOS demande l'autorisation a l'user au moment du run).
+                cmd += ["--scripts", str(scripts_dir)]
+            cmd.append(str(pkg_path))
             if Process.Run(cmd) == 0:
                 Colored.PrintSuccess(f"PKG package: {pkg_path}")
                 return 0
@@ -1223,6 +1327,37 @@ Description: {project.name} packaged by Jenga
             return 1
 
         return 1
+
+    @staticmethod
+    def _BuildMacosPkgScripts(project, output_dir: Path, FirewallSpec) -> Optional[Path]:
+        """
+        Genere un dossier scripts/ pour pkgbuild --scripts contenant postinstall
+        et postupgrade qui autorisent l'app dans le pare-feu applicatif macOS
+        (socketfilterfw). Retourne le path du dossier ou None si rien a faire.
+
+        Convention pkgbuild :
+          - postinstall : execute apres installation des fichiers.
+              $1 = path du .pkg, $2 = location d'install, $3 = volume target.
+          - postupgrade : execute lors d'une mise a jour. Idem $1/$2/$3.
+        """
+        add_lines = FirewallSpec.BuildSocketfilterfwAddScript(project, "$2")
+        if not add_lines:
+            return None
+        scripts_dir = output_dir / f"{project.name}_pkg_scripts"
+        if scripts_dir.exists():
+            shutil.rmtree(scripts_dir)
+        scripts_dir.mkdir(parents=True)
+        postinstall = scripts_dir / "postinstall"
+        content = "#!/bin/sh\nset -e\n\n" + "\n".join(add_lines) + "\nexit 0\n"
+        postinstall.write_text(content, encoding="utf-8")
+        # pkgbuild exige que le script soit executable (sinon il l'ignore).
+        import stat as _stat
+        postinstall.chmod(postinstall.stat().st_mode | _stat.S_IEXEC | _stat.S_IXGRP | _stat.S_IXOTH)
+        # Idem postupgrade (meme contenu) pour les mises a jour.
+        postupgrade = scripts_dir / "postupgrade"
+        postupgrade.write_text(content, encoding="utf-8")
+        postupgrade.chmod(postupgrade.stat().st_mode | _stat.S_IEXEC | _stat.S_IXGRP | _stat.S_IXOTH)
+        return scripts_dir
 
     # -----------------------------------------------------------------------
     # Web (Emscripten)
@@ -1253,4 +1388,76 @@ Description: {project.name} packaged by Jenga
             for src_abs, archive_path in PackageCommand._CollectDependFiles(project, builder):
                 zf.write(src_abs, archive_path)
         Colored.PrintSuccess(f"Web ZIP package: {zip_path}")
+        return 0
+
+    @staticmethod
+    def _PackageHarmonyOS(project, builder, pkg_type: str, output_dir: Path) -> int:
+        """Packaging HarmonyOS : compile le .so via OHOS NDK, puis invoque hvigor."""
+        import subprocess, shutil, os
+
+        # 1. Compiler le projet
+        if not builder.BuildProject(project):
+            Colored.PrintError("Build failed, cannot package.")
+            return 1
+
+        so_dir = builder.GetTargetDir(project)
+        so_files = list(so_dir.glob("*.so"))
+        if not so_files:
+            Colored.PrintError("No .so found after build.")
+            return 1
+
+        # 2. Trouver hvigorw — OHOS_SDK pointe vers .../sdk/default/openharmony
+        #    on remonte 3 niveaux pour atteindre command-line-tools/
+        ohos_sdk   = os.environ.get("OHOS_SDK", "")
+        harmony_sdk = getattr(builder.workspace, "harmonySdkPath", "")
+
+        if ohos_sdk:
+            cli_tools = Path(ohos_sdk).parents[2]
+        elif harmony_sdk:
+            # harmonysdk() peut pointer vers openharmony/ ou command-line-tools/
+            p = Path(harmony_sdk)
+            cli_tools = p.parents[2] if p.name == "openharmony" else p
+        else:
+            cli_tools = Path("C:/ohos/command-line-tools")
+
+        hvigor_wrapper = cli_tools / "bin" / "hvigorw.bat"
+        if not hvigor_wrapper.exists():
+            hvigor_wrapper = cli_tools / "bin" / "hvigorw"
+        if not hvigor_wrapper.exists():
+            Colored.PrintError(
+                f"hvigorw not found in {cli_tools / 'bin'}.\n"
+                "Set OHOS_SDK env var or harmonysdk() in your .jenga."
+            )
+            return 1
+
+        # 3. Copier le .so dans <project>/libs/arm64-v8a/
+        hap_root = Path(project.location)
+        libs_dir = hap_root / "libs" / "arm64-v8a"
+        libs_dir.mkdir(parents=True, exist_ok=True)
+        for so in so_files:
+            shutil.copy2(so, libs_dir / so.name)
+            Colored.PrintInfo(f"Copied {so.name} -> {libs_dir}")
+
+        # 4. Invoquer hvigor
+        result = subprocess.run(
+            [str(hvigor_wrapper), "assembleHap",
+            "--mode", "module",
+            "-p", "product=default"],
+            cwd=str(hap_root)
+        )
+        if result.returncode != 0:
+            Colored.PrintError("hvigor assembleHap failed.")
+            return 1
+
+        # 5. Récupérer et copier le .hap
+        hap_files = list(hap_root.rglob("*.hap"))
+        if not hap_files:
+            Colored.PrintError("No .hap generated by hvigor.")
+            return 1
+
+        for hap in hap_files:
+            dest = output_dir / hap.name
+            shutil.copy2(hap, dest)
+            Colored.PrintSuccess(f"HAP packaged: {dest}")
+
         return 0

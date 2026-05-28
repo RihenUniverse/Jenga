@@ -1,0 +1,84 @@
+name: Release
+
+# Cree une release GitHub quand tu pushes un tag de version (v*).
+# La release contient :
+#   - le package Python reconstruit par le CI (wheel + sdist, dans dist/)
+#   - une archive d'exemples ALLEGEE (zip + tar.gz) : les exemples sans les
+#     dossiers de build ni les sous-modules/externals lourds
+#     (voir .github/examples-exclude.txt).
+#
+# Utilisation :
+#   1. Bumper la version dans Jenga/_version.py (__version__) — source unique.
+#   2. git tag v2.0.2 && git push origin v2.0.2
+#   -> la release v2.0.2 est creee automatiquement.
+#
+# Prerequis : Settings > Actions > General > "Read and write permissions".
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:        # permet aussi un declenchement manuel (sans tag)
+
+permissions:
+  contents: write           # necessaire pour creer la release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Determiner la version
+        id: ver
+        run: |
+          set -euo pipefail
+          PKG_VERSION=$(python -c "import re,io; s=io.open('Jenga/_version.py',encoding='utf-8').read(); print(re.search(r'__version__\s*=\s*[\"\\']([^\"\\']+)', s).group(1))")
+          echo "package=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          # Si declenche par un tag vX.Y.Z, verifier la coherence avec __version__.
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME#v}"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            if [ "$TAG" != "$PKG_VERSION" ]; then
+              echo "::warning::Le tag (v$TAG) ne correspond pas a Jenga.__version__ ($PKG_VERSION)."
+            fi
+            echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build du package Python (wheel + sdist) — leger, sans Exemples
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build          # genere dist/*.whl et dist/jenga-<ver>.tar.gz
+          ls -lh dist/
+
+      - name: Construire l'archive d'exemples allegee (sans Nkentseu)
+        run: |
+          # Source unique de verite des exclusions (build, externals, gros
+          # assets, Nkentseu) -> meme resultat qu'en local via cri.bat/cri.sh.
+          python scripts/build_examples_archive.py dist
+          ls -lh dist/jenga-examples-* || true
+
+      - name: Creer / mettre a jour la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          # Sur tag : le nom/tag de la release est pris du tag. En manuel
+          # (workflow_dispatch) : on cree un tag base sur __version__.
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', steps.ver.outputs.version) }}
+          name: Jenga v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          # Tout le contenu de dist/ : wheel + sdist du package + archives
+          # d'exemples (zip/tar.gz). softprops uploade chaque fichier en asset.
+          files: |
+            dist/*.whl
+            dist/jenga-[0-9]*.tar.gz
+            dist/jenga-examples-*.zip
+            dist/jenga-examples-*.tar.gz

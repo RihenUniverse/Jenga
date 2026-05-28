@@ -54,6 +54,7 @@ def print_global_help():
     cmds = [
         ("build, b", "Compile le workspace ou un projet"),
         ("run, r", "Exécute un projet"),
+        ("gdb, g, debug", "Débogue un projet avec GDB (ou LLDB)"),
         ("test, t", "Lance les tests unitaires"),
         ("clean, c", "Supprime les fichiers générés"),
         ("rebuild", "Nettoie et compile"),

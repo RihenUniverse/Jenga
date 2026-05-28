@@ -153,10 +153,10 @@ else
 fi
 
 # =============================================================================
-# [5/6] Build de la distribution (wheel + sdist)
+# [5/7] Build de la distribution (wheel + sdist) — LEGER (sans Exemples)
 # =============================================================================
 echo ""
-info "[5/6] Build de la distribution utilisateur (wheel + sdist) ..."
+info "[5/7] Build de la distribution utilisateur (wheel + sdist) ..."
 pip_ensure build
 
 # Utilise --no-isolation si setuptools est déjà disponible localement,
@@ -167,16 +167,42 @@ else
     "$PY" -m build
 fi
 
+# Affiche la taille du wheel : il doit etre LEGER (~1 Mo). S'il depasse
+# plusieurs dizaines de Mo, c'est que pyproject embarque Exemples par erreur.
+WHL=$(ls -t dist/*.whl 2>/dev/null | head -1)
+if [ -n "$WHL" ]; then
+    WHL_SIZE=$(du -h "$WHL" | cut -f1)
+    echo "  → wheel : $(basename "$WHL")  ($WHL_SIZE)"
+fi
+
 # =============================================================================
-# [6/6] Vérification des artefacts avec twine
+# [6/7] Vérification du package avec twine (avant d'ajouter l'archive exemples)
 # =============================================================================
 echo ""
-info "[6/6] Vérification des artefacts ..."
+info "[6/7] Vérification des artefacts ..."
 pip_ensure twine
-if "$PY" -m twine check dist/*; then
+# Les vieux twine importent pkg_resources, retiré par setuptools récent /
+# Python 3.13+. Si twine est cassé, on le met à jour (importlib.metadata).
+if ! "$PY" -m twine --version &>/dev/null; then
+    warn "twine cassé (pkg_resources manquant) — mise à jour ..."
+    "$PY" -m pip install -U twine --quiet || true
+fi
+# On ne vérifie QUE le package (wheel + sdist), pas l'archive d'exemples.
+if "$PY" -m twine check dist/*.whl dist/jenga-[0-9]*.tar.gz; then
     ok "twine check OK."
 else
-    warn "twine check a signalé des problèmes."
+    warn "twine check a signalé des problèmes (non bloquant)."
+fi
+
+# =============================================================================
+# [7/7] Archive d'exemples allégée (sans build, sans externals, sans Nkentseu)
+# =============================================================================
+echo ""
+info "[7/7] Construction de l'archive d'exemples allégée ..."
+if "$PY" scripts/build_examples_archive.py dist; then
+    ok "Archive d'exemples générée dans dist/."
+else
+    warn "Échec de la génération de l'archive d'exemples."
 fi
 
 # =============================================================================
@@ -194,8 +220,10 @@ if [ -n "$LATEST_WHL" ]; then
     echo "    pip install $LATEST_WHL --force-reinstall"
 fi
 echo ""
-echo "  Pour publier sur PyPI :"
-echo "    python -m twine upload dist/*"
+echo "  Pour publier le package sur PyPI (wheel + sdist UNIQUEMENT) :"
+echo "    python -m twine upload dist/*.whl dist/jenga-[0-9]*.tar.gz"
+echo "    (NB: ne pas uploader jenga-examples-*.{zip,tar.gz} sur PyPI —"
+echo "         ces archives vont sur la release GitHub.)"
 echo ""
 echo "============================================================"
 ok "TERMINÉ avec succès."

@@ -7,14 +7,19 @@ Examples command – List and copy example projects.
 import argparse
 import shutil
 import sys
+import zipfile
+import urllib.request
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from ..Utils import Colored, Display
 
 
 class ExamplesCommand:
     """jenga examples [list|copy] [options]"""
+
+    # Depot GitHub d'ou telecharger l'archive d'exemples (release assets).
+    GITHUB_REPO = "RihenUniverse/Jenga"
 
     # Example projects metadata
     EXAMPLES = {
@@ -232,7 +237,11 @@ class ExamplesCommand:
 
         # Fallback: try common installation paths
         import site
-        for site_path in site.getsitepackages():
+        try:
+            site_paths = site.getsitepackages()
+        except Exception:
+            site_paths = []
+        for site_path in site_paths:
             installed_candidates = [
                 Path(site_path) / "Jenga" / "Exemples",
                 Path(site_path) / "Jenga" / "Jenga" / "Exemples",
@@ -243,6 +252,84 @@ class ExamplesCommand:
 
         return candidates[0]
 
+    # -----------------------------------------------------------------------
+    # Telechargement a la demande des exemples absents du wheel
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def _GetVersion() -> str:
+        """Version courante de Jenga (pour cibler l'asset de release)."""
+        try:
+            from .. import __version__
+            return __version__
+        except Exception:
+            return "latest"
+
+    @staticmethod
+    def _ExamplesCacheDir() -> Path:
+        """Dossier de cache des exemples telecharges (~/.jenga/examples-cache/<version>)."""
+        return Path.home() / ".jenga" / "examples-cache" / ExamplesCommand._GetVersion()
+
+    @staticmethod
+    def _DownloadAndExtractExamples() -> bool:
+        """
+        Telecharge l'archive d'exemples allegee depuis la release GitHub
+        correspondant a la version courante, et l'extrait dans le cache.
+        L'archive contient un dossier racine 'jenga-examples/<id>/...'.
+        Retourne True si l'extraction a reussi.
+        """
+        version = ExamplesCommand._GetVersion()
+        url = (f"https://github.com/{ExamplesCommand.GITHUB_REPO}"
+               f"/releases/download/v{version}/jenga-examples-{version}.zip")
+        cache = ExamplesCommand._ExamplesCacheDir()
+        cache.mkdir(parents=True, exist_ok=True)
+        tmp_zip = cache / "_download.zip"
+
+        Colored.PrintInfo(f"Telechargement des exemples depuis : {url}")
+        try:
+            urllib.request.urlretrieve(url, tmp_zip)
+        except Exception as e:
+            Colored.PrintError(f"Echec du telechargement : {e}")
+            Colored.PrintInfo(
+                "Verifie que la release existe, ou clone le depot pour obtenir "
+                "tous les exemples : "
+                f"https://github.com/{ExamplesCommand.GITHUB_REPO}")
+            return False
+        try:
+            with zipfile.ZipFile(tmp_zip) as zf:
+                zf.extractall(cache)
+        except Exception as e:
+            Colored.PrintError(f"Archive d'exemples invalide : {e}")
+            return False
+        finally:
+            try:
+                tmp_zip.unlink()
+            except OSError:
+                pass
+        return True
+
+    @staticmethod
+    def _ResolveExampleDir(example_id: str) -> Optional[Path]:
+        """
+        Localise le dossier d'un exemple, dans l'ordre :
+          1. Local : depot clone ou mini-echantillon embarque dans le wheel.
+          2. Cache : archive deja telechargee.
+          3. Telechargement a la demande depuis la release GitHub.
+        Retourne le Path, ou None si introuvable apres tentative de download.
+        """
+        local = ExamplesCommand.GetExamplesPath() / example_id
+        if local.exists():
+            return local
+
+        cached = ExamplesCommand._ExamplesCacheDir() / "jenga-examples" / example_id
+        if cached.exists():
+            return cached
+
+        Colored.PrintInfo(
+            f"Exemple '{example_id}' absent en local — telechargement a la demande...")
+        if ExamplesCommand._DownloadAndExtractExamples() and cached.exists():
+            return cached
+        return None
+
     @staticmethod
     def ListExamples(args: List[str]) -> int:
         """List all available example projects."""
@@ -251,11 +338,9 @@ class ExamplesCommand:
         parsed = parser.parse_args(args)
 
         examples_path = ExamplesCommand.GetExamplesPath()
-
-        if not examples_path.exists():
-            Colored.PrintError(f"Examples directory not found: {examples_path}")
-            Colored.PrintInfo("Make sure Jenga is installed correctly.")
-            return 1
+        cache_root = ExamplesCommand._ExamplesCacheDir() / "jenga-examples"
+        # Pas d'echec si le dossier est absent : les exemples non-locaux sont
+        # marques "telechargeables a la demande" (voir jenga examples copy).
 
         # Header
         print()
@@ -281,16 +366,16 @@ class ExamplesCommand:
 
         # Display examples in a nice table format
         for idx, (key, meta) in enumerate(filtered, 1):
-            # Check if example exists
-            example_path = examples_path / key
-            exists = example_path.exists()
+            # Disponibilite : local (clone/wheel sample) ou cache telecharge.
+            exists_local = (examples_path / key).exists() or (cache_root / key).exists()
 
             # Number and name
             num = Colored.Colorize(f"{idx:2d}.", color='cyan', bold=True)
             name = Colored.Colorize(meta['name'], color='white', bold=True)
 
-            # Status indicator
-            status = Colored.Colorize("✓", color='green') if exists else Colored.Colorize("✗", color='red')
+            # Status : ✓ disponible localement, ⤓ telechargeable a la demande.
+            status = (Colored.Colorize("✓", color='green') if exists_local
+                      else Colored.Colorize("⤓", color='yellow'))
 
             print(f"{num} {status} {name}")
             print(f"    {Colored.Colorize('ID:', color='yellow')} {key}")
@@ -311,6 +396,9 @@ class ExamplesCommand:
 
         # Footer with usage
         print(Colored.Colorize("─" * 100, color='cyan'))
+        print(f"  {Colored.Colorize('✓', color='green')} disponible localement   "
+              f"{Colored.Colorize('⤓', color='yellow')} téléchargé à la demande "
+              f"depuis la release GitHub")
         print(Colored.Colorize("Usage:", color='yellow', bold=True))
         print(f"  {Colored.Colorize('jenga examples copy', color='green')} {Colored.Colorize('<example-id>', color='cyan')} {Colored.Colorize('<destination-parent>', color='cyan')} [{Colored.Colorize('--name', color='yellow')} {Colored.Colorize('<new-name>', color='cyan')}]")
         print(f"  Example: {Colored.Colorize('jenga examples copy 01_hello_console ~/projects --name hello_demo', color='green')}")
@@ -338,9 +426,8 @@ class ExamplesCommand:
             Colored.PrintInfo("Use 'jenga examples list' to see available examples.")
             return 1
 
-        # Get paths
-        examples_path = ExamplesCommand.GetExamplesPath()
-        source_path = examples_path / parsed.example_id
+        # Get paths — local (clone/wheel sample), cache, ou telechargement.
+        source_path = ExamplesCommand._ResolveExampleDir(parsed.example_id)
         dest_root = Path(parsed.destination).resolve()
         dest_name = (parsed.name or parsed.example_id).strip()
         if not dest_name:
@@ -348,9 +435,9 @@ class ExamplesCommand:
             return 1
         dest_path = dest_root / dest_name
 
-        # Check source exists
-        if not source_path.exists():
-            Colored.PrintError(f"Example not found: {source_path}")
+        # Check source exists (apres tentative de telechargement a la demande)
+        if source_path is None or not source_path.exists():
+            Colored.PrintError(f"Example not found and download failed: {parsed.example_id}")
             return 1
 
         # Check destination parent

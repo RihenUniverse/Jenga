@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import platform
 
+from .._version import __version__
+
 
 class JengaConfig:
     """
@@ -67,7 +69,7 @@ class JengaConfig:
     def _GetDefaultConfig(self) -> Dict[str, Any]:
         """Configuration par défaut."""
         return {
-            "version": "2.0.1",
+            "version": __version__,
             "toolchains_paths": [],
             "sysroots_paths": [],
             "global_cache_enabled": True,

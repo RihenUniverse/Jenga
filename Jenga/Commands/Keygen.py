@@ -26,6 +26,7 @@ class KeygenCommand:
         parser.add_argument("--validity", type=int, default=10000, help="Validity in days (default: 10000)")
         parser.add_argument("--output", "-o", help="Output keystore file (default: ./keystore.jks)")
         parser.add_argument("--interactive", "-i", action="store_true", help="Interactive mode")
+        parser.add_argument("--harmony", action="store_true", help="Generate HarmonyOS key (.p12)")
         parsed = parser.parse_args(args)
 
         # Détecter keytool (Java)
@@ -45,6 +46,9 @@ class KeygenCommand:
             if overwrite.lower() not in ('y', 'yes'):
                 Colored.PrintInfo("Cancelled.")
                 return 0
+            
+        if parsed.harmony:
+            return KeygenCommand._GenerateHarmonyKey(parsed)
 
         # Mode interactif
         if parsed.interactive:
@@ -90,3 +94,33 @@ class KeygenCommand:
         except Exception as e:
             Colored.PrintError(f"Error: {e}")
             return 1
+
+    @staticmethod
+    def _GenerateHarmonyKey(args) -> int:
+        """Génère un .p12 pour HarmonyOS via keytool."""
+        # HarmonyOS utilise aussi keytool Java mais avec .p12 (PKCS12)
+        keytool = FileSystem.FindExecutable("keytool")
+        if not keytool:
+            Colored.PrintError("keytool not found. Install Java JDK.")
+            return 1
+
+        output = Path(args.output or "harmony_key.p12")
+        alias  = args.alias or "harmony"
+        cmd = [
+            keytool, "-genkeypair",
+            "-alias", alias,
+            "-keyalg", "EC",        # HarmonyOS utilise ECDSA
+            "-keysize", "256",
+            "-validity", str(args.validity or 3650),
+            "-keystore", str(output),
+            "-storetype", "PKCS12",  # .p12 pas .jks
+            "-storepass", "harmony123",
+            "-dname", "CN=HarmonyOS App, O=MyOrg, C=CN"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            Colored.PrintSuccess(f"HarmonyOS keystore: {output}")
+            Colored.PrintInfo("Utilisez ce .p12 avec harmonykeystore() dans votre .jenga")
+            return 0
+        Colored.PrintError(f"Failed: {result.stderr}")
+        return 1

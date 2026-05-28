@@ -52,6 +52,22 @@ compile_commands.json
 *.log
 *.tmp
 
+# Artefacts de compilation / debug a la racine (ne jamais committer)
+tmp_*
+*.o
+*.obj
+*.o.d
+*.pdb
+*.disasm
+nkmain_disasm.txt
+# Crash dumps Android (tombstones)
+tombstone_*.txt
+# Binaires de sandbox sortis du build
+device_*.so
+# Fichiers de sauvegarde / patch temporaires
+*.bak
+*.orig
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -1,0 +1,77 @@
+name: Sync Wiki
+
+# Publie automatiquement le contenu de Jenga/Docs/wiki/ vers l'onglet Wiki
+# GitHub (depot separe RihenUniverse/Jenga.wiki.git) a chaque push sur main
+# qui modifie le wiki. Declenchable aussi manuellement (workflow_dispatch).
+#
+# PREREQUIS (a faire UNE SEULE FOIS) :
+#   1. Activer le wiki : Settings > General > Features > cocher "Wikis".
+#   2. Initialiser le wiki : aller dans l'onglet "Wiki" du depot et cliquer
+#      "Create the first page" (n'importe quel contenu). Sans cette etape, le
+#      depot <repo>.wiki.git n'existe pas et le clone echoue.
+#   3. Autoriser l'ecriture : Settings > Actions > General >
+#      "Workflow permissions" > "Read and write permissions".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Jenga/Docs/wiki/**'
+      - '.github/workflows/sync-wiki.yml'
+  workflow_dispatch:        # bouton "Run workflow" dans l'onglet Actions
+
+permissions:
+  contents: write           # necessaire pour pusher vers le wiki
+
+# Evite deux syncs concurrents si plusieurs pushes arrivent coup sur coup.
+concurrency:
+  group: sync-wiki
+  cancel-in-progress: true
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du depot principal
+        uses: actions/checkout@v4
+
+      - name: Synchroniser le dossier wiki vers le Wiki GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIKI_SRC: Jenga/Docs/wiki
+        run: |
+          set -euo pipefail
+
+          if [ ! -d "$WIKI_SRC" ]; then
+            echo "::error::Dossier wiki introuvable: $WIKI_SRC"
+            exit 1
+          fi
+
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          WIKI_REPO="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          TMP="$(mktemp -d)"
+
+          echo "Clonage du wiki ${GITHUB_REPOSITORY}.wiki.git ..."
+          if ! git clone --depth 1 "$WIKI_REPO" "$TMP" 2>/dev/null; then
+            echo "::error::Impossible de cloner le wiki. As-tu cree la premiere page du wiki ?"
+            echo "::error::Onglet Wiki > 'Create the first page', puis relance ce workflow."
+            exit 1
+          fi
+
+          # Remplace tout le contenu du wiki (sauf .git) par notre dossier source.
+          find "$TMP" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          cp -R "$WIKI_SRC"/. "$TMP"/
+
+          cd "$TMP"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Wiki deja a jour, rien a pusher."
+            exit 0
+          fi
+
+          git commit -m "docs(wiki): sync depuis ${GITHUB_SHA::7}"
+          # Le wiki utilise sa branche par defaut (master ou main) : push HEAD.
+          git push origin HEAD
+          echo "Wiki synchronise avec succes."

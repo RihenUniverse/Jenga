@@ -15,6 +15,7 @@ from ..Core.Toolchains import ToolchainManager
 from ..Core.Platform import Platform
 from ..Utils import Colored, Display, FileSystem
 from ..Core import Api
+from .._version import __version__
 
 
 class InfoCommand:
@@ -130,7 +131,7 @@ class InfoCommand:
             print(f"Host Environment: {Platform.GetHostEnvironment().value}")
             print(f"Host Triple: {Platform.GetHostTriple()}")
             print(f"Python: {sys.version}")
-            print(f"Jenga version: 2.0.1")
+            print(f"Jenga version: {__version__}")
             print()
 
         return 0
