@@ -181,6 +181,7 @@ class InitCommand:
         create_project = Display.PromptYesNo("Create an initial project in this workspace?", default=True)
         project_name = None
         project_kind = None
+        project_separate = False
         if create_project:
             project_name = Display.Prompt("Project name", default=name)
             kind_choices = ["console", "windowed", "static", "shared"]
@@ -189,6 +190,10 @@ class InitCommand:
                 choices=kind_choices,
                 default="console"
             )
+            # Fichier .jenga separe (inclus) ou inline dans le workspace ?
+            project_separate = Display.PromptYesNo(
+                "Donner au projet son PROPRE fichier .jenga (inclus via include) ? "
+                "(Non = inline dans le .jenga du workspace)", default=False)
 
         # 9. Unit test framework
         use_tests = Display.PromptYesNo("Enable unit testing (Unitest)?", default=False)
@@ -244,6 +249,7 @@ class InitCommand:
                 lang="C++" if standard.startswith("C++") else "C",
                 location=".",
                 dialect=standard,
+                separate=project_separate,
             )
             entry_file = workspace_root / f"{name}.jenga"
             CreateCommand._CreateProjectDirect(proj_args, entry_file)
