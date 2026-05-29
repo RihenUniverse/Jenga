@@ -21,8 +21,11 @@
 #include <ctype.h>
 
 #ifdef _WIN32
+  #define COBJMACROS              /* macros C pour COM (IShellLink_SetPath...) */
   #include <windows.h>
   #include <direct.h>
+  #include <shlobj.h>             /* IShellLink, SHGetFolderPath, CSIDL_* */
+  #include <objbase.h>            /* CoInitialize, CoCreateInstance */
   #define PATH_SEP '\\'
   #define MKDIR(p) _mkdir(p)
 #else
@@ -304,9 +307,120 @@ static int ExtractArchive(FILE *fp, uint64_t entries, const char *destDir,
 }
 
 /* ----------------------------------------------------------------------- */
-/* Ecrit un desinstalleur simple (script) dans le dossier d'install.       */
+/* Raccourcis (menu / bureau) + enregistrement desinstallation OS          */
 /* ----------------------------------------------------------------------- */
-static void WriteUninstaller(const char *destDir, const char *fwDel) {
+
+/* Chemin du raccourci MENU pour `name`. 0 si OK, -1 si non supporte. */
+static int MenuShortcutPath(const char *name, char *out, size_t n) {
+#ifdef _WIN32
+    char base[PATH_MAX_LEN];
+    if (SHGetFolderPathA(NULL, CSIDL_PROGRAMS, NULL, 0, base) != S_OK) return -1;
+    snprintf(out, n, "%s\\%s.lnk", base, name);
+    return 0;
+#elif defined(__APPLE__)
+    (void)name; (void)out; (void)n; return -1;     /* pas de "menu" sur macOS */
+#else
+    const char *home = getenv("HOME");
+    if (!home) return -1;
+    snprintf(out, n, "%s/.local/share/applications/%s.desktop", home, name);
+    return 0;
+#endif
+}
+
+/* Chemin du raccourci BUREAU pour `name`. 0 si OK, -1 si non supporte. */
+static int DesktopShortcutPath(const char *name, char *out, size_t n) {
+#ifdef _WIN32
+    char base[PATH_MAX_LEN];
+    if (SHGetFolderPathA(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, base) != S_OK) return -1;
+    snprintf(out, n, "%s\\%s.lnk", base, name);
+    return 0;
+#elif defined(__APPLE__)
+    (void)name; (void)out; (void)n; return -1;
+#else
+    const char *home = getenv("HOME");
+    if (!home) return -1;
+    snprintf(out, n, "%s/Desktop/%s.desktop", home, name);
+    return 0;
+#endif
+}
+
+/* Cree un raccourci `shortcutPath` vers `target`. 0 si OK. */
+static int CreateShortcut(const char *target, const char *shortcutPath,
+                          const char *workDir, const char *iconPath, const char *name) {
+#ifdef _WIN32
+    (void)name;
+    IShellLinkA *psl = NULL; IPersistFile *ppf = NULL;
+    HRESULT hr; int ok = -1;
+    CoInitialize(NULL);
+    hr = CoCreateInstance(&CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
+                          &IID_IShellLinkA, (void **)&psl);
+    if (SUCCEEDED(hr)) {
+        IShellLinkA_SetPath(psl, target);
+        if (workDir && workDir[0]) IShellLinkA_SetWorkingDirectory(psl, workDir);
+        if (iconPath && iconPath[0]) IShellLinkA_SetIconLocation(psl, iconPath, 0);
+        hr = IShellLinkA_QueryInterface(psl, &IID_IPersistFile, (void **)&ppf);
+        if (SUCCEEDED(hr)) {
+            WCHAR wide[PATH_MAX_LEN];
+            MultiByteToWideChar(CP_ACP, 0, shortcutPath, -1, wide, PATH_MAX_LEN);
+            if (SUCCEEDED(IPersistFile_Save(ppf, wide, TRUE))) ok = 0;
+            IPersistFile_Release(ppf);
+        }
+        IShellLinkA_Release(psl);
+    }
+    CoUninitialize();
+    return ok;
+#elif defined(__APPLE__)
+    (void)workDir; (void)iconPath; (void)name;
+    unlink(shortcutPath);
+    return symlink(target, shortcutPath);
+#else
+    (void)workDir;
+    FILE *f = fopen(shortcutPath, "wb");
+    if (!f) return -1;
+    fprintf(f, "[Desktop Entry]\nType=Application\nName=%s\nExec=\"%s\"\nTerminal=false\n",
+            name ? name : "App", target);
+    if (iconPath && iconPath[0]) fprintf(f, "Icon=%s\n", iconPath);
+    fclose(f);
+    chmod(shortcutPath, 0755);
+    return 0;
+#endif
+}
+
+/* Enregistre l'app pour la desinstallation OS (Windows : registre Uninstall). */
+static void RegisterUninstall(const char *name, const char *version,
+                              const char *publisher, const char *installDir,
+                              const char *uninstaller, const char *iconPath) {
+#ifdef _WIN32
+    char subkey[PATH_MAX_LEN];
+    snprintf(subkey, sizeof(subkey),
+             "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\%s", name);
+    HKEY hk;
+    if (RegCreateKeyExA(HKEY_CURRENT_USER, subkey, 0, NULL, 0, KEY_WRITE, NULL, &hk, NULL) != ERROR_SUCCESS)
+        return;
+    #define JNG_REGSTR(k, v) RegSetValueExA(hk, (k), 0, REG_SZ, (const BYTE *)(v), (DWORD)strlen(v) + 1)
+    JNG_REGSTR("DisplayName", name);
+    JNG_REGSTR("DisplayVersion", version);
+    JNG_REGSTR("Publisher", publisher);
+    JNG_REGSTR("InstallLocation", installDir);
+    JNG_REGSTR("UninstallString", uninstaller);
+    if (iconPath && iconPath[0]) JNG_REGSTR("DisplayIcon", iconPath);
+    #undef JNG_REGSTR
+    DWORD one = 1;
+    RegSetValueExA(hk, "NoModify", 0, REG_DWORD, (const BYTE *)&one, sizeof(one));
+    RegSetValueExA(hk, "NoRepair", 0, REG_DWORD, (const BYTE *)&one, sizeof(one));
+    RegCloseKey(hk);
+#else
+    (void)name; (void)version; (void)publisher;
+    (void)installDir; (void)uninstaller; (void)iconPath;
+#endif
+}
+
+/* ----------------------------------------------------------------------- */
+/* Ecrit le desinstalleur (script) : retire la cle de registre, la regle    */
+/* pare-feu, les raccourcis, puis les fichiers installes.                   */
+/* ----------------------------------------------------------------------- */
+static void WriteUninstaller(const char *destDir, const char *fwDel, const char *name,
+                             char shortcuts[][PATH_MAX_LEN], int nShortcuts) {
     char path[PATH_MAX_LEN];
 #ifdef _WIN32
     snprintf(path, sizeof(path), "%s%cuninstall.bat", destDir, PATH_SEP);
@@ -314,17 +428,23 @@ static void WriteUninstaller(const char *destDir, const char *fwDel) {
     if (!u) return;
     fprintf(u, "@echo off\r\n");
     fprintf(u, "REM Desinstalleur genere par Jenga Installer\r\n");
+    fprintf(u, "reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\%s\" /f >nul 2>&1\r\n", name);
     if (fwDel && fwDel[0]) fprintf(u, "%s >nul 2>&1\r\n", fwDel);
+    for (int i = 0; i < nShortcuts; ++i)
+        fprintf(u, "del /f /q \"%s\" >nul 2>&1\r\n", shortcuts[i]);
     fprintf(u, "for /f \"usebackq delims=\" %%%%F in (\"%s%cuninstall.files\") do del /f /q \"%s%c%%%%F\" >nul 2>&1\r\n",
             destDir, PATH_SEP, destDir, PATH_SEP);
     fprintf(u, "echo Desinstalle.\r\n");
     fclose(u);
 #else
+    (void)name;
     snprintf(path, sizeof(path), "%s%cuninstall.sh", destDir, PATH_SEP);
     FILE *u = fopen(path, "wb");
     if (!u) return;
     fprintf(u, "#!/bin/sh\n# Desinstalleur genere par Jenga Installer\n");
     if (fwDel && fwDel[0]) fprintf(u, "%s >/dev/null 2>&1 || true\n", fwDel);
+    for (int i = 0; i < nShortcuts; ++i)
+        fprintf(u, "rm -f \"%s\"\n", shortcuts[i]);
     fprintf(u, "DIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\n");
     fprintf(u, "while IFS= read -r f; do rm -f \"$DIR/$f\"; done < \"$DIR/uninstall.files\"\n");
     fprintf(u, "echo Desinstalle.\n");
@@ -464,8 +584,53 @@ int main(int argc, char **argv) {
         system(fwAdd);
     }
 
-    /* 7. desinstalleur */
-    WriteUninstaller(destDir, fwDel);
+    /* 7. raccourcis (menu / bureau) selon le manifeste */
+    char shortcuts[4][PATH_MAX_LEN];
+    int nShortcuts = 0;
+    char exe[256] = "", iconRel[PATH_MAX_LEN] = "", wantMenu[8] = "", wantDesktop[8] = "";
+    ManifestGet(manifest, "exe", exe, sizeof(exe));
+    ManifestGet(manifest, "icon", iconRel, sizeof(iconRel));
+    ManifestGet(manifest, "shortcut_menu", wantMenu, sizeof(wantMenu));
+    ManifestGet(manifest, "shortcut_desktop", wantDesktop, sizeof(wantDesktop));
+
+    char targetExe[PATH_MAX_LEN] = "", iconAbs[PATH_MAX_LEN] = "";
+    if (exe[0]) {
+        snprintf(targetExe, sizeof(targetExe), "%s%c%s", destDir, PATH_SEP, exe);
+        ToNativeSep(targetExe);
+    }
+    if (iconRel[0]) {
+        snprintf(iconAbs, sizeof(iconAbs), "%s%c%s", destDir, PATH_SEP, iconRel);
+        ToNativeSep(iconAbs);
+    }
+    if (exe[0] && wantMenu[0] == '1') {
+        char sc[PATH_MAX_LEN];
+        if (MenuShortcutPath(name, sc, sizeof(sc)) == 0 &&
+            CreateShortcut(targetExe, sc, destDir, iconAbs, name) == 0) {
+            strncpy(shortcuts[nShortcuts++], sc, PATH_MAX_LEN - 1);
+            if (!silent) printf("Raccourci menu : %s\n", sc);
+        }
+    }
+    if (exe[0] && wantDesktop[0] == '1') {
+        char sc[PATH_MAX_LEN];
+        if (DesktopShortcutPath(name, sc, sizeof(sc)) == 0 &&
+            CreateShortcut(targetExe, sc, destDir, iconAbs, name) == 0) {
+            strncpy(shortcuts[nShortcuts++], sc, PATH_MAX_LEN - 1);
+            if (!silent) printf("Raccourci bureau : %s\n", sc);
+        }
+    }
+
+    /* 8. enregistrement desinstallation OS (registre Windows) */
+    char uninstallerPath[PATH_MAX_LEN];
+#ifdef _WIN32
+    snprintf(uninstallerPath, sizeof(uninstallerPath), "%s%cuninstall.bat", destDir, PATH_SEP);
+#else
+    snprintf(uninstallerPath, sizeof(uninstallerPath), "%s%cuninstall.sh", destDir, PATH_SEP);
+#endif
+    RegisterUninstall(name, version[0] ? version : "1.0.0", publisher,
+                      destDir, uninstallerPath, iconAbs);
+
+    /* 9. desinstalleur (retire registre + firewall + raccourcis + fichiers) */
+    WriteUninstaller(destDir, fwDel, name, shortcuts, nShortcuts);
 
     free(manifest);
     printf("Installation terminee dans : %s\n", destDir);

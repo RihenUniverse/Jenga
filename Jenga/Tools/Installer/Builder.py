@@ -62,20 +62,24 @@ def CompileStub(stub_src: Path, out_bin: Path, cc: Optional[List[str]] = None,
         )
     out_bin.parent.mkdir(parents=True, exist_ok=True)
     is_cl = cc[0].lower() == "cl"
+    on_windows = os.name == "nt"
     if is_cl:
         # MSVC : /O2 optimise, /Fe nomme l'exe ; objets dans un tmp.
+        # Libs Windows : COM (.lnk via IShellLink), registre (Uninstall), shell.
         with tempfile.TemporaryDirectory() as td:
             cmd = cc + ["/nologo", "/O2", "/MT", str(stub_src),
-                        f"/Fe:{out_bin}", f"/Fo:{Path(td) / 'stub.obj'}"]
+                        f"/Fe:{out_bin}", f"/Fo:{Path(td) / 'stub.obj'}",
+                        "/link", "ole32.lib", "uuid.lib", "shell32.lib", "advapi32.lib"]
             _Run(cmd, verbose, cwd=td)
     else:
-        # gcc/clang/cc : -O2, -s (strip) pour un stub compact.
-        cmd = cc + ["-O2", "-s", str(stub_src), "-o", str(out_bin)]
+        # gcc/clang/cc : -O2, -s (strip) pour un stub compact. Sur Windows,
+        # lier ole32/uuid/shell32/advapi32 (raccourcis COM + registre).
+        win_libs = ["-lole32", "-luuid", "-lshell32", "-ladvapi32"] if on_windows else []
         try:
-            _Run(cmd, verbose)
+            _Run(cc + ["-O2", "-s", str(stub_src), "-o", str(out_bin)] + win_libs, verbose)
         except BuilderError:
             # -s n'est pas supporté partout (ex: macOS ld) -> retenter sans.
-            _Run(cc + ["-O2", str(stub_src), "-o", str(out_bin)], verbose)
+            _Run(cc + ["-O2", str(stub_src), "-o", str(out_bin)] + win_libs, verbose)
     if not out_bin.exists():
         raise BuilderError(f"La compilation du stub n'a produit aucun binaire : {out_bin}")
 
