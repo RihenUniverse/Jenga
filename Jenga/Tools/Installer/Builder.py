@@ -52,8 +52,13 @@ def DetectCCompiler() -> Optional[List[str]]:
 
 
 def CompileStub(stub_src: Path, out_bin: Path, cc: Optional[List[str]] = None,
-                verbose: bool = False) -> None:
-    """Compile le stub C en binaire natif (optimisé, autonome)."""
+                verbose: bool = False, manifest: Optional[Dict[str, str]] = None,
+                require_admin: bool = False, icon_path: Optional[str] = None) -> None:
+    """Compile le stub C en binaire natif (optimisé, autonome).
+
+    Sur Windows, génère et lie une ressource (VERSIONINFO + manifeste UAC) qui
+    réduit les faux positifs antivirus. La ressource est best-effort : si l'outil
+    (rc.exe/windres) manque ou échoue, le stub est compilé sans elle."""
     cc = cc or DetectCCompiler()
     if not cc:
         raise BuilderError(
@@ -63,23 +68,50 @@ def CompileStub(stub_src: Path, out_bin: Path, cc: Optional[List[str]] = None,
     out_bin.parent.mkdir(parents=True, exist_ok=True)
     is_cl = cc[0].lower() == "cl"
     on_windows = os.name == "nt"
-    if is_cl:
-        # MSVC : /O2 optimise, /Fe nomme l'exe ; objets dans un tmp.
-        # Libs Windows : COM (.lnk via IShellLink), registre (Uninstall), shell.
-        with tempfile.TemporaryDirectory() as td:
-            cmd = cc + ["/nologo", "/O2", "/MT", str(stub_src),
-                        f"/Fe:{out_bin}", f"/Fo:{Path(td) / 'stub.obj'}",
-                        "/link", "ole32.lib", "uuid.lib", "shell32.lib", "advapi32.lib"]
-            _Run(cmd, verbose, cwd=td)
-    else:
-        # gcc/clang/cc : -O2, -s (strip) pour un stub compact. Sur Windows,
-        # lier ole32/uuid/shell32/advapi32 (raccourcis COM + registre).
-        win_libs = ["-lole32", "-luuid", "-lshell32", "-ladvapi32"] if on_windows else []
-        try:
-            _Run(cc + ["-O2", "-s", str(stub_src), "-o", str(out_bin)] + win_libs, verbose)
-        except BuilderError:
-            # -s n'est pas supporté partout (ex: macOS ld) -> retenter sans.
-            _Run(cc + ["-O2", str(stub_src), "-o", str(out_bin)] + win_libs, verbose)
+
+    with tempfile.TemporaryDirectory() as td:
+        td_path = Path(td)
+
+        # Ressource Windows (métadonnées éditeur + manifeste UAC). Best-effort.
+        resource_obj: Optional[Path] = None
+        if on_windows and manifest:
+            from .Resource import CompileWindowsResource
+            try:
+                resource_obj = CompileWindowsResource(
+                    td_path, manifest, is_cl=is_cl,
+                    require_admin=require_admin, icon_path=icon_path, verbose=verbose)
+            except Exception as exc:   # noqa: BLE001 — best-effort, ne bloque pas le build
+                if verbose:
+                    print(f"  [resource] ignorée: {exc}")
+                resource_obj = None
+
+        if is_cl:
+            # MSVC : /O2 optimise ; .res passé comme entrée (lié automatiquement).
+            # Libs Windows : COM (.lnk via IShellLink), registre (Uninstall), shell.
+            head = cc + ["/nologo", "/O2", "/MT", str(stub_src)]
+            tail = [f"/Fe:{out_bin}", f"/Fo:{td_path / 'stub.obj'}",
+                    "/link", "ole32.lib", "uuid.lib", "shell32.lib", "advapi32.lib"]
+            attempts = []
+            if resource_obj:
+                attempts.append(head + [str(resource_obj)] + tail)
+            attempts.append(head + tail)   # repli sans ressource
+            _RunFirstThatWorks(attempts, verbose, cwd=td, on_fallback=(
+                "  [resource] lien échoué — recompilation sans ressource." if resource_obj else None))
+        else:
+            # gcc/clang/cc : -O2, -s (strip) pour un stub compact. Sur Windows,
+            # lier ole32/uuid/shell32/advapi32 (raccourcis COM + registre).
+            win_libs = ["-lole32", "-luuid", "-lshell32", "-ladvapi32"] if on_windows else []
+            res = [str(resource_obj)] if resource_obj else []
+            attempts = [
+                cc + ["-O2", "-s", str(stub_src)] + res + ["-o", str(out_bin)] + win_libs,
+                cc + ["-O2", str(stub_src)] + res + ["-o", str(out_bin)] + win_libs,
+            ]
+            if res:
+                # Dernier recours : sans ressource (ex. .res non liable par gcc).
+                attempts.append(cc + ["-O2", str(stub_src), "-o", str(out_bin)] + win_libs)
+            _RunFirstThatWorks(attempts, verbose, on_fallback=(
+                "  [resource] lien échoué — recompilation sans ressource." if res else None))
+
     if not out_bin.exists():
         raise BuilderError(f"La compilation du stub n'a produit aucun binaire : {out_bin}")
 
@@ -91,6 +123,23 @@ def _Run(cmd: List[str], verbose: bool, cwd: Optional[str] = None) -> None:
     if proc.returncode != 0:
         msg = (proc.stderr or proc.stdout or "").strip() if not verbose else ""
         raise BuilderError(f"Échec compilation stub (code {proc.returncode}).\n{msg}")
+
+
+def _RunFirstThatWorks(attempts: List[List[str]], verbose: bool,
+                       cwd: Optional[str] = None, on_fallback: Optional[str] = None) -> None:
+    """Tente chaque commande dans l'ordre ; s'arrête à la première qui réussit.
+    Lève la dernière erreur si toutes échouent."""
+    last_err: Optional[BuilderError] = None
+    for index, cmd in enumerate(attempts):
+        try:
+            _Run(cmd, verbose, cwd=cwd)
+            return
+        except BuilderError as exc:
+            last_err = exc
+            if index == 0 and on_fallback and verbose:
+                print(on_fallback)
+    if last_err:
+        raise last_err
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -139,26 +188,37 @@ def BuildInstaller(files: List[FileEntry],
                    output: Path,
                    stub_src: Optional[Path] = None,
                    cc: Optional[List[str]] = None,
-                   verbose: bool = False) -> Path:
+                   verbose: bool = False,
+                   platform: Optional[str] = None,
+                   require_admin: bool = False,
+                   icon_path: Optional[str] = None,
+                   sign_options: Optional[Dict[str, str]] = None) -> Path:
     """
     Construit un installateur self-extracting.
 
-    files    : liste de (arcName, cheminAbsolu, modePosix). `arcName` est le
-               chemin relatif dans le dossier d'installation final.
-    manifest : métadonnées (name, version, publisher, default_dir_*, exe,
-               firewall_add/firewall_del, ...).
-    output   : chemin de l'installateur à produire.
+    files        : liste de (arcName, cheminAbsolu, modePosix). `arcName` est le
+                   chemin relatif dans le dossier d'installation final.
+    manifest     : métadonnées (name, version, publisher, default_dir_*, exe,
+                   firewall_add/firewall_del, ...).
+    output       : chemin de l'installateur à produire.
+    platform     : plateforme cible (windows/linux/macos) ; défaut = OS courant.
+    require_admin: manifeste UAC `requireAdministrator` (sinon `asInvoker`).
+    icon_path    : icône à embarquer dans le stub Windows (optionnel).
+    sign_options : infos de signature de code (cf. Signing.SignBinary) ; sans
+                   certificat, l'installateur est produit mais non signé.
     Retourne le chemin de l'installateur.
     """
     output = Path(output)
+    platform = (platform or _CurrentPlatform()).lower()
     stub_src = Path(stub_src) if stub_src else (Path(__file__).parent / "Stub" / "Installer.c")
     if not stub_src.is_file():
         raise BuilderError(f"Source du stub introuvable : {stub_src}")
 
-    # 1. Compiler le stub dans un emplacement temporaire.
+    # 1. Compiler le stub dans un emplacement temporaire (avec ressource Windows).
     with tempfile.TemporaryDirectory() as td:
         stub_bin = Path(td) / ("stub.exe" if os.name == "nt" else "stub")
-        CompileStub(stub_src, stub_bin, cc=cc, verbose=verbose)
+        CompileStub(stub_src, stub_bin, cc=cc, verbose=verbose,
+                    manifest=manifest, require_admin=require_admin, icon_path=icon_path)
         stub_bytes = stub_bin.read_bytes()
 
     # 2. Manifeste + archive.
@@ -192,4 +252,26 @@ def BuildInstaller(files: List[FileEntry],
         import stat as _stat
         output.chmod(output.stat().st_mode | _stat.S_IEXEC | _stat.S_IXGRP | _stat.S_IXOTH)
 
+    # 7. Signature de code (anti-faux-positifs AV) — uniquement si certificat fourni.
+    from .Signing import SignBinary, HasSigningInfo, SigningError
+    if HasSigningInfo(sign_options):
+        try:
+            result = SignBinary(output, sign_options, platform, verbose=verbose)
+            if verbose or not result.signed:
+                print(f"  [sign] {result.message}")
+        except SigningError as exc:
+            # La signature ne doit pas détruire un installateur déjà produit :
+            # on prévient mais on conserve le binaire non signé.
+            print(f"  [sign] AVERTISSEMENT : signature échouée — {exc}")
+
     return output
+
+
+def _CurrentPlatform() -> str:
+    """Plateforme de l'OS courant : windows / macos / linux."""
+    import sys
+    if sys.platform.startswith("win"):
+        return "windows"
+    if sys.platform == "darwin":
+        return "macos"
+    return "linux"

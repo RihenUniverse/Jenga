@@ -39,18 +39,20 @@ final, le stub s'auto-extrait et installe l'application.
 |       size       : u64 LE                                           |
 |       data       : size octets                                      |
 +=====================================================================+
-|  TRAILER  (taille fixe = 48 octets, tout a la fin du fichier)       |
+|  TRAILER  (taille fixe = 80 octets, tout a la fin du fichier)       |
 |       magic            : 8 octets = "JNGINST1"                       |
 |       manifest_offset  : u64 LE  (offset absolu dans le fichier)    |
 |       manifest_size    : u64 LE                                     |
 |       archive_offset   : u64 LE                                     |
 |       archive_entries  : u64 LE  (nombre de fichiers)               |
-|       payload_crc32    : u32 LE  (integrite du payload)             |
+|       payload_crc32    : u32 LE  (integrite rapide)                 |
 |       reserved         : u32 (0)                                    |
+|       payload_sha256   : 32 octets (anti-tampering, verifie         |
+|                          avant extraction par le stub)              |
 +=====================================================================+
 ```
 
-Le stub lit les **48 derniers octets** (trailer), vérifie le magic, puis se
+Le stub lit les **80 derniers octets** (trailer), vérifie le magic, puis se
 repositionne via les offsets pour lire le manifeste et l'archive. Format
 volontairement **simple** (pas de ZIP, pas de JSON) pour un stub C autonome,
 sans dépendance tierce.
@@ -193,9 +195,11 @@ intégrée nativement :
 
 - **Phase 1 (MVP, fait)** : format + stub (extraction + dossier d'install +
   uninstaller) + Builder + CLI/silencieux. Bonnes pratiques anti-faux-positifs.
-- **Phase 2** : intégrité SHA-256 + raccourcis + entrée désinstallation OS
-  (registre) + pare-feu (FirewallSpec) + intégration `jenga package --type jng`
-  + signature de code (si certificat).
+- **Phase 2 (fait)** : intégrité SHA-256 + raccourcis (.lnk + .desktop) + entrée
+  désinstallation OS (registre Windows) + pare-feu (FirewallSpec) + intégration
+  `jenga package --type jng` + **VERSIONINFO + manifeste UAC `asInvoker`**
+  (anti-faux-positifs AV) + **signature Authenticode/codesign/GPG** si certificat
+  fourni via le DSL (`signingcertificate`, `signingidentity`, `signinggpgkey`…).
 - **Phase 3** : interface graphique (wizard EULA/dossier/composants/progression)
   + compression LZMA/zstd + hooks pré/post-install.
 - **Phase 4** : multi-langues + associations de fichiers/PATH + upgrade/repair.

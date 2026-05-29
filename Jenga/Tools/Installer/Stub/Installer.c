@@ -2,9 +2,10 @@
  * Jenga Installer — stub self-extracting multi-plateforme.
  *
  * Ce binaire est compile par Jenga puis se voit accoler un PAYLOAD
- * (manifeste + archive) suivi d'un TRAILER de 48 octets. A l'execution, le
- * stub se lit lui-meme, extrait les fichiers vers le dossier d'installation,
- * configure le pare-feu et ecrit un desinstalleur.
+ * (manifeste + archive) suivi d'un TRAILER de 80 octets (48 d'entetes +
+ * 32 de SHA-256). A l'execution, le stub se lit lui-meme, verifie le
+ * SHA-256 du payload (anti-tampering), extrait les fichiers vers le dossier
+ * d'installation, configure le pare-feu et ecrit un desinstalleur.
  *
  * Format : voir Jenga/Tools/Installer/DESIGN.md.
  * Edite par Rihen — fait partie de Jenga.
