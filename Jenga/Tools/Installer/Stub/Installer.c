@@ -248,6 +248,23 @@ static void ExpandPath(const char *in, char *out, size_t n) {
 #endif
 }
 
+/* Remplace toutes les occurrences de `token` par `value` dans `buf`. Sert a
+ * substituer {exe} (chemin de l'exe installe, connu au runtime) dans les
+ * commandes pare-feu du manifeste. */
+static void ReplacePlaceholder(char *buf, size_t bufSize, const char *token, const char *value) {
+    char tmp[4096];
+    size_t tokenLen = strlen(token), valueLen = strlen(value);
+    char *pos = strstr(buf, token);
+    while (pos) {
+        size_t prefixLen = (size_t)(pos - buf);
+        if (prefixLen + valueLen + strlen(pos + tokenLen) >= bufSize) break;
+        snprintf(tmp, sizeof(tmp), "%.*s%s%s", (int)prefixLen, buf, value, pos + tokenLen);
+        strncpy(buf, tmp, bufSize - 1);
+        buf[bufSize - 1] = '\0';
+        pos = strstr(buf, token);
+    }
+}
+
 /* ----------------------------------------------------------------------- */
 /* Extraction de l'archive : lit `entries` fichiers depuis fp (positionne  */
 /* au debut de l'archive). Ecrit la liste des fichiers poses dans `listFp`. */
@@ -575,10 +592,21 @@ int main(int argc, char **argv) {
     fclose(fp);
     if (rc != 0) { fprintf(stderr, "Extraction echouee.\n"); free(manifest); return 1; }
 
-    /* 6. pare-feu : execute la commande 'add' du manifeste si presente */
+    /* 6. pare-feu : execute la commande 'add' du manifeste. Le placeholder
+     * {exe} y est remplace par le chemin absolu de l'exe installe. */
     char fwAdd[2048] = "", fwDel[2048] = "";
     ManifestGet(manifest, "firewall_add", fwAdd, sizeof(fwAdd));
     ManifestGet(manifest, "firewall_del", fwDel, sizeof(fwDel));
+    {
+        char exeForFw[256] = "", targetForFw[PATH_MAX_LEN] = "";
+        ManifestGet(manifest, "exe", exeForFw, sizeof(exeForFw));
+        if (exeForFw[0]) {
+            snprintf(targetForFw, sizeof(targetForFw), "%s%c%s", destDir, PATH_SEP, exeForFw);
+            ToNativeSep(targetForFw);
+            ReplacePlaceholder(fwAdd, sizeof(fwAdd), "{exe}", targetForFw);
+            ReplacePlaceholder(fwDel, sizeof(fwDel), "{exe}", targetForFw);
+        }
+    }
     if (fwAdd[0]) {
         if (!silent) printf("Configuration du pare-feu...\n");
         system(fwAdd);
