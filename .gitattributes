@@ -1,0 +1,27 @@
+# Normalisation des fins de ligne — evite que les scripts soient corrompus
+# lors des checkouts cross-OS.
+
+# Par defaut : git gere les fins de ligne automatiquement pour le texte.
+* text=auto
+
+# Scripts Windows : DOIVENT etre en CRLF (sinon cmd.exe lit mal : "setlocal"
+# devient "tlocal", etc.).
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Scripts Unix : DOIVENT rester en LF (sinon bash/sh casse sur le \r).
+*.sh    text eol=lf
+
+# Fichiers binaires : jamais de conversion.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.ico   binary
+*.icns  binary
+*.so    binary
+*.dll   binary
+*.dylib binary
+*.pdb   binary
+*.whl   binary
+*.tar.gz binary
