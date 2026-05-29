@@ -1,85 +1,27 @@
-# Jenga Build System v2.0.1
+<div align="center">
 
-Modern multi-platform C/C++ build system with a unified Python DSL.
+# 🧱 Jenga Build System
 
-[![License](https://img.shields.io/badge/License-Proprietary-blue.svg)]()
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org)
-[![Targets](https://img.shields.io/badge/Targets-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android%20%7C%20iOS%20%7C%20Web%20%7C%20HarmonyOS-green.svg)]()
+**Modern, cross-platform C/C++ build system driven by a unified Python DSL.**
 
-## Documentation Links
+*Un système de build C/C++ multi-plateforme, piloté par un DSL Python unifié.*
 
-- Main README: [`README.md`](./README.md)
-- Complete README: [`READMEV2.md`](./READMEV2.md)
-- Wiki: [`wiki/README.md`](./wiki/README.md) (home: [`wiki/Home.md`](./wiki/Home.md))
-- User Guide: [`Jenga_User_Guide.md`](./Jenga_User_Guide.md)
-- Developer Guide: [`Jenga_Developer_Guide.md`](./Jenga_Developer_Guide.md)
+[![Version](https://img.shields.io/badge/version-2.0.2-blue.svg)]()
+[![License](https://img.shields.io/badge/license-Proprietary-lightgrey.svg)](./LICENSE)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org)
+[![Targets](https://img.shields.io/badge/targets-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Android%20%7C%20iOS%20%7C%20Web%20%7C%20HarmonyOS%20%7C%20Xbox-green.svg)]()
 
-## Overview
+**📖 [Wiki (FR / EN)](https://github.com/RihenUniverse/Jenga/wiki) · 🗺️ [Roadmap](./Jenga/Docs/ROADMAP.md) · 🚀 [Quick Start](#-quick-start) · 💬 Édité par [Rihen](#-publisher--license)**
 
-Jenga is a build system for native projects, driven by a Python DSL (`.jenga` files) and a CLI.
+</div>
 
-Current codebase highlights:
-- Workspace/project DSL in `Jenga/Core/Api.py`
-- CLI commands in `Jenga/Commands/`
-- Multi-platform builders in `Jenga/Core/Builders/`
-- Built-in test integration (`unitest` + `test` contexts)
-- Documentation extraction command (`jenga docs`)
-- Toolchain registration/detection workflows (`jenga install toolchain`, `jenga config`)
+---
 
-## Table of Contents
+## 🎯 What is Jenga?
 
-- [Documentation Links](#documentation-links)
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [CLI Reference](#cli-reference)
-- [Python DSL Reference](#python-dsl-reference)
-- [Project Creation and File Management](#project-creation-and-file-management)
-- [External Project Integration](#external-project-integration)
-- [Toolchains and Sysroots](#toolchains-and-sysroots)
-- [Documentation Extraction](#documentation-extraction)
-- [Examples](#examples)
-- [Known Limitations](#known-limitations)
-- [Repository Structure](#repository-structure)
-- [License](#license)
-- [Disclaimer](#disclaimer)
+**Jenga** is a build system for native projects (C, C++, Objective-C, Assembly, Rust, Zig). Instead of generating intermediate Makefiles or `CMakeLists.txt`, it **compiles directly** through native toolchains, driven by readable `.jenga` files — plain Python enriched with a build DSL.
 
-## Features
-
-### Core Build Features
-- Python DSL with context managers: `workspace`, `project`, `toolchain`, `filter`, `unitest`, `test`, `include`, `batchinclude`
-- Build graph with project dependencies via `dependson([...])`
-- Incremental workflow with cache and daemon support in core commands
-- Unified build/run/test/clean/rebuild/watch commands
-
-### Platform and Toolchain Features
-- Target model in API: OS, architecture, environment (`TargetOS`, `TargetArch`, `TargetEnv`)
-- Builder dispatch for wired platforms: Windows, Linux, macOS, Android, iOS, Web (Emscripten), HarmonyOS, Xbox
-- Custom toolchain definitions in DSL (`settarget`, `ccompiler`, `cppcompiler`, `sysroot`, `targettriple`, flags)
-- Global toolchain registry management (`jenga install toolchain ...`, `jenga config toolchain ...`)
-
-### Developer Productivity
-- Project scaffolding and code element creation (`jenga project`)
-- File/include/link/define injection into `.jenga` (`jenga file`)
-- Example catalog and copy workflow (`jenga examples list/copy`)
-- Project generator command (`jenga gen --cmake --makefile --vs2022 --xcode`)
-
-### Docs and Packaging Commands
-- API documentation extraction from source comments (`jenga docs`)
-- Packaging, deploy, publish, profile, bench command families available
-
-## Quick Start
-
-### 1) Create a workspace and a project
-
-```bash
-mkdir hello-jenga
-cd hello-jenga
-jenga workspace HelloWorkspace
-jenga project HelloApp --kind console --lang C++
-```
-
-### 2) Minimal `.jenga` example
+One description builds your project for **every supported platform**, with packaging, networking permissions, tests and deployment built in. Jenga is developed by **Rihen**.
 
 ```python
 from Jenga import *
@@ -92,409 +34,210 @@ with workspace("HelloWorkspace"):
     with project("HelloApp"):
         consoleapp()
         language("C++")
-        files(["src/**.cpp", "include/**.hpp"])
-```
-
-### 3) Build and run
-
-```bash
-jenga build --config Debug
-jenga run HelloApp
-```
-
-## Installation
-
-### From source (recommended for this repository)
-
-```bash
-pip install -e .
-```
-
-### Launch options
-
-Use one of the following launch paths:
-
-```bash
-# Linux/macOS
-bash ./jenga.sh --help
-
-# Windows
-jenga.bat --help
-
-# Direct Python entry
-python3 Jenga/jenga.py --help
-```
-
-Dependencies are defined in `pyproject.toml` (`watchdog`, `requests`) and optional extras in `setup.py`.
-
-## CLI Reference
-
-The command registry is defined in `Jenga/Commands/__init__.py`.
-
-### Core workflow
-
-```bash
-jenga build   [--config Debug|Release] [--platform <os[-arch[-env]]>] [--target <project>] [--no-cache]
-jenga run     [project] [--config Debug] [--platform <platform>] [--args ...] [--no-build]
-jenga test    [--project <test-project>] [--config Debug] [--platform <platform>] [--no-build]
-jenga clean   [--project <project>] [--config <cfg>] [--platform <platform>] [--all]
-jenga rebuild [--config <cfg>] [--platform <platform>] [--target <project>] [--clean-all]
-jenga watch   [--config <cfg>] [--platform <platform>] [--polling]
-jenga info    [--verbose]
-jenga gen     --cmake|--makefile|--vs2022|--xcode [--output <dir>]
-```
-
-Common aliases:
-- `b` -> `build`
-- `r` -> `run`
-- `t` -> `test`
-- `c` -> `clean`
-- `w` -> `watch`
-- `i` -> `info`
-- `e` -> `examples`
-- `d` -> `docs`
-- `k` -> `keygen`
-- `s` -> `sign`
-- `h` -> `help`
-
-### Workspace and project authoring
-
-```bash
-jenga workspace [name] [--path .] [--configs Debug,Release] [--oses Windows,Linux,macOS] [--archs x86_64]
-jenga project <name> [--kind console|windowed|static|shared|test] [--lang C++|C] [--location .]
-jenga project --element class|struct|enum|union|interface|function|source|header|custom \
-              --name <ElementName> --project <ProjectName> [--template <template-name>]
-jenga file [project] [--src ...] [--inc ...] [--link ...] [--def ...] [--type source|header|resource]
-```
-
-### Toolchains and configuration
-
-```bash
-jenga install toolchain list
-jenga install toolchain detect
-jenga install toolchain install zig|emsdk|android-sdk|android-ndk|harmony-sdk|macos-tools \
-      [--path <dir_or_archive>] [--version <ver>] [--force]
-
-jenga config init
-jenga config show
-jenga config set <key> <value>
-jenga config get <key>
-jenga config toolchain add <name> <json-file>
-jenga config toolchain list
-jenga config toolchain remove <name>
-jenga config sysroot add <name> <path> [--os Linux] [--arch x86_64]
-jenga config sysroot list
-jenga config sysroot remove <name>
-```
-
-### Examples and docs
-
-```bash
-jenga examples list [--filter <platform|difficulty>]
-jenga examples copy <example-id> <destination> [--force]
-
-jenga docs extract [--project <name>] [--output docs] [--format markdown|html|pdf|all] \
-                   [--include-private] [--exclude-projects ...] [--exclude-dirs ...] [--verbose]
-jenga docs stats [--project <name>] [--json]
-jenga docs list
-jenga docs clean [--project <name>] [--output docs]
-```
-
-### Distribution and operations
-
-```bash
-jenga package --platform android|ios|windows|linux|macos|web [--type <pkg-type>] [--project <name>]
-jenga deploy  --platform android|ios|xbox|linux|macos|windows [--target <device>] [--project <name>]
-jenga publish --registry nuget|vcpkg|conan|npm|pypi|custom [--package <path>] [--dry-run]
-jenga profile --platform windows|linux|macos|android|ios [--project <name>] [--duration 30]
-jenga bench   [--project <name>] [--iterations 10] [--output ./bench_results.json]
-jenga help [command]
-```
-
-## Python DSL Reference
-
-The public DSL is exported from `Jenga/__init__.py` and implemented in `Jenga/Core/Api.py`.
-
-### Minimal workspace and project
-
-```python
-from Jenga import *
-
-with workspace("MyWorkspace"):
-    configurations(["Debug", "Release"])
-    targetoses([TargetOS.WINDOWS, TargetOS.LINUX, TargetOS.MACOS])
-    targetarchs([TargetArch.X86_64])
-    startproject("App")
-
-    with project("App"):
-        consoleapp()
-        language("C++")
         cppdialect("C++20")
         files(["src/**.cpp", "include/**.hpp"])
-        includedirs(["include"])
 ```
 
-### Toolchain definition and selection
+---
 
-```python
-with workspace("CrossDemo"):
-    with toolchain("linux_cross", "clang"):
-        settarget("linux", "x64", "gnu")
-        targettriple("x86_64-unknown-linux-gnu")
-        ccompiler("clang")
-        cppcompiler("clang++")
-        linker("clang++")
-        archiver("ar")
-        cflags(["--target=x86_64-unknown-linux-gnu"])
-        cxxflags(["--target=x86_64-unknown-linux-gnu"])
-        ldflags(["--target=x86_64-unknown-linux-gnu"])
+## ✨ Key Features
 
-    usetoolchain("linux_cross")
-```
+- **Python DSL** with context managers: `workspace`, `project`, `toolchain`, `filter`, `unitest`, `test`, `include`.
+- **Direct compilation** — no intermediate project files (unlike CMake/Meson).
+- **Incremental cache** (3 levels: mtime → `.d` deps → SHA256) + **background daemon** for instant commands.
+- **Parallel builds** (`-j`, `ThreadPoolExecutor`).
+- **Cross-compilation** to any target from any host, with automatic toolchain detection (MSVC, GCC, Clang, NDK, Emscripten, Zig, OHOS…).
+- **Multi-platform packaging**: MSI/EXE/ZIP, DEB, PKG/DMG, APK/AAB, IPA, HAP, Web ZIP.
+- **Network & firewall permissions** generated automatically at install time, on every platform — see [Networking](#-networking--firewall).
+- **Built-in C++ unit testing** (Unitest) and **automatic API documentation** (`jenga docs`).
+- **Project generators**: CMake, Makefile, Visual Studio 2022, Xcode.
 
-### Filters and conditional settings
+---
 
-```python
-with project("Renderer"):
-    sharedlib()
-    files(["src/**.cpp"])
+## 🖥️ Supported Platforms
 
-    with filter("system:Windows"):
-        links(["d3d11", "dxgi"])
-        defines(["PLATFORM_WINDOWS"])
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Windows x64 | ✅ Production | MSVC, clang-cl, MinGW/clang |
+| Linux x64 | ✅ Production | GCC, Clang (native & cross) |
+| Android (4 ABIs) | ✅ Production | NDK r27c, Universal APK |
+| Web / WASM | ✅ Production | Emscripten (emsdk) |
+| macOS | ✅ Ready | requires macOS (Apple Clang) |
+| iOS / tvOS / watchOS / visionOS | ✅ Ready | requires macOS + Xcode |
+| HarmonyOS | ✅ Ready | OpenHarmony NDK — [guide](https://github.com/RihenUniverse/Jenga/wiki/HarmonyOS) |
+| Xbox One / Series | 🟡 Partial | requires Microsoft GDK |
+| Nintendo Switch / PS4-PS5 | 🔒 Licensed | requires vendor SDK |
 
-    with filter("system:Linux"):
-        links(["X11"])
-        defines(["PLATFORM_LINUX"])
-```
+---
 
-### Built-in unit testing workflow
+## 📦 Installation
 
-```python
-with workspace("UnitDemo"):
-    with unitest() as u:
-        u.Precompiled()  # or u.Compile(...)
-
-    with project("Core"):
-        staticlib()
-        files(["src/**.cpp"])
-        includedirs(["include"])
-
-        with test():
-            testfiles(["tests/**.cpp"])
-            testmainfile("src/main.cpp")
-            testoptions(["--verbose"])
-```
-
-### Platform-specific DSL APIs
-
-Android:
-- `androidsdkpath`, `androidndkpath`, `javajdkpath`
-- `androidapplicationid`, `androidversioncode`, `androidversionname`
-- `androidminsdk`, `androidtargetsdk`, `androidcompilesdk`
-- `androidabis`, `androidproguard`, `androidproguardrules`
-- `androidassets`, `androidpermissions`, `androidnativeactivity`
-- `androidsign`, `androidkeystore`, `androidkeystorepass`, `androidkeyalias`
-
-Emscripten:
-- `emscriptenshellfile`, `emscriptencanvasid`, `emscripteninitialmemory`
-- `emscriptenstacksize`, `emscriptenexportname`, `emscriptenextraflags`
-
-iOS:
-- `iosbundleid`, `iosversion`, `iosminsdk`
-- `iossigningidentity`, `iosentitlements`, `iosappicon`, `iosbuildnumber`
-
-### Build and linker tuning APIs
-
-- Compile/link flags: `addcflag`, `addcxxflag`, `addldflag`, `cflags`, `cxxflags`, `ldflags`, `asmflags`, `arflags`
-- Linking: `framework`, `frameworkpath`, `librarypath`, `library`, `rpath`
-- Low-level toggles: `sanitize`, `nostdlib`, `nostdinc`, `pic`, `pie`
-- Build metadata: `buildoption`, `buildoptions`
-
-## Project Creation and File Management
-
-### Create projects
+**Requirements:** Python 3.8+. Compilers depend on your targets.
 
 ```bash
-jenga project Game --kind console --lang C++ --location .
-jenga project Engine --kind static --lang C++
-jenga project Tools --kind shared --lang C++
+# From source (recommended for this repository)
+git clone https://github.com/RihenUniverse/Jenga.git
+cd Jenga
+pip install -e .
+
+# Or from a release artifact (GitHub Releases)
+pip install jenga-2.0.2-py3-none-any.whl
 ```
 
-### Create code elements in existing project
+Verify and launch:
 
 ```bash
-jenga project --element class --name Player --project Game
-jenga project --element struct --name Vec3 --project Engine
-jenga project --element enum --name ErrorCode --project Engine
-jenga project --element custom --name config.json --project Game --template json
+jenga --version
+jenga --help          # or: jenga.bat --help (Windows) / bash ./jenga.sh --help
 ```
 
-### Update `.jenga` quickly
+Full setup details: **[Installation wiki](https://github.com/RihenUniverse/Jenga/wiki/Installation)**.
+
+---
+
+## 🚀 Quick Start
 
 ```bash
-jenga file Game --src src/new_system.cpp
-jenga file Game --inc third_party/include
-jenga file Game --link opengl32
-jenga file Game --def ENABLE_LOGS=1
+# 1. Create a workspace and a project
+jenga workspace HelloWorkspace
+jenga project HelloApp --kind console --lang C++
+
+# 2. Build, run, test
+jenga build --config Debug
+jenga run HelloApp
+jenga test
 ```
 
-## External Project Integration
+Step-by-step: **[First Workspace wiki](https://github.com/RihenUniverse/Jenga/wiki/Premier-Workspace)**.
 
-The API includes external workspace inclusion and introspection helpers.
+---
 
-### Include one external `.jenga`
+## 📚 Documentation
+
+The full documentation lives in the **bilingual (FR / EN) [Wiki](https://github.com/RihenUniverse/Jenga/wiki)**. Source pages are versioned under [`Jenga/Docs/wiki/`](./Jenga/Docs/wiki/) and auto-published to the wiki on push to `main`.
+
+| Page | Description |
+|------|-------------|
+| [Home](https://github.com/RihenUniverse/Jenga/wiki/Home) | Wiki entry point |
+| [Installation](https://github.com/RihenUniverse/Jenga/wiki/Installation) | Install & prerequisites |
+| [First Workspace](https://github.com/RihenUniverse/Jenga/wiki/Premier-Workspace) | Your first `.jenga` project |
+| [CLI Commands](https://github.com/RihenUniverse/Jenga/wiki/Commandes-CLI) | All `jenga` commands |
+| [DSL Reference](https://github.com/RihenUniverse/Jenga/wiki/DSL-Reference) | Full DSL API |
+| [Toolchains & Sysroots](https://github.com/RihenUniverse/Jenga/wiki/Toolchains-et-Sysroots) | Custom/cross toolchains |
+| [Unitest Tests](https://github.com/RihenUniverse/Jenga/wiki/Tests-Unitest) | Built-in C++ testing |
+| [Automatic Documentation](https://github.com/RihenUniverse/Jenga/wiki/Documentation-Automatique) | `jenga docs` extractor |
+| [Packaging & Deployment](https://github.com/RihenUniverse/Jenga/wiki/Packaging-Deploiement-Publication) | MSI/EXE/DEB/PKG/APK/IPA/HAP… |
+| [Networking & Firewall](https://github.com/RihenUniverse/Jenga/wiki/Reseau-et-Pare-feu) | Install-time network permissions |
+| [HarmonyOS](https://github.com/RihenUniverse/Jenga/wiki/HarmonyOS) | OpenHarmony / HAP builds |
+| [Examples](https://github.com/RihenUniverse/Jenga/wiki/Exemples) | Sample workspaces |
+| [FAQ / Troubleshooting](https://github.com/RihenUniverse/Jenga/wiki/FAQ-Depannage) | Common issues |
+
+**Other documents:**
+- 🗺️ [Roadmap](./Jenga/Docs/ROADMAP.md) — done / in progress / to do
+- 📘 [Complete Guide](./Jenga/Docs/GUIDE_COMPLET_JENGA.md) — 20-chapter user guide
+- 🛠️ [Developer Guide](./Jenga/Docs/Jenga_Developer_Guide.md)
+
+---
+
+## ⚙️ CLI Overview
+
+```bash
+# Core workflow
+jenga build [--config Debug|Release] [--platform <os[-arch[-env]]>] [--target <project>]
+jenga run [project] | jenga test | jenga clean | jenga rebuild | jenga watch
+
+# Authoring
+jenga workspace [name]      jenga project <name> --kind console|windowed|static|shared|test
+jenga file [project] --src ... --inc ... --link ... --def ...
+jenga gen --cmake|--makefile|--vs2022|--xcode
+
+# Toolchains, packaging, distribution
+jenga install toolchain detect|list|install <name>
+jenga package --platform windows|linux|macos|android|ios|web [--type <pkg>]
+jenga deploy  --platform android|ios|xbox|...        jenga publish --registry nuget|...
+jenga docs extract        jenga bench        jenga examples list|copy
+```
+
+Aliases: `b`=build, `r`=run, `t`=test, `c`=clean, `w`=watch, `i`=info, `e`=examples, `d`=docs, `h`=help.
+Full reference: **[CLI wiki](https://github.com/RihenUniverse/Jenga/wiki/Commandes-CLI)**.
+
+---
+
+## 🌐 Networking & Firewall
+
+Jenga configures **network permissions automatically at install time**, on every platform, from a single DSL declaration — no more manually opening the firewall for LAN multiplayer games or local servers.
 
 ```python
-with workspace("App"):
-    with include("libs/math/math.jenga") as inc:
-        inc.only(["MathLib"])  # or inc.skip(["Tests"])
-
-    with project("AppMain"):
-        consoleapp()
-        dependson(["MathLib"])
+with project("MyGame"):
+    consoleapp()
+    networkenabled(True)                          # default inbound rule on the app
+    firewallrule(protocol="udp", ports=["7777"])  # optional custom rules
 ```
 
-### Include multiple files
+| Platform | Generated at install |
+|----------|----------------------|
+| Windows (MSI/EXE) | `netsh advfirewall` rule (all profiles), removed on uninstall |
+| macOS (PKG) | `socketfilterfw --add` postinstall |
+| Linux (DEB) | `postinst`/`postrm` via `ufw` / `firewall-cmd` / `iptables` |
+| Android | `INTERNET` + `ACCESS_NETWORK_STATE` + `ACCESS_WIFI_STATE` |
+| iOS | `NSLocalNetworkUsageDescription` + Bonjour keys |
+| HarmonyOS | `ohos.permission.INTERNET` + network info |
 
-```python
-with workspace("App"):
-    with batchinclude([
-        "libs/logger/logger.jenga",
-        "libs/math/math.jenga",
-    ]):
-        pass
-```
+Details: **[Networking & Firewall wiki](https://github.com/RihenUniverse/Jenga/wiki/Reseau-et-Pare-feu)**.
 
-### Introspection helpers
+---
 
-- `useproject(projectname, copyincludes=True, copydefines=True)`
-- `getprojectproperties(projectname=None)`
-- `includefromdirectory(directory, pattern="*.jenga")`
-- `listincludes()`, `getincludeinfo(projectname)`, `validateincludes()`
-- `getincludedprojects()`, `generatedependencyreport("DEPENDENCIES.md")`, `listallprojects()`
+## 📂 Examples
 
-## Toolchains and Sysroots
-
-### DSL-level custom tool definitions
-
-- `CreateAndroidNdkTool(ndkPath, apiLevel=21, arch="arm64-v8a")`
-- `CreateEmscriptenTool(emsdkPath)`
-- `CreateCustomGccTool(gccPath, version="")`
-
-### Tool registry helpers
-
-- `addtools(...)` context
-- `usetool(name)`, `listtools()`, `gettoolinfo(name)`, `validatetools()`
-
-### Sysroot setup helper script
-
-Repository includes `scripts/setup_linux_sysroot.py` to bootstrap a Linux sysroot for cross-compilation scenarios.
-
-## Documentation Extraction
-
-`jenga docs` is implemented in `Jenga/Commands/Docs.py`.
-
-### Supported source comment forms in extractor
-
-- Block comments: `/** ... */`
-- Line comments: `/// ...`
-- Doxygen-style tags parsing for:
-  - `@brief`
-  - `@param`
-  - `@tparam`
-  - `@return`, `@retval`
-  - `@throws`
-  - `@example`, `@code ... @endcode`
-  - `@note`, `@warning`, `@see`
-  - `@since`, `@deprecated`, `@author`, `@date`, `@complexity`
-
-### Typical usage
-
-```bash
-jenga docs extract
-jenga docs extract --project NKFramework --include-private --verbose
-jenga docs list
-jenga docs stats
-jenga docs clean
-```
-
-### Generated markdown structure
-
-```text
-docs/
-  <ProjectName>/
-    markdown/
-      index.md
-      api.md
-      search.md
-      stats.md
-      files/
-      namespaces/
-      types/
-```
-
-## Examples
-
-The `Exemples/` directory contains ready-to-use workspaces, including:
-
-- `01_hello_console`
-- `02_static_library`
-- `03_shared_library`
-- `04_unit_tests`
-- `05_android_ndk`
-- `07_web_wasm`
-- `14_cross_compile`
-- `21_zig_cross_compile`
-- `22_nk_multiplatform_sandbox`
-
-Use:
+27 ready-to-use workspaces live in [`Jenga/Exemples/`](./Jenga/Exemples/) — from `01_hello_console` to multi-platform sandboxes.
 
 ```bash
 jenga examples list
 jenga examples copy 01_hello_console ./hello_copy
 ```
 
-## Known Limitations
+---
 
-Current command/API surface is broad, but some parts are partial in code:
-
-- `jenga docs`:
-  - `--format html|pdf|all` is accepted, but generator currently implements markdown output path.
-  - `docs stats` currently prints minimal workspace-level stats.
-- `jenga publish`:
-  - NuGet flow is implemented.
-  - vcpkg/conan/npm/pypi/custom paths are placeholders.
-- `jenga profile`:
-  - Linux has a partial `perf` flow.
-  - Other platform implementations are mostly placeholders.
-- `jenga deploy`:
-  - Android/iOS/Xbox paths exist.
-  - Linux deploy is marked as not implemented.
-- Advanced packaging types depend on builder/tool availability on host system.
-
-## Repository Structure
+## 🗂️ Repository Structure
 
 ```text
 Jenga/
+  _version.py        # Single source of truth: version + publisher (Rihen)
+  Core/Api.py        # DSL (200+ functions)
+  Core/Builders/     # One builder per platform
+  Core/FirewallSpec.py  # Cross-platform network/firewall command generator
   Commands/          # CLI commands
-  Core/              # DSL, loader, cache, builder core
-  Core/Builders/     # Platform builders
-  Utils/             # Utilities
-  Unitest/           # Built-in C++ unit test framework assets
-Exemples/            # Sample projects
-scripts/             # Utility scripts (sysroot, wrappers)
-templates/           # Toolchain templates
-jenga.sh / jenga.bat # CLI launchers
+  Unitest/           # Built-in C++ test framework
+  Exemples/          # 27 sample workspaces
+  Docs/              # Guides, ROADMAP, wiki sources
+gitpush.sh / .bat    # Commit + push helpers (branch => wiki, --release => release)
+scripts/             # Utility scripts (sysroot, examples archive)
 ```
 
-## License
+---
 
-Proprietary License.
+## ⚠️ Known Limitations
 
-See repository policy and distribution terms defined by the project owner.
+- `jenga publish`: NuGet implemented; vcpkg/conan/npm/pypi are placeholders.
+- `jenga profile`: partial `perf` on Linux; other platforms mostly placeholders.
+- `jenga deploy`: Android/iOS/Xbox available; Linux not yet implemented.
+- Linux packaging: DEB implemented; RPM/AppImage/Snap pending.
+- Xbox requires Microsoft GDK; Switch/PlayStation require vendor SDKs.
 
-## Disclaimer
+See the [Roadmap](./Jenga/Docs/ROADMAP.md) for the full status.
 
-This software is provided "as is", without warranty of any kind.
-Use in production requires validation in your own toolchain and target environment.
+---
+
+## 👤 Publisher & License
+
+**Jenga** is a product developed and maintained by **Rihen**.
+
+- Author / Publisher: **Rihen** — <rihen.universe@gmail.com>
+- Repository: <https://github.com/RihenUniverse/Jenga>
+- License: **Proprietary** — see [`LICENSE`](./LICENSE).
+
+---
+
+## 📝 Disclaimer
+
+This software is provided "as is", without warranty of any kind. Production use requires validation in your own toolchain and target environment.

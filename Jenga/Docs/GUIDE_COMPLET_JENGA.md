@@ -1365,4 +1365,4 @@ winget install Microsoft.Gaming.GDK
 
 ---
 
-*Document généré par l'analyse complète du projet Jenga v2.0 — Février 2026*
+*Document généré par l'analyse complète du projet Jenga v2.0.2 — Février 2026*

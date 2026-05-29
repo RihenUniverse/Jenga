@@ -1,6 +1,6 @@
 # Jenga — Roadmap du projet
 
-**Version courante :** v2.0.1 (release du 23 février 2026)
+**Version courante :** v2.0.2 (réseau/pare-feu multi-plateforme, mai 2026)
 **Document rédigé :** 27 mai 2026
 **Auteur :** synthèse du code et des documents existants
 
@@ -238,7 +238,7 @@ D'après le `Readme.md` racine et la philosophie du projet :
 
 ---
 
-## 5. Ce qui a été fait (v2.0.1, février 2026)
+## 5. Ce qui a été fait (jusqu'à v2.0.2)
 
 ### 5.1 Cœur du build system
 
@@ -333,8 +333,8 @@ D'après le `Readme.md` racine et la philosophie du projet :
   Commandes CLI, Toolchains, Tests, Documentation auto, Packaging, FAQ
 - ✅ 27 exemples fonctionnels (`Jenga/Exemples/01_hello_console`
   → `27_nk_window`)
-- ✅ Rapport d'analyse v2.0 (3 bugs critiques corrigés, fonctionnalités
-  ajoutées documentées)
+- ✅ Analyse complète du code : 3 bugs critiques corrigés et documentés
+  (notes de version)
 
 ---
 
