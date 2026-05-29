@@ -15,6 +15,7 @@ Nomenclature : fonctions/classes en PascalCase ; variables locales en snake_case
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import struct
@@ -25,7 +26,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 MAGIC = b"JNGINST1"           # 8 octets
-TRAILER_SIZE = 48
+TRAILER_SIZE = 80            # 48 (entetes) + 32 (SHA-256 du payload)
 
 # Une entrée de fichier à embarquer : (arcName, cheminAbsolu, modePosix)
 FileEntry = Tuple[str, str, int]
@@ -165,11 +166,14 @@ def BuildInstaller(files: List[FileEntry],
     archive_off = manifest_off + len(manifest_bytes)
     payload = manifest_bytes + archive_bytes
     crc = zlib.crc32(payload) & 0xFFFFFFFF
+    # SHA-256 du payload : vérifié par le stub avant extraction (anti-tampering).
+    sha256 = hashlib.sha256(payload).digest()    # 32 octets
 
-    # 4. Trailer 48 octets : magic(8) + 4×u64 + crc(u32) + reserved(u32).
+    # 4. Trailer 80 octets : magic(8) + 4×u64 + crc(u32) + reserved(u32) + sha256(32).
     trailer = (MAGIC
                + struct.pack("<QQQQ", manifest_off, len(manifest_bytes), archive_off, entry_count)
-               + struct.pack("<II", crc, 0))
+               + struct.pack("<II", crc, 0)
+               + sha256)
     assert len(trailer) == TRAILER_SIZE, f"trailer={len(trailer)}"
 
     # 5. Écriture : stub + payload + trailer.
