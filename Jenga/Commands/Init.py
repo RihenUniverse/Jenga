@@ -93,13 +93,28 @@ class InitCommand:
             archs=args.archs.split(','),
         )
         FileSystem.WriteFile(entry_file, content)
+
+        # Generer les fichiers de coloration syntaxique / config IDE pour le
+        # .jenga (traite comme du Python), comme c'est fait au 1er `jenga build`.
+        InitCommand._ConfigureIDE(workspace_root)
+
         Colored.PrintSuccess(f"Workspace '{workspace_name}' created at {entry_file}")
         return 0
 
     @staticmethod
+    def _ConfigureIDE(workspace_root: Path) -> None:
+        """Genere les fichiers de coloration/IDE du .jenga (non bloquant)."""
+        try:
+            from ..Core.IDEConfigurator import AutoConfigure
+            AutoConfigure(workspace_root, force=False, verbose=False)
+        except Exception:
+            pass  # la creation du workspace reste prioritaire
+
+    @staticmethod
     def _RunInteractive(args) -> int:
         """Création interactive (questions/réponses)."""
-        Display.PrintBanner()
+        # NB: la banniere est deja affichee par le dispatcher CLI (Jenga.py),
+        # on ne la re-affiche pas ici (evite le doublon).
         Display.Section("Create a new Jenga workspace")
 
         # 1. Nom du workspace
@@ -191,19 +206,17 @@ class InitCommand:
             print(f"  Project:      {project_name} ({project_kind})")
         print(f"  Unit tests:   {'Yes' if use_tests else 'No'}")
 
-        # Directory structure preview
+        # Directory structure preview — reflete la VRAIE structure : le projet
+        # vit dans un sous-dossier <project_name>/ du workspace.
         print(f"\n  Directory structure:")
         print(f"  {workspace_root.name}/")
         print(f"  +-- {name}.jenga")
         if project_name:
-            print(f"  +-- src/")
-            if standard.startswith("C++"):
-                print(f"  |   +-- main.cpp")
-            else:
-                print(f"  |   +-- main.c")
-            print(f"  +-- include/")
-        if use_tests:
-            print(f"  +-- tests/")
+            ext = "cpp" if standard.startswith("C++") else "c"
+            print(f"  +-- {project_name}/")
+            print(f"  |   +-- src/")
+            print(f"  |   |   +-- main.{ext}")
+            print(f"  |   +-- include/")
 
         print()
         if not Display.PromptYesNo("Create workspace?", default=True):

@@ -494,13 +494,14 @@ public:
         }
         kind_fn = kind_to_dsl.get(kind_enum, "consoleapp")
 
-        # Determine dialect DSL call
+        # Determine dialect DSL call (indente a 8 espaces : contenu du projet,
+        # lui-meme indente a 4 dans le bloc `with workspace(...)`).
         dialect_line = ""
         if dialect:
             if lang_enum.value in ("C++", "Objective-C++"):
-                dialect_line = f'\n    cppdialect("{dialect}")'
+                dialect_line = f'\n        cppdialect("{dialect}")'
             else:
-                dialect_line = f'\n    cdialect("{dialect}")'
+                dialect_line = f'\n        cdialect("{dialect}")'
 
         # Determine file extensions based on language
         if lang_enum.value in ("C++", "Objective-C++"):
@@ -508,17 +509,17 @@ public:
         else:
             files_pattern = 'files(["src/**.c", "include/**.h"])'
 
+        # Le bloc projet est INDENTE (4 espaces) pour vivre A L'INTERIEUR du
+        # `with workspace(...):`. Pas de shebang/coding (le fichier en a deja
+        # un en tete). On ajoute une ligne vide de separation avant le bloc.
         with open(entry_file, 'a', encoding='utf-8') as f:
-            f.write(f'''#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-                    
-# Project: {name}
-
-with project("{name}"):
-    {kind_fn}()
-    language("{lang_enum.value}"){dialect_line}
-    location("{location}")
-    {files_pattern}
+            f.write(f'''
+    # Project: {name}
+    with project("{name}"):
+        {kind_fn}()
+        language("{lang_enum.value}"){dialect_line}
+        location("{location}")
+        {files_pattern}
 ''')
 
     @staticmethod
