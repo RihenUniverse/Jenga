@@ -26,12 +26,12 @@ class InitCommand:
             prog="jenga workspace",
             description="Create a new Jenga workspace.",
             epilog="Examples:\n"
-                   "  jenga workspace MyGame\n"
-                   "  jenga workspace --interactive\n"
-                   "  jenga workspace --path ./projects/MyLib"
+                   "  jenga workspace MyGame             # -> ./MyGame/MyGame.jenga\n"
+                   "  jenga workspace MyGame --path apps # -> apps/MyGame/MyGame.jenga\n"
+                   "  jenga workspace --interactive"
         )
         parser.add_argument("name", nargs="?", help="Workspace name")
-        parser.add_argument("--path", default=".", help="Directory where to create the workspace (default: current)")
+        parser.add_argument("--path", default=".", help="Parent directory; the workspace is created in <path>/<name>/ (default: .)")
         parser.add_argument("--configs", default="Debug,Release", help="Comma-separated build configurations (default: Debug,Release)")
         parser.add_argument("--oses", default="Windows,Linux,macOS", help="Comma-separated target OSes (default: Windows,Linux,macOS)")
         parser.add_argument("--archs", default="x86_64", help="Comma-separated target architectures (default: x86_64)")
@@ -51,20 +51,38 @@ class InitCommand:
             return InitCommand._RunDirect(parsed)
 
     @staticmethod
+    def _ResolveWorkspaceRoot(path: str, name: str) -> Path:
+        """Le workspace est cree dans un dossier portant SON nom, sous `path`.
+
+          --path "."      -> ./<name>
+          --path "apps"   -> apps/<name>
+          --path <absolu> -> <absolu>/<name>
+
+        Deduplication : si le dernier segment de `path` est deja <name>
+        (ex: --path ./<name>), on ne re-ajoute pas le segment."""
+        base = Path(path or ".")
+        if base.name == name:
+            return base.resolve()
+        return (base / name).resolve()
+
+    @staticmethod
     def _RunDirect(args) -> int:
         """Création directe avec arguments."""
-        workspace_root = Path(args.path).resolve()
         workspace_name = args.name
+        # Le workspace vit dans un dossier portant SON nom (sous --path), pour
+        # que les projets crees ensuite tombent dans <name>/<projet>.
+        workspace_root = InitCommand._ResolveWorkspaceRoot(args.path, workspace_name)
 
-        # Vérifier si le répertoire existe déjà
-        if not workspace_root.exists():
-            FileSystem.MakeDirectory(workspace_root)
-        else:
-            # Vérifier s'il y a déjà un workspace
-            existing = FileSystem.FindWorkspaceEntry(workspace_root)
+        # Vérifier s'il existe déjà un workspace DANS ce dossier précis
+        # (on ne remonte pas : un workspace parent ne doit pas bloquer).
+        if workspace_root.exists():
+            existing = [f for f in workspace_root.glob("*.jenga") if f.is_file()]
             if existing:
-                Colored.PrintError(f"A workspace already exists at {existing.parent}")
+                Colored.PrintError(
+                    f"A workspace already exists in {workspace_root} ({existing[0].name})")
                 return 1
+        else:
+            FileSystem.MakeDirectory(workspace_root)
 
         # Générer le fichier .jenga
         entry_file = workspace_root / f"{workspace_name}.jenga"
@@ -90,10 +108,10 @@ class InitCommand:
         if not name:
             name = default_name
 
-        # 2. Chemin
+        # 2. Chemin (dossier PARENT ; le workspace est cree dans <path>/<name>)
         default_path = "."
-        path = Display.Prompt("Directory to create workspace", default=default_path)
-        workspace_root = Path(path).resolve()
+        path = Display.Prompt("Parent directory (workspace goes in <path>/<name>)", default=default_path)
+        workspace_root = InitCommand._ResolveWorkspaceRoot(path, name)
 
         # 3. Configurations
         all_configs = ["Debug", "Release", "Profile", "Distribution"]
