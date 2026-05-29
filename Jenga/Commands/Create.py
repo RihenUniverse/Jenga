@@ -244,6 +244,8 @@ class CreateCommand:
         project_root = Path(entry_file.parent) / relative_location
         print(f"\n  Structure:")
         print(f"  {relative_location}/")
+        if separate:
+            print(f"  +-- {name}.jenga   (projet inclus via include)")
         if create_dirs:
             print(f"  +-- src/")
             if create_files:

@@ -97,6 +97,10 @@ class InitCommand:
         # Generer les fichiers de coloration syntaxique / config IDE pour le
         # .jenga (traite comme du Python), comme c'est fait au 1er `jenga build`.
         InitCommand._ConfigureIDE(workspace_root)
+        # .gitignore de base : les fichiers IDE generes contiennent des chemins
+        # ABSOLUS machine-specifiques (extraPaths -> install Jenga) ; on les
+        # exclut du versionnement pour ne pas casser la config des autres.
+        InitCommand._EnsureWorkspaceGitignore(workspace_root)
 
         Colored.PrintSuccess(f"Workspace '{workspace_name}' created at {entry_file}")
         return 0
@@ -109,6 +113,37 @@ class InitCommand:
             AutoConfigure(workspace_root, force=False, verbose=False)
         except Exception:
             pass  # la creation du workspace reste prioritaire
+
+    @staticmethod
+    def _EnsureWorkspaceGitignore(workspace_root: Path) -> None:
+        """Cree un .gitignore de base (s'il n'existe pas deja).
+
+        Les fichiers IDE generes par Jenga (.vscode/settings.json,
+        pyrightconfig.json) contiennent un `extraPaths` ABSOLU vers l'install
+        Jenga, donc machine-specifique : ils sont regeneres localement a chaque
+        build et NE doivent PAS etre versionnes/partages. On les ignore, avec
+        les artefacts de build et caches."""
+        gitignore = workspace_root / ".gitignore"
+        if gitignore.exists():
+            return  # ne pas ecraser un .gitignore existant
+        content = '''# Genere par Jenga a la creation du workspace.
+
+# Config IDE locale (chemins machine-specifiques -> regeneree a chaque build)
+.vscode/
+pyrightconfig.json
+
+# Artefacts de build et caches Jenga
+Build/
+.jenga/
+
+# Python
+__pycache__/
+*.py[cod]
+'''
+        try:
+            FileSystem.WriteFile(gitignore, content)
+        except Exception:
+            pass
 
     @staticmethod
     def _RunInteractive(args) -> int:
@@ -219,6 +254,8 @@ class InitCommand:
         if project_name:
             ext = "cpp" if standard.startswith("C++") else "c"
             print(f"  +-- {project_name}/")
+            if project_separate:
+                print(f"  |   +-- {project_name}.jenga   (projet inclus via include)")
             print(f"  |   +-- src/")
             print(f"  |   |   +-- main.{ext}")
             print(f"  |   +-- include/")
